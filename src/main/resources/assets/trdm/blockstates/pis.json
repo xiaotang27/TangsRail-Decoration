@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "trdm:block/pids_rv", "y": 270 },
+    "facing=east": { "model": "trdm:block/pids_rv", "y": 0 },
+    "facing=south": { "model": "trdm:block/pids_rv", "y": 90 },
+    "facing=west": { "model": "trdm:block/pids_rv", "y": 180 }
+  }
+}

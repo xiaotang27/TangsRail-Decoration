@@ -1,0 +1,15 @@
+# 统一换行，避免 Windows/Linux 之间来回改整份文件
+* text=auto eol=lf
+
+# Windows 脚本必须是 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+gradlew text eol=lf
+
+# 二进制资源，不做换行转换也不做文本 diff
+*.jar binary
+*.png binary
+*.ttf binary
+*.ogg binary
+*.mp4 binary
+*.zip binary

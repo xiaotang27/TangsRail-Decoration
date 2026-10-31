@@ -1,0 +1,43 @@
+{
+  "credit": "占位模型：贴墙/落地的小控制箱。等正式贴图来了直接换 textures 或整个换掉本文件（物品模型用 trdm:block/psd_control，别改文件名）。",
+  "textures": {
+    "particle": "minecraft:block/iron_block",
+    "body": "minecraft:block/iron_block",
+    "panel": "minecraft:block/polished_blackstone",
+    "screen": "minecraft:block/lime_concrete"
+  },
+  "elements": [
+    {
+      "from": [1, 0, 1],
+      "to": [15, 3, 15],
+      "faces": {
+        "down": { "uv": [0, 0, 14, 14], "texture": "#body" },
+        "up": { "uv": [0, 0, 14, 14], "texture": "#body" },
+        "north": { "uv": [0, 0, 14, 3], "texture": "#body" },
+        "south": { "uv": [0, 0, 14, 3], "texture": "#body" },
+        "west": { "uv": [0, 0, 14, 3], "texture": "#body" },
+        "east": { "uv": [0, 0, 14, 3], "texture": "#body" }
+      }
+    },
+    {
+      "from": [2, 3, 2],
+      "to": [14, 13, 14],
+      "faces": {
+        "down": { "uv": [0, 0, 12, 12], "texture": "#panel" },
+        "up": { "uv": [0, 0, 12, 12], "texture": "#panel" },
+        "north": { "uv": [0, 0, 12, 10], "texture": "#panel" },
+        "south": { "uv": [0, 0, 12, 10], "texture": "#panel" },
+        "west": { "uv": [0, 0, 12, 10], "texture": "#panel" },
+        "east": { "uv": [0, 0, 12, 10], "texture": "#panel" }
+      }
+    },
+    {
+      "from": [4, 5, 1.9],
+      "to": [12, 11, 2],
+      "faces": {
+        "north": { "uv": [0, 0, 8, 6], "texture": "#screen" },
+        "south": { "uv": [0, 0, 8, 6], "texture": "#screen" }
+      }
+    }
+  ]
+}

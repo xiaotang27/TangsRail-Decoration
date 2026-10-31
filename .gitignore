@@ -1,0 +1,30 @@
+# ===== Gradle =====
+.gradle/
+build/
+
+# ===== 本机专属配置（绝对路径 / 代理 / 本地素材位置）=====
+local.properties
+
+# ===== IDE =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.code-workspace
+
+# ===== 开发运行目录（含世界存档、日志、别人发的 mod jar，绝不能进仓库）=====
+run/
+logs/
+crash-reports/
+
+# ===== 本机放第三方素材的地方（见 local.properties.example）=====
+/fonts/
+/jcm/
+/libs/
+
+# ===== 系统杂项 =====
+*.log
+*.bak
+Thumbs.db
+.DS_Store

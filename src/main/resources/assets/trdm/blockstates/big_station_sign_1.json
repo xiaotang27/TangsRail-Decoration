@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "trdm:block/station_sign_empty"
+    }
+  }
+}

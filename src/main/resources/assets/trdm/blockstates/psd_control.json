@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "trdm:block/psd_control"
+    }
+  }
+}

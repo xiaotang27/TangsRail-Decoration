@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "trdm:block/rv_pids_pole_extended" }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "trdm",
+  "version": "${version}",
+  "name": "TangsRail Decoration",
+  "description": "Extend the railway facilities for Minecraft Transit Railway.",
+  "authors": [
+    "Xiaotang27"
+  ],
+  "contact": {
+    "homepage": "https://www.xiaotang27.top"
+  },
+  "license": "MIT",
+  "icon": "assets/trdm/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "top.xiaotang27.trdm.Trdm"
+    ],
+    "client": [
+      "top.xiaotang27.trdm.TrdmClient"
+    ],
+    "modmenu": [
+      "top.xiaotang27.trdm.client.TrdmModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "trdm.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~1.20.1",
+    "java": ">=17",
+    "fabric-api": "*",
+    "mtr": "<4.0.0"
+  }
+}

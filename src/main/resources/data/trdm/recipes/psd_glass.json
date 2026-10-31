@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["IGI", "IGI", "III"],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "G": { "item": "minecraft:glass_pane" }
+  },
+  "result": { "item": "trdm:psd_glass_1" }
+}

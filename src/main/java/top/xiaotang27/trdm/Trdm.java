@@ -1,0 +1,166 @@
+package top.xiaotang27.trdm;
+
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import top.xiaotang27.trdm.block.BlockTrdmBigStationSign;
+import top.xiaotang27.trdm.block.BlockTrdmHungBigSign;
+import top.xiaotang27.trdm.block.BlockTrdmPSDControl;
+import top.xiaotang27.trdm.block.BlockTrdmPSDDoor;
+import top.xiaotang27.trdm.block.BlockTrdmPSDGlass;
+import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
+import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
+import top.xiaotang27.trdm.block.BlockTrdmPis;
+import top.xiaotang27.trdm.block.BlockTrdmPisPole;
+import top.xiaotang27.trdm.block.BlockTrdmStationSign;
+import top.xiaotang27.trdm.item.ItemTrdmPSD;
+import top.xiaotang27.trdm.item.ItemTrdmBigSign;
+import top.xiaotang27.trdm.control.PsdManualHold;
+import top.xiaotang27.trdm.net.TrdmControlNetwork;
+
+/**
+ * TangsRail Decoration (TRD) — 主入口。
+ * <p>
+ * 第一版内容：把 MTR 的整套全高屏蔽门（门扇 / 玻璃 / 端头玻璃 / 门楣）移植到 TRD 自己的命名空间。
+ * 方块仍然继承 MTR 的 BlockPSDAPGDoorBase / BlockPSDAPGGlassBase / BlockPSDAPGGlassEndBase
+ * （TrainServer 的开门逻辑认的是这些基类），但类本身、BE、渲染器、blockstate 全部归 TRD 所有，
+ * 后续可以独立修改。
+ * <p>
+ * 只保留一套站台门（{@code TRD站台门}）；以前那套「样式 2」的门扇 / 玻璃 / 端头玻璃已经删除，
+ * 注册 id 沿用 {@code psd_door_1} 之类，老存档里已经放下的方块照常工作 —— 物品名不再带样式号。
+ * 吊版 / 玻璃装饰线的具体样式不在这里注册，而是<b>每个门楣单独选</b>（蹲下 + 刷子右键屏蔽门）。
+ */
+public class Trdm implements ModInitializer {
+
+    public static final String MOD_ID = "trdm";
+    public static final Logger LOGGER = LoggerFactory.getLogger("TangsRail Decoration");
+
+    // 方块：一套门扇、玻璃、端头玻璃，外加一格门楣
+    public static final BlockTrdmPSDDoor PSD_DOOR_1 = new BlockTrdmPSDDoor();
+    public static final BlockTrdmPSDGlass PSD_GLASS_1 = new BlockTrdmPSDGlass();
+    public static final BlockTrdmPSDGlassEnd PSD_GLASS_END_1 = new BlockTrdmPSDGlassEnd();
+    public static final BlockTrdmPSDTop PSD_TOP = new BlockTrdmPSDTop();
+    /** 屏蔽门集控装置：刷子右键选站台，空手右键开关该站台所有屏蔽门。 */
+    public static final BlockTrdmPSDControl PSD_CONTROL = new BlockTrdmPSDControl();
+    /** 站名牌：显示本站 / 下一站 / 线路色带，刷子右键选站台。 */
+    public static final BlockTrdmStationSign STATION_SIGN = new BlockTrdmStationSign();
+    /** 大站名牌：深灰横牌，标志 + 线路编号 + 站名 + 出口字母；站 / ZHAN 与无障碍电梯牌都在刷子菜单里切。 */
+    public static final BlockTrdmBigStationSign BIG_SIGN_1 = new BlockTrdmBigStationSign();
+    /** 悬挂式站外站名牌：内容同上，吊在天花板下，单面有字、自发光。 */
+    public static final BlockTrdmHungBigSign HUNG_SIGN = new BlockTrdmHungBigSign();
+    /** PIS 乘客信息屏：16:9 吊挂横屏，内容由 MTR3 到站数据实时绘制。 */
+    public static final BlockTrdmPis PIS = new BlockTrdmPis();
+    /** 显示屏柱：单独一格的立杆，用来把 PIS 架高。 */
+    public static final BlockTrdmPisPole PIS_POLE = new BlockTrdmPisPole();
+
+    // 物品（与 MTR 一致：门楣没有独立物品，用玻璃物品放置）
+    public static final ItemTrdmPSD PSD_DOOR_ITEM_1 = new ItemTrdmPSD(ItemTrdmPSD.Kind.DOOR);
+    public static final ItemTrdmPSD PSD_GLASS_ITEM_1 = new ItemTrdmPSD(ItemTrdmPSD.Kind.GLASS);
+    public static final ItemTrdmPSD PSD_GLASS_END_ITEM_1 = new ItemTrdmPSD(ItemTrdmPSD.Kind.GLASS_END);
+    public static final Item PSD_CONTROL_ITEM = new BlockItem(PSD_CONTROL, new Item.Properties());
+    public static final Item STATION_SIGN_ITEM = new BlockItem(STATION_SIGN, new Item.Properties());
+    public static final Item BIG_SIGN_ITEM_1 = new ItemTrdmBigSign(BIG_SIGN_1);
+    public static final Item HUNG_SIGN_ITEM = new ItemTrdmBigSign(HUNG_SIGN);
+    public static final Item PIS_ITEM = new BlockItem(PIS, new Item.Properties());
+    public static final Item PIS_POLE_ITEM = new BlockItem(PIS_POLE, new Item.Properties());
+
+    public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
+    public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
+    public static BlockEntityType<BlockTrdmPSDControl.TileEntityTrdmPSDControl> PSD_CONTROL_BE;
+    public static BlockEntityType<BlockTrdmStationSign.TileEntityTrdmStationSign> STATION_SIGN_BE;
+    public static BlockEntityType<BlockTrdmBigStationSign.TileEntityTrdmBigStationSign> BIG_SIGN_1_BE;
+    public static BlockEntityType<BlockTrdmHungBigSign.TileEntityTrdmHungBigSign> HUNG_SIGN_BE;
+    public static BlockEntityType<BlockTrdmPis.TileEntityTrdmPis> PIS_BE;
+
+    public static CreativeModeTab CREATIVE_TAB;
+
+    @Override
+    public void onInitialize() {
+        registerBlock("psd_door_1", PSD_DOOR_1);
+        registerBlock("psd_glass_1", PSD_GLASS_1);
+        registerBlock("psd_glass_end_1", PSD_GLASS_END_1);
+        registerBlock("psd_top", PSD_TOP);
+        registerBlock("psd_control", PSD_CONTROL);
+        registerBlock("station_sign", STATION_SIGN);
+        registerBlock("big_station_sign_1", BIG_SIGN_1);
+        registerBlock("hung_big_station_sign", HUNG_SIGN);
+        registerBlock("pis", PIS);
+        registerBlock("pis_pole", PIS_POLE);
+
+        registerItem("psd_door_1", PSD_DOOR_ITEM_1);
+        registerItem("psd_glass_1", PSD_GLASS_ITEM_1);
+        registerItem("psd_glass_end_1", PSD_GLASS_END_ITEM_1);
+        registerItem("psd_control", PSD_CONTROL_ITEM);
+        registerItem("station_sign", STATION_SIGN_ITEM);
+        registerItem("big_station_sign_1", BIG_SIGN_ITEM_1);
+        registerItem("hung_big_station_sign", HUNG_SIGN_ITEM);
+        registerItem("pis", PIS_ITEM);
+        registerItem("pis_pole", PIS_POLE_ITEM);
+
+        PSD_DOOR_1_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_door_1"),
+                BlockEntityType.Builder.of(BlockTrdmPSDDoor.TileEntityTrdmPSDDoor::new, PSD_DOOR_1).build(null));
+        PSD_TOP_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_top"),
+                BlockEntityType.Builder.of(BlockTrdmPSDTop.TileEntityTrdmPSDTop::new, PSD_TOP).build(null));
+        PSD_CONTROL_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_control"),
+                BlockEntityType.Builder.of(BlockTrdmPSDControl.TileEntityTrdmPSDControl::new, PSD_CONTROL).build(null));
+        STATION_SIGN_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("station_sign"),
+                BlockEntityType.Builder.of(BlockTrdmStationSign.TileEntityTrdmStationSign::new, STATION_SIGN).build(null));
+        BIG_SIGN_1_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("big_station_sign_1"),
+                BlockEntityType.Builder.of(BlockTrdmBigStationSign.TileEntityTrdmBigStationSign::new, BIG_SIGN_1).build(null));
+        HUNG_SIGN_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("hung_big_station_sign"),
+                BlockEntityType.Builder.of(BlockTrdmHungBigSign.TileEntityTrdmHungBigSign::new, HUNG_SIGN).build(null));
+        PIS_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("pis"),
+                BlockEntityType.Builder.of(BlockTrdmPis.TileEntityTrdmPis::new, PIS).build(null));
+
+        // C2S：刷子右键选完站台 → 写回集控装置；门楣外观 / 大站名牌选项同理
+        TrdmControlNetwork.registerServer();
+        // 服务端全局 tick：手动开门保持着的时候，每 tick 把门压回开启（列车逻辑改不动它）
+        PsdManualHold.registerServerTick();
+
+        CREATIVE_TAB = Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, id(MOD_ID),
+                FabricItemGroup.builder()
+                        .icon(() -> new ItemStack(PSD_DOOR_ITEM_1))
+                        .title(Component.translatable("itemGroup.trdm"))
+                        .build());
+        ItemGroupEvents.modifyEntriesEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB, id(MOD_ID)))
+                .register(entries -> {
+                    entries.accept(new ItemStack(PSD_DOOR_ITEM_1));
+                    entries.accept(new ItemStack(PSD_GLASS_ITEM_1));
+                    entries.accept(new ItemStack(PSD_GLASS_END_ITEM_1));
+                    entries.accept(new ItemStack(PSD_CONTROL_ITEM));
+                    entries.accept(new ItemStack(STATION_SIGN_ITEM));
+                    entries.accept(new ItemStack(BIG_SIGN_ITEM_1));
+                    entries.accept(new ItemStack(HUNG_SIGN_ITEM));
+                    entries.accept(new ItemStack(PIS_ITEM));
+                    entries.accept(new ItemStack(PIS_POLE_ITEM));
+                });
+
+        LOGGER.info("TangsRail Decoration initialized —— Version DEV_0.01");
+    }
+
+    public static ResourceLocation id(String path) {
+        return new ResourceLocation(MOD_ID, path);
+    }
+
+    private static void registerBlock(String path, Block block) {
+        Registry.register(BuiltInRegistries.BLOCK, id(path), block);
+    }
+
+    private static void registerItem(String path, Item item) {
+        Registry.register(BuiltInRegistries.ITEM, id(path), item);
+    }
+}

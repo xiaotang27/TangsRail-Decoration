@@ -1,0 +1,324 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap' version "1.17.19"
+    id 'maven-publish'
+}
+
+group = "top.xiaotang27.trdm"
+version = "DEV_0.1"
+
+// ===== 本机专属配置 =====
+// 依赖 jar 的路径、本地素材位置这些「每台机器都不一样」的值不进仓库，写在 mod 根目录的
+// local.properties（已在 .gitignore 里，模板见 local.properties.example）。
+// 取值顺序：local.properties → 环境变量 → 约定好的同级目录。
+def localProps = new Properties()
+def localPropsFile = file('local.properties')
+if (localPropsFile.isFile()) {
+    localPropsFile.withInputStream { stream -> localProps.load(stream) }
+}
+
+def localPath = { String key, String environment, String fallback ->
+    file(localProps.getProperty(key) ?: System.getenv(environment) ?: fallback)
+}
+
+def yomimtrJar = localPath('yomimtr_jar', 'YOMIMTR_JAR', '../libs/MTR-fabric-1.20.1-3.6.3.jar')
+def architecturyJar = localPath('architectury_jar', 'ARCHITECTURY_JAR', '../libs/architectury-9.2.14-fabric.jar')
+def pisFontSource = localPath('pis_font_source', 'PIS_FONT_SOURCE', '../fonts/SourceHanSansHWSC-VF.ttf')
+def jcmPisTextures = localPath('jcm_pis_textures', 'JCM_PIS_TEXTURES',
+        '../jcm/TJPIS_1.0/assets/jsblock/textures')
+
+def requireJar = { File jarFile, String key ->
+    if (!jarFile.isFile()) {
+        throw new GradleException("找不到依赖 jar：${jarFile}\n" +
+                "  在 ${projectDir}${File.separator}local.properties 里加一行：${key}=<jar 的绝对路径>\n" +
+                "  模板见 ${projectDir}${File.separator}local.properties.example")
+    }
+    jarFile
+}
+
+repositories {
+    // 国内镜像优先，缓解 mavenCentral / gradlePluginPortal 拉取慢的问题。
+    // Fabric 专属坐标（fabric-loader / fabric-api / fabric-loom）仍由 loom 自动注入的
+    // maven.fabricmc.net 提供，这里不用重复声明。
+    maven { url = "https://maven.aliyun.com/repository/public" }
+    maven { url = "https://maven.aliyun.com/repository/gradle-plugin" }
+    maven { url = "https://maven.terraformersmc.com/releases/" }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.20.1"
+    // 官方 Mojang 映射（mojmap）：Fabric 1.x 时代全用 mojmap，不用 yarn。
+    // 注意：mojmap 工程里类名是 BuiltInRegistries/Item.Properties/CommandSourceStack 等，
+    // 与社区教程常见的 Yarn 名（Registries/Item.Settings/ServerCommandStack）不同，勿混用。
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:0.19.3"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.92.11+1.20.1"
+
+    // YomiMTR（mod id "mtr"）：生产版 jar 由 Loom 从 intermediary 重映射到 named。
+    // 路径来自 local.properties 的 yomimtr_jar。
+    modImplementation files(requireJar(yomimtrJar, 'yomimtr_jar'))
+
+    // YMTR 自己的 fabric.mod.json 没声明 Architectury，但它的客户端入口
+    // mtr.MTRFabricClient -> mtr.MTRClient.init -> RegistryUtilitiesClient.registerClientTickEvent
+    // 直接引用 dev.architectury.event.events.client.ClientTickEvent。
+    // 少了它 runClient 会在 client 入口阶段崩（NoClassDefFoundError）。
+    // 正式游戏实例里玩家也是手动装 architectury，这里等价地把 9.2.14 放进开发 runtime。
+    modImplementation files(requireJar(architecturyJar, 'architectury_jar'))
+
+    // PIS 广告的 mp4 播放：JCodec 纯 Java 解 H.264/MP4，不带任何原生库。
+    // 用 include 夹进 jar（Fabric 的 jar-in-jar），玩家不用另外装。
+    implementation include("org.jcodec:jcodec:0.2.5")
+    implementation include("org.jcodec:jcodec-javase:0.2.5")
+    // ModMenu：编译期依赖，装了才加载入口
+    modCompileOnly "com.terraformersmc:modmenu:7.2.2"
+
+}
+
+processResources {
+    // 把 Gradle version 展开进 fabric.mod.json 的 ${version}。
+    filesMatching('fabric.mod.json') {
+        expand "version": version
+    }
+}
+
+// 每个 jar 都夹带许可证与第三方声明：MIT 正文 + MTR/思源黑体/JCodec 的声明，
+// 这样从 Release 下载的 jar 单独拿出去也满足许可要求。
+jar {
+    from('LICENSE') { into 'META-INF' }
+    from('THIRD-PARTY-NOTICES.md') { into 'META-INF' }
+}
+
+// 目标 Java 版本用 toolchain 声明：环境 JDK 低于目标（例如环境是 17、目标是 21）时，
+// 只有 toolchain 会让 foojay 自动 provision 对应 JDK，否则 javac 报「不支持发行版本」。
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+// 一次性工具：重新生成站点信息吊板的箭头素材（assets/trdm/textures/block/sign/arrow.png）。
+// 生成后可以直接用同尺寸 PNG 覆盖，渲染端把它当黑色剪影蒙版用。
+tasks.register('generateArrowAsset', JavaExec) {
+    group = 'trdm'
+    description = 'Regenerates the default door-header arrow asset'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.ArrowAssetGenerator'
+}
+
+// 一次性工具：检查 assets/trdm/textures/block/sign/ 下素材的透明度构成（决定渲染端按 alpha 还是按亮度取蒙版）。
+tasks.register('inspectSignAssets', JavaExec) {
+    group = 'trdm'
+    description = 'Prints alpha statistics for the sign icon assets'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.SignAssetInspector'
+}
+
+// 一次性工具：把参考图按 build/preview/crops.txt 裁成放大裁剪图，输出到 build/preview/。
+tasks.register('cropImage', JavaExec) {
+    group = 'trdm'
+    description = 'Crops reference images according to build/preview/crops.txt'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.ImageCrop'
+    def specs = file('build/preview/crops.txt')
+    inputs.files(specs)
+    doFirst {
+        args = [specs.absolutePath, file('build/preview').absolutePath]
+    }
+}
+
+// 一次性工具：按 build/preview/scan.txt 扫描参考图的行/列，打印颜色区间，用来量尺寸。
+tasks.register('pixelScan', JavaExec) {
+    group = 'trdm'
+    description = 'Scans rows/columns of a reference image according to build/preview/scan.txt'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.PixelScan'
+    def specs = file('build/preview/scan.txt')
+    inputs.files(specs)
+    doFirst {
+        args = [specs.absolutePath]
+    }
+}
+
+// 一次性工具：打印 YMTR 里某个类（含嵌套类）的字段/方法签名。
+tasks.register('inspectClass', JavaExec) {
+    group = 'trdm'
+    description = 'Prints fields and methods of the given classes (-Pcls=a,b)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.ClassInspector'
+    doFirst {
+        args = (project.findProperty('cls') ?: '').toString().split(',').findAll { !it.isBlank() }
+    }
+}
+
+// 一次性工具：导出/摘要 jar 里的资源（看原版模型长什么样）。
+tasks.register('jarDump', JavaExec) {
+    group = 'trdm'
+    description = 'Dumps jar entries (-Pjar=path -Pprefix=assets/mtr/models/block/psd_top [-PlistOnly=true])'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.JarDump'
+    doFirst {
+        args = [(project.findProperty('jar') ?: '').toString(),
+                (project.findProperty('prefix') ?: '').toString(),
+                (project.findProperty('listOnly') ?: 'false').toString()]
+    }
+}
+
+// 一次性工具：从参考图里抠出装饰带中央的「文字 + logo」图（去洋红底 → 透明 PNG）。
+tasks.register('extractBandCenter', JavaExec) {
+    group = 'trdm'
+    description = 'Extracts the band centre artwork from a reference screenshot (-Pinput= -Pout= -Pbox=x0,y0,x1,y1)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.BandCenterExtractor'
+    doFirst {
+        args = [(project.findProperty('input') ?: '').toString(),
+                (project.findProperty('out') ?: 'src/main/resources/assets/trdm/textures/block/band/band_center.png').toString(),
+                (project.findProperty('box') ?: '').toString()]
+    }
+}
+
+// 一次性工具：离线预览「开往 / 下一站」站点信息吊板（核对长玻璃段是否被拉伸）。
+tasks.register('previewStationInfo', JavaExec) {
+    group = 'trdm'
+    description = 'Renders preview PNGs of the station info panels for 2..8 glass blocks'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.StationInfoPreview'
+}
+
+// 一次性工具：离线预览玻璃装饰带的版面，输出到 build/preview/。
+tasks.register('previewBand', JavaExec) {
+    group = 'trdm'
+    description = 'Renders preview PNGs of the PSD glass decal band'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.BandCenterPreview'
+}
+
+// 一次性工具：离线预览线路图吊板（不开游戏），输出到 build/preview/。
+tasks.register('previewRouteMap', JavaExec) {
+    group = 'trdm'
+    description = 'Renders a preview PNG of the route map panel (-Paspect=4.57 -ParrowLeft=true)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.RouteMapPreview'
+    doFirst {
+        args = [(project.findProperty('aspect') ?: 'natural').toString(),
+                (project.findProperty('arrowLeft') ?: 'true').toString()]
+    }
+}
+
+// 一次性工具：离线预览集控装置的站台选择界面（排版核对），输出到 build/preview/。
+tasks.register('previewControlUi', JavaExec) {
+    group = 'trdm'
+    description = 'Renders a mockup of the PSD control device platform selector UI'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.ControlUiPreview'
+}
+
+// 一次性工具：离线预览站名牌的版面，输出到 build/preview/。
+tasks.register('previewStationSign', JavaExec) {
+    group = 'trdm'
+    description = 'Renders preview PNGs of the station name sign panel'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.StationSignPreview'
+}
+
+// 一次性工具：离线预览大站名牌的版面，输出到 build/preview/。
+tasks.register('previewBigStationSign', JavaExec) {
+    group = 'trdm'
+    description = 'Renders preview PNGs of the large station sign panel'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.BigStationSignPreview'
+}
+
+// 一次性工具：量站名牌贴图烘一张要多久（同步烘焙的卡顿时长）。
+tasks.register('benchSignBake', JavaExec) {
+    group = 'trdm'
+    description = 'Measures the bake time of station sign textures per plate width'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.SignBakeBench'
+}
+
+// 一次性工具：画「悬挂式站外站名牌」的模型示意（正视图 + 侧视图），输出到 build/preview/。
+tasks.register('previewHungSign', JavaExec) {
+    group = 'trdm'
+    description = 'Draws a model sketch (front + side view) of the hanging station sign'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.HungSignPreview'
+}
+
+// 一次性工具：离线预览门楣「站名吊板」（站名中英比例 + 换乘线路标志）。
+tasks.register('previewHeaderPanel', JavaExec) {
+    group = 'trdm'
+    description = 'Renders preview PNGs of the PSD header station-name panel'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.HeaderPanelPreview'
+}
+
+// 一次性工具：离线预览 PIS 屏幕（16:9，JCM 那套贴图），输出到 build/preview/。
+tasks.register('previewPis', JavaExec) {
+    group = 'trdm'
+    description = 'Renders a preview PNG of the PIS screen (16:9, JCM art)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.PisPreview'
+}
+
+// 一次性工具：生成 PIS 广告示例资源包（两张 png + 一个 mp4），输出到 build/sample-pack/。
+tasks.register('makeSamplePack', JavaExec) {
+    group = 'trdm'
+    description = 'Generates a sample PIS ad resource pack (-Pout=build/sample-pack/trdm-pis-sample)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.SamplePackGenerator'
+    doFirst {
+        args = [(project.findProperty('out') ?: 'build/sample-pack/trdm-pis-sample').toString()]
+    }
+}
+
+// 一次性工具：量 PIS 背景图里欢迎语的居中位置（左栏文字的竖中对齐用）。
+tasks.register('measurePisBackground', JavaExec) {
+    group = 'trdm'
+    description = 'Measures the horizontal centre of the welcome text in tjpids.png'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.PisMeasure'
+}
+
+// 一次性工具：把 JCM（TJPIS 资源包）里的 PIS 贴图搬进本 mod 的资源目录
+// （用户决定「模型和贴图先使用 jcm 的」）。只在需要重新导入时手动跑。
+tasks.register('importJcmAssets', Copy) {
+    group = 'trdm'
+    description = 'Imports the JCM PIS textures into src/main/resources/assets/trdm/textures/block/pis'
+    from jcmPisTextures
+    include 'tjpids.png', 'tc.png', 'zj.png', '0tc.png', 'adsdef.png'
+    into 'src/main/resources/assets/trdm/textures/block/pis'
+}
+
+// 一次性工具：把用户提供的思源黑体（Source Han Sans HW SC VF）打进 jar，
+// PIS / 站名牌的中文都用它（AWT 从 jar 里的 ttf 加载，不依赖系统装没装）。
+// 注意：资源路径只能是小写，所以统一存成 sourcehansanshwsc-vf.ttf。
+tasks.register('importPisFont') {
+    group = 'trdm'
+    description = 'Copies SourceHanSansHWSC-VF.ttf into src/main/resources/assets/trdm/font'
+    doLast {
+        def source = pisFontSource
+        def targetDir = file('src/main/resources/assets/trdm/font')
+        targetDir.mkdirs()
+        java.nio.file.Files.copy(source.toPath(),
+                new File(targetDir, 'sourcehansanshwsc-vf.ttf').toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        new File(targetDir, 'SourceHanSansHWSC-VF.ttf').delete()
+        println "font -> " + new File(targetDir, 'sourcehansanshwsc-vf.ttf').length() + " bytes"
+    }
+}
+
+// 一次性工具：列出某个 jar 里的 class 引用了哪些成员（核对第三方 mod 的真实字节码）。
+tasks.register('classRefs', JavaExec) {
+    group = 'trdm'
+    description = 'Lists member references of a class inside a jar (-Pjar= -Pentry= -Pfilter=)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'top.xiaotang27.trdm.tools.ClassRefs'
+    doFirst {
+        args = [(project.findProperty('jar') ?: '').toString(),
+                (project.findProperty('entry') ?: '').toString(),
+                (project.findProperty('filter') ?: '').toString(),
+                (project.findProperty('mode') ?: '').toString()]
+    }
+}
+

@@ -1,0 +1,22 @@
+{
+  "credit": "站名牌底板：贴墙那一侧的 1/16 厚白背板，比牌面贴图各边大 1/16，露出来当边框。换外观改 textures 即可。",
+  "textures": {
+    "particle": "minecraft:block/white_concrete",
+    "board": "minecraft:block/white_concrete",
+    "edge": "minecraft:block/light_gray_concrete"
+  },
+  "elements": [
+    {
+      "from": [0, 1, 15],
+      "to": [16, 15, 16],
+      "faces": {
+        "down": { "uv": [0, 0, 16, 1], "texture": "#edge" },
+        "up": { "uv": [0, 0, 16, 1], "texture": "#edge" },
+        "north": { "uv": [0, 0, 16, 14], "texture": "#board" },
+        "south": { "uv": [0, 0, 16, 14], "texture": "#edge" },
+        "west": { "uv": [0, 0, 1, 14], "texture": "#edge" },
+        "east": { "uv": [0, 0, 1, 14], "texture": "#edge" }
+      }
+    }
+  ]
+}

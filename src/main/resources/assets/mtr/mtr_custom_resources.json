@@ -1,0 +1,218 @@
+{
+    "custom_signs":  {
+                         "wenxun_2":  {
+                                          "texture_id":  "trdm:textures/block/sign/wenxun.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "问询|Enquiry",
+                                          "flip_custom_text":  true,
+                                          "small":  true
+                                      },
+                         "train_shiyu_2":  {
+                                               "texture_id":  "trdm:textures/block/sign/train_shiyu.png",
+                                               "file_texture":  false,
+                                               "custom_text":  "乘车|To Subway",
+                                               "flip_custom_text":  true,
+                                               "small":  true
+                                           },
+                         "jinzhixiaxing":  {
+                                               "texture_id":  "trdm:textures/block/sign/cross.png",
+                                               "file_texture":  false,
+                                               "flip_custom_text":  false,
+                                               "small":  true
+                                           },
+                         "anjian_1":  {
+                                          "texture_id":  "trdm:textures/block/sign/anjian.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "安全检查|Security Check",
+                                          "flip_custom_text":  false,
+                                          "small":  true
+                                      },
+                         "jinzhixiaxing_2":  {
+                                                 "texture_id":  "trdm:textures/block/sign/cross.png",
+                                                 "file_texture":  false,
+                                                 "custom_text":  "禁止下行|No Downward",
+                                                 "flip_custom_text":  true,
+                                                 "small":  true
+                                             },
+                         "muyingshi":  {
+                                           "texture_id":  "trdm:textures/block/sign/muyingshi.png",
+                                           "file_texture":  false,
+                                           "small":  true
+                                       },
+                         "weishengjian_1":  {
+                                                "texture_id":  "trdm:textures/block/sign/toilets.png",
+                                                "file_texture":  false,
+                                                "custom_text":  "卫生间|Toilet",
+                                                "flip_custom_text":  false,
+                                                "small":  true
+                                            },
+                         "anjian":  {
+                                        "texture_id":  "trdm:textures/block/sign/anjian.png",
+                                        "file_texture":  false,
+                                        "flip_custom_text":  false,
+                                        "small":  true
+                                    },
+                         "jinzhishangxing":  {
+                                                 "texture_id":  "trdm:textures/block/sign/cross.png",
+                                                 "file_texture":  false,
+                                                 "flip_custom_text":  false,
+                                                 "small":  true
+                                             },
+                         "nvweishengjian_2":  {
+                                                  "texture_id":  "trdm:textures/block/sign/female.png",
+                                                  "file_texture":  false,
+                                                  "custom_text":  "卫生间|Toilet",
+                                                  "flip_custom_text":  true,
+                                                  "small":  true
+                                              },
+                         "bupiao_2":  {
+                                          "texture_id":  "trdm:textures/block/sign/bupiao.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "补票|Fare Adjustment",
+                                          "flip_custom_text":  true,
+                                          "small":  true
+                                      },
+                         "train_shiyu_1":  {
+                                               "texture_id":  "trdm:textures/block/sign/train_shiyu.png",
+                                               "file_texture":  false,
+                                               "custom_text":  "乘车|To Subway",
+                                               "flip_custom_text":  false,
+                                               "small":  true
+                                           },
+                         "nanweishengjian_2":  {
+                                                   "texture_id":  "trdm:textures/block/sign/male.png",
+                                                   "file_texture":  false,
+                                                   "custom_text":  "卫生间|Toilet",
+                                                   "flip_custom_text":  true,
+                                                   "small":  true
+                                               },
+                         "nanweishengjian_1":  {
+                                                   "texture_id":  "trdm:textures/block/sign/male.png",
+                                                   "file_texture":  false,
+                                                   "custom_text":  "卫生间|Toilet",
+                                                   "flip_custom_text":  false,
+                                                   "small":  true
+                                               },
+                         "bupiao":  {
+                                        "texture_id":  "trdm:textures/block/sign/bupiao.png",
+                                        "file_texture":  false,
+                                        "flip_custom_text":  false,
+                                        "small":  true
+                                    },
+                         "wenxun_1":  {
+                                          "texture_id":  "trdm:textures/block/sign/wenxun.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "问询|Enquiry",
+                                          "flip_custom_text":  false,
+                                          "small":  true
+                                      },
+                         "kefuzhongxin_1":  {
+                                                "texture_id":  "trdm:textures/block/sign/customer_service_centre.png",
+                                                "file_texture":  false,
+                                                "custom_text":  "客服中心|Passenger Service Cente",
+                                                "flip_custom_text":  false,
+                                                "small":  true
+                                            },
+                         "anjian_2":  {
+                                          "texture_id":  "trdm:textures/block/sign/anjian.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "安全检查|Security Check",
+                                          "flip_custom_text":  true,
+                                          "small":  true
+                                      },
+                         "chengche_2":  {
+                                            "texture_id":  "trdm:textures/block/sign/train.png",
+                                            "file_texture":  false,
+                                            "custom_text":  "乘车|To Subway",
+                                            "flip_custom_text":  true,
+                                            "small":  true
+                                        },
+                         "dianti_2":  {
+                                          "texture_id":  "trdm:textures/block/sign/lift_1.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "无障碍电梯|Accessible Elevator",
+                                          "flip_custom_text":  true,
+                                          "small":  true
+                                      },
+                         "dianti_1":  {
+                                          "texture_id":  "trdm:textures/block/sign/lift_1.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "无障碍电梯|Accessible Elevator",
+                                          "flip_custom_text":  false,
+                                          "small":  true
+                                      },
+                         "chengche_1":  {
+                                            "texture_id":  "trdm:textures/block/sign/train.png",
+                                            "file_texture":  false,
+                                            "custom_text":  "乘车|To Subway",
+                                            "flip_custom_text":  false,
+                                            "small":  true
+                                        },
+                         "train_shiyu":  {
+                                             "texture_id":  "trdm:textures/block/sign/train_shiyu.png",
+                                             "file_texture":  false,
+                                             "flip_custom_text":  false,
+                                             "small":  true
+                                         },
+                         "nvweishengjian_1":  {
+                                                  "texture_id":  "trdm:textures/block/sign/female.png",
+                                                  "file_texture":  false,
+                                                  "custom_text":  "卫生间|Toilet",
+                                                  "flip_custom_text":  false,
+                                                  "small":  true
+                                              },
+                         "weishengjian_2":  {
+                                                "texture_id":  "trdm:textures/block/sign/toilets.png",
+                                                "file_texture":  false,
+                                                "custom_text":  "卫生间|Toilet",
+                                                "flip_custom_text":  true,
+                                                "small":  true
+                                            },
+                         "jinzhishangxing_2":  {
+                                                   "texture_id":  "trdm:textures/block/sign/cross.png",
+                                                   "file_texture":  false,
+                                                   "custom_text":  "禁止上行|No Upward",
+                                                   "flip_custom_text":  true,
+                                                   "small":  true
+                                               },
+                         "lunyishengjiangji":  {
+                                                   "texture_id":  "trdm:textures/block/sign/lunyishengjiangji.png",
+                                                   "file_texture":  false,
+                                                   "small":  true
+                                               },
+                         "bupiao_1":  {
+                                          "texture_id":  "trdm:textures/block/sign/bupiao.png",
+                                          "file_texture":  false,
+                                          "custom_text":  "补票|Fare Adjustment",
+                                          "flip_custom_text":  false,
+                                          "small":  true
+                                      },
+                         "jinzhixiaxing_1":  {
+                                                 "texture_id":  "trdm:textures/block/sign/cross.png",
+                                                 "file_texture":  false,
+                                                 "custom_text":  "禁止下行|No Downward",
+                                                 "flip_custom_text":  false,
+                                                 "small":  true
+                                             },
+                         "kefuzhongxin_2":  {
+                                                "texture_id":  "trdm:textures/block/sign/customer_service_centre.png",
+                                                "file_texture":  false,
+                                                "custom_text":  "客服中心|Passenger Service Cente",
+                                                "flip_custom_text":  true,
+                                                "small":  true
+                                            },
+                         "wenxun":  {
+                                        "texture_id":  "trdm:textures/block/sign/wenxun.png",
+                                        "file_texture":  false,
+                                        "flip_custom_text":  false,
+                                        "small":  true
+                                    },
+                         "jinzhishangxing_1":  {
+                                                   "texture_id":  "trdm:textures/block/sign/cross.png",
+                                                   "file_texture":  false,
+                                                   "custom_text":  "禁止上行|No Upward",
+                                                   "flip_custom_text":  false,
+                                                   "small":  true
+                                               }
+                     }
+}
