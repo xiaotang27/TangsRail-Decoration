@@ -7,14 +7,14 @@
 
 ## 依赖
 
-| 依赖 | 版本             | 说明              |
-|---|----------------|-----------------|
-| Minecraft | 1.20.1         |                 |
-| Fabric Loader | 0.19.3+        |                 |
-| Fabric API | 0.92.11+1.20.1 |                 |
-| Minecraft Transit Railway | 3.2.x          | mod id `mtr`，必须 |
-| Architectury API | 9.2.14         | [YMTR](https://github.com/jonafanho/Minecraft-Transit-Railway) 的运行时依赖 |
-| Mod Menu | 7.2.2+         | 可选              |
+| 依赖 | 版本             | 说明                                                                                         |
+|---|----------------|--------------------------------------------------------------------------------------------|
+| Minecraft | 1.20.1         |                                                                                            |
+| Fabric Loader | 0.19.3+        |                                                                                            |
+| Fabric API | 0.92.11+1.20.1 |                                                                                            |
+| Minecraft Transit Railway | 3.2.x          | mod id `mtr`，必须                                                                            |
+| Architectury API | 9.2.14         | [YMTR](https://github.com/yomi-china/Yomis-Minecraft-Transit-Railway) 的运行时依赖（仅针对使用YMTR的用户） |
+| Mod Menu | 7.2.2+         | 可选                                                                                         |
 
 ## 构建
 
@@ -26,15 +26,15 @@
 3. 在项目里临时加同名键（注意别提交）。
 
 1. 准备两个本地 jar（它们不在仓库里，需自己下载）：
-   - MTR 3.6.3 的 **release** jar（不要 `-dev-shadow`）
-   - Architectury API 9.2.14 的 fabric jar
+   - MTR 的 **release** jar（不要 `-dev-shadow`）
+   - Architectury API 的 fabric jar
 2. 复制模板并填路径：
    ```sh
    cp local.properties.example local.properties
    ```
    ```properties
-   yomimtr_jar=D:/mods/MTR-fabric-1.20.1-3.6.3.jar
-   architectury_jar=D:/mods/architectury-9.2.14-fabric.jar
+   mtr_jar=D:/mods/MTR.jar
+   architectury_jar=D:/mods/architectury.jar
    ```
 3. 构建：
    ```sh
