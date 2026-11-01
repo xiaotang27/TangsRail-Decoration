@@ -7,6 +7,7 @@ import mtr.block.BlockPSDAPGDoorBase;
 import mtr.block.IBlock;
 import mtr.data.IGui;
 import mtr.mappings.BlockEntityRendererMapper;
+import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import mtr.mappings.ModelDataWrapper;
 import mtr.mappings.ModelMapper;
 import mtr.mappings.UtilitiesClient;
@@ -59,6 +60,16 @@ public class RenderTrdmPSDDoor<T extends BlockTrdmPSDDoor.TileEntityTrdmPSDDoor>
 
     private final int style;
 
+    /** 四个水平方向上有没有直角玻璃尾端。 */
+    private static boolean touchingGlassEnd(Level world, BlockPos pos) {
+        for (final Direction direction : Direction.Plane.HORIZONTAL) {
+            if (world.getBlockState(pos.relative(direction)).getBlock() instanceof BlockTrdmPSDGlassEnd) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public RenderTrdmPSDDoor(BlockEntityRenderDispatcher dispatcher, int style) {
         super(dispatcher);
         this.style = style;
@@ -75,7 +86,9 @@ public class RenderTrdmPSDDoor<T extends BlockTrdmPSDDoor.TileEntityTrdmPSDDoor>
         final Direction facing = IBlock.getStatePropertySafe(world, pos, BlockPSDAPGDoorBase.FACING);
         final boolean side = IBlock.getStatePropertySafe(world, pos, BlockPSDAPGDoorBase.SIDE) == EnumSide.RIGHT;
         final boolean half = IBlock.getStatePropertySafe(world, pos, BlockPSDAPGDoorBase.HALF) == DoubleBlockHalf.UPPER;
-        final boolean end = IBlock.getStatePropertySafe(world, pos, BlockPSDAPGDoorBase.END);
+        // 紧贴直角玻璃尾端的门按普通门渲染
+        final boolean end = IBlock.getStatePropertySafe(world, pos, BlockPSDAPGDoorBase.END)
+                && !touchingGlassEnd(world, pos);
         final boolean unlocked = IBlock.getStatePropertySafe(world, pos, BlockPSDAPGDoorBase.UNLOCKED);
         final float open = Math.min(entity.getOpen(MTRClient.getLastFrameDuration()), 1);
 

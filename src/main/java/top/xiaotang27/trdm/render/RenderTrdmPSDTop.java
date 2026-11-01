@@ -120,7 +120,7 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             UtilitiesClient.rotateYDegrees(matricesNew, -facing.toYRot());
         });
 
-        renderEndCaps(storedMatrixTransformations.copy(), state, facing, light);
+        // 端头交给 trdm:block/psd_top_end_square_* 模型，不再用 MTR 的斜角封板画法
 
         if (RenderTrains.shouldNotRender(pos, RenderTrains.maxTrainRenderDistance, null)) {
             return;
@@ -760,13 +760,8 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         final boolean airRight = isNotPersistent && IBlock.getStatePropertySafe(state, BlockTrdmPSDTop.AIR_RIGHT);
         RenderTrains.scheduleRender(ClientData.DATA_CACHE.getColorStrip(platformId).resourceLocation, false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matrices, vertexConsumer) -> {
             storedMatrixTransformations.transform(matrices);
-            IDrawing.drawTexture(matrices, vertexConsumer, airLeft ? 0.625F : 0, COLOR_STRIP_START, 0, airRight ? 0.375F : 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
-            if (airLeft) {
-                IDrawing.drawTexture(matrices, vertexConsumer, END_FRONT_OFFSET, COLOR_STRIP_START, -0.625F - END_FRONT_OFFSET, 0.75F + END_FRONT_OFFSET, COLOR_STRIP_END, 0.125F - END_FRONT_OFFSET, facing, -1, light);
-            }
-            if (airRight) {
-                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F - END_FRONT_OFFSET, COLOR_STRIP_START, 0.125F - END_FRONT_OFFSET, 1 - END_FRONT_OFFSET, COLOR_STRIP_END, -0.625F - END_FRONT_OFFSET, facing, -1, light);
-            }
+            // 直角端头：色带整幅铺满正面
+            IDrawing.drawTexture(matrices, vertexConsumer, 0, COLOR_STRIP_START, 0, 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
             matrices.popPose();
         });
     }

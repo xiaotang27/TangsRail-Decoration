@@ -1,6 +1,7 @@
 package top.xiaotang27.trdm.block;
 
 import mtr.block.BlockPSDAPGGlassEndBase;
+import mtr.block.BlockPSDAPGGlassEndBase.EnumPSDAPGGlassEndSide;
 import mtr.block.IBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,10 +25,12 @@ import top.xiaotang27.trdm.Trdm;
  */
 public class BlockTrdmPSDGlassEnd extends BlockPSDAPGGlassEndBase {
 
-    /** 转角条（模型 x 4–6、z 8–16）。 */
-    private static final double[] STRIP = {4, 0, 8, 6, 16, 16};
-    /** 垂直端板（模型 x 4–16、z 14–16）。 */
-    private static final double[] PANEL = {4, 0, 14, 16, 16, 16};
+    /** 普通玻璃面（与门排同一条线：x 2–4）。 */
+    private static final double[] PANE = {2, 0, 0, 4, 16, 16};
+    /** 拐向左端的垂直挡板（z 14–16）。 */
+    private static final double[] RETURN_LEFT = {4, 0, 14, 16, 16, 16};
+    /** 拐向右端的垂直挡板（z 0–2）。 */
+    private static final double[] RETURN_RIGHT = {4, 0, 0, 16, 16, 2};
 
     public BlockTrdmPSDGlassEnd() {
         super();
@@ -46,7 +49,13 @@ public class BlockTrdmPSDGlassEnd extends BlockPSDAPGGlassEndBase {
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
         final Direction facing = IBlock.getStatePropertySafe(state, HorizontalDirectionalBlock.FACING);
-        return Shapes.or(cornerBox(STRIP, facing), cornerBox(PANEL, facing));
+        return Shapes.or(cornerBox(PANE, facing), cornerBox(turnsRight(state) ? RETURN_RIGHT : RETURN_LEFT, facing));
+    }
+
+    /** 有门的一侧不拐弯，拐向另一侧（与 blockstate 的选型规则一致）。 */
+    public static boolean turnsRight(BlockState state) {
+        return IBlock.getStatePropertySafe(state, TOUCHING_LEFT) == EnumPSDAPGGlassEndSide.DOOR
+                || IBlock.getStatePropertySafe(state, TOUCHING_RIGHT) == EnumPSDAPGGlassEndSide.AIR;
     }
 
     @Override
