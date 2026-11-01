@@ -763,12 +763,6 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             // 直角端头：色带整幅铺满正面
             // 拐弯面也画色带
             IDrawing.drawTexture(matrices, vertexConsumer, 0, COLOR_STRIP_START, 0, 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
-            if (airLeft) {
-                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F, COLOR_STRIP_START, 1, 1, COLOR_STRIP_BOTTOM, 1, facing.getOpposite(), color, light);
-            }
-            if (airRight) {
-                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F, COLOR_STRIP_START, 0, 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
-            }
             matrices.popPose();
         });
     }

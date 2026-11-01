@@ -2,33 +2,33 @@
   "parent": "block/block",
   "textures": {
     "particle": "mtr:block/psd_top",
-    "main": "mtr:block/psd_top",
+    "frame": "mtr:block/psd_top",
     "edge": "mtr:block/psd_top_edge"
   },
   "elements": [
     {
       "from": [
-        4,
         0,
-        0
+        12,
+        6
       ],
       "to": [
         16,
         16,
-        2
+        10
       ],
       "faces": {
         "down": {
           "texture": "#edge"
         },
         "up": {
-          "texture": "#edge"
+          "texture": "#frame"
         },
         "north": {
-          "texture": "#main"
+          "texture": "#frame"
         },
         "south": {
-          "texture": "#main"
+          "texture": "#frame"
         },
         "east": {
           "texture": "#edge"
@@ -40,33 +40,97 @@
     },
     {
       "from": [
-        4,
-        12,
-        0
+        0,
+        1,
+        6
       ],
       "to": [
         16,
-        16,
-        6
+        12,
+        7
       ],
       "faces": {
         "down": {
           "texture": "#edge"
         },
         "up": {
-          "texture": "#main"
+          "texture": "#edge"
         },
         "north": {
-          "texture": "#main"
+          "texture": "#frame"
         },
         "south": {
-          "texture": "#main"
+          "texture": "#frame"
         },
         "east": {
           "texture": "#edge"
         },
         "west": {
           "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        0,
+        6
+      ],
+      "to": [
+        16,
+        1,
+        9
+      ],
+      "faces": {
+        "down": {
+          "texture": "#edge"
+        },
+        "up": {
+          "texture": "#edge"
+        },
+        "north": {
+          "texture": "#edge"
+        },
+        "south": {
+          "texture": "#edge"
+        },
+        "east": {
+          "texture": "#edge"
+        },
+        "west": {
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        12,
+        0
+      ],
+      "to": [
+        4,
+        16,
+        10
+      ],
+      "faces": {
+        "down": {
+          "texture": "#edge"
+        },
+        "up": {
+          "texture": "#frame"
+        },
+        "north": {
+          "texture": "#frame"
+        },
+        "south": {
+          "texture": "#frame"
+        },
+        "east": {
+          "texture": "#frame"
+        },
+        "west": {
+          "texture": "#frame"
         }
       }
     }
