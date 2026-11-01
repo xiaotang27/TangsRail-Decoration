@@ -285,11 +285,11 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         if (airLeft || airRight) {
             // 端头 L 形：沿门排的腿 + 回折板，与 psd_top_end_square_left / right 对齐
             shape = Shapes.or(shape,
-                    BlockTrdmPSDGlassEnd.cornerBox(new double[]{2, 12, 0, 6, 16, 16}, facing));
+                    BlockTrdmPSDGlassEnd.cornerBox(new double[]{2, yBottom, 0, 6, 16, 16}, facing));
             shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(
                     airRight && !airLeft
-                            ? new double[]{4, 12, 0, 16, 16, 4}
-                            : new double[]{4, 12, 12, 16, 16, 16},
+                            ? new double[]{4, yBottom, 0, 16, 16, 4}
+                            : new double[]{4, yBottom, 12, 16, 16, 16},
                     facing));
         }
         return shape;
