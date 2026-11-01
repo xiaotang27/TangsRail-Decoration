@@ -282,10 +282,10 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         VoxelShape shape = IBlock.getVoxelShapeByDirection(0, yBottom, 0, 16, 16, 6, facing);
         // 端头：梁拐 90° 的那一节（与 psd_top_end_square_* 模型一致）
         if (IBlock.getStatePropertySafe(state, AIR_LEFT)) {
-            shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(new double[]{12, 12, 0, 16, 16, 10}, facing));
+            shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(new double[]{12, 12, 2, 16, 16, 10}, facing));
         }
         if (IBlock.getStatePropertySafe(state, AIR_RIGHT)) {
-            shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(new double[]{0, 12, 0, 4, 16, 10}, facing));
+            shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(new double[]{0, 12, 2, 4, 16, 10}, facing));
         }
         return shape;
     }
