@@ -2,7 +2,8 @@
 
 为 [Minecraft Transit Railway 3.x](https://github.com/jonafanho/Minecraft-Transit-Railway) 拓展了铁路设施。
 
-> 本模组的代码与部分美术素材使用了生成式人工智能（AIGC）工具参与制作，并进行了人工审查测试。
+> 本模组的代码与部分美术素材使用了生成式人工智能（AIGC）工具参与制作。
+
 
 ## 依赖
 
