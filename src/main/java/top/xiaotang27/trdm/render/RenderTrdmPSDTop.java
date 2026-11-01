@@ -50,17 +50,6 @@ import java.util.Set;
 /**
  * 门楣渲染器（重写版，不再继承 MTR 的 RenderRouteBase，只沿用它的几何与坐标约定）。
  * <p>
- * 之所以自己写一遍 render()：门楣要按「下方是滑动门 / 普通玻璃 / 端头玻璃」分组，而不是按整排门楣分段。
- * MTR 的分段依赖方块自己的 SIDE_EXTENDED 边界，本 mod 的门楣已经没有那个边界了（整排连通），
- * 所以这里直接看下方方块来定分组，站名才能真的居中在「一扇门」而不是「一整排」的中间。
- * <p>
- * 每种内容都按 MTR 的老办法绘制：整段只烘焙一张贴图，每格按自己在段内的位置裁一条 UV。
- * <ul>
- *   <li>门上：{@link TrdmHeaderTextures} 生成的黑体站名吊板（中英文 + 换乘线路标志）；</li>
- *   <li>玻璃上：线路图 / 方向箭头（照抄 MTR 的 RenderRouteBase 选型）；</li>
- *   <li>端头玻璃上：不画；</li>
- *   <li>所有门楣：底部站台色带。</li>
- * </ul>
  */
 public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.TileEntityTrdmPSDTop> implements IGui, IBlock {
 
@@ -131,7 +120,7 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             UtilitiesClient.rotateYDegrees(matricesNew, -facing.toYRot());
         });
 
-        renderEndCaps(storedMatrixTransformations.copy(), state, facing, light);
+        // 端头交给 trdm:block/psd_top_end_square_* 模型，不再用 MTR 的斜角封板画法
 
         if (RenderTrains.shouldNotRender(pos, RenderTrains.maxTrainRenderDistance, null)) {
             return;
@@ -211,25 +200,6 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     /**
      * 装饰带：线路色底 + 两端人字纹 + 正中一张「文字 + logo」图，画在玻璃两格的中缝高度上。
      * <p>
-     * <b>分段规则</b>：一段 = 一块「合并后的玻璃」（{@link #getBandRightBlocks}），
-     * 由这一段最左那一格整条画完，两端各收 {@link #BAND_END_INSET}。
-     * 所以六块玻璃 3+3 合并时是<b>两条</b>装饰带（各自两端收边），而不是横跨六块的一条；
-     * 一段玻璃一格都没合并过时视同合并的一整块（整段一条），端头玻璃完全不画。
-     * <p>
-     * 效果就是一张双面都印了内容的不干胶：玻璃两个面各印一份，各自朝外
-     * （站台面 6/16 那面朝站台、轨道面 4/16 那面朝轨道），两面同时存在、任何时候都在，
-     * 但每一面都开了背面剔除，所以正面看不到反面的内容、反面也看不到正面的内容。
-     * <p>
-     * 为了实现这件事，这里不再用 MTR 的 {@code IDrawing.drawTexture}（它的绕序和渲染层剔除行为
-     * 没法离线确认），改成自己按<b>世界坐标</b>算四个角、自己写顶点：
-     * <ul>
-     *   <li>渲染层用 {@code RenderType.entityCutout}（开了背面剔除），顶点格式里的
-     *       position/color/uv/overlay/light/normal 全部自己填，不依赖别处的约定；</li>
-     *   <li>绕序用右手定则现场判定：{@code (B−A)×(C−A)} 和朝外法线同向才算正面，
-     *       不同向就把顶点顺序倒过来 —— 所以不存在“绕序反了导致整面看不见”的情况；</li>
-     *   <li>两面用的是同一张世界方向的图（不镜像）：人字始终指向列车行进方向，slogan 不镜像。</li>
-     * </ul>
-     * 方向跟着门楣的 {@link BlockTrdmPSDTop#ARROW_DIRECTION} 走（人字朝左/朝右）。
      */
     private static void renderDecalBand(BlockPos pos, long platformId, BlockState state, Direction quadFacing,
                                         int color, int light, int rightBlocks) {
@@ -500,8 +470,6 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     /**
      * 站点信息吊板：箭头 +「开往 终点站」+「下一站 下一站名」。
      * <p>
-     * {@link BlockTrdmPSDTop#ARROW_DIRECTION} 只决定<b>版面朝向</b>（箭头朝左/朝右，整块镜像），
-     * 不改变文字信息：内容固定按线路正方向（终点＝线路末站，下一站＝index+1）。
      */
     private void renderStationInfo(StoredMatrixTransformations storedMatrixTransformations, long platformId, BlockState state, int leftBlocks, int rightBlocks, Direction facing, int color, int light) {
         final int arrowDirection = IBlock.getStatePropertySafe(state, BlockTrdmPSDTop.ARROW_DIRECTION);
@@ -681,17 +649,6 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     /**
      * 装饰带的分段入口。
      * <p>
-     * 规则有两条，先看第一条：
-     * <ol>
-     *   <li><b>整段玻璃一格都没合并过</b>（两块滑动门之间散着放的那种），视同合并的一整块，
-     *       整段画一条；</li>
-     *   <li>这一段里只要有任何一块被刷子合并过，就严格按合并组分段 —— 每组合并后的玻璃各一条，
-     *       没参与合并的单块玻璃自己一条。</li>
-     * </ol>
-     * 两种情况下这一条装饰带都只由它最左那一格画（{@link #getRunBlocks} 之类会取「段内位置」，
-     * 所以必须只有一个 BE 画）。
-     *
-     * @return 本条装饰带在本格右侧还有几格；本格不是它的最左格、或下面不是普通玻璃时返回 -1
      */
     private static int getBandRightBlocks(Level world, BlockPos pos, Direction facing) {
         final EnumSide ownSide = getMergedGlassSide(world, pos, facing);
@@ -748,19 +705,6 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     /**
      * 装饰带的「一段」= 用刷子连起来的一块玻璃，也就是 MTR {@code connectGlass} 写在玻璃方块上的
      * {@code SIDE_EXTENDED} 所描述的那一组。语义（照 MTR 的 connectGlass）：
-     * <ul>
-     *   <li>{@code SINGLE}：孤立一格，左右都不连；</li>
-     *   <li>{@code LEFT}：左边断开、右边连着 → <b>这一组的起点</b>；</li>
-     *   <li>{@code MIDDLE}：左右都连着；</li>
-     *   <li>{@code RIGHT}：右边断开、左边连着 → <b>这一组的终点</b>。</li>
-     * </ul>
-     * 所以六块玻璃「3 + 3」合并后的状态就是 {@code LEFT MIDDLE RIGHT | LEFT MIDDLE RIGHT}：
-     * 第三块的 RIGHT 和第四块的 LEFT 都算断开，中间是立柱，于是这里分成两段装饰带。
-     * <p>
-     * 只有这一组最左那一格负责画整条（否则整组每格都画一遍会重复叠画）。
-     *
-     * @return 本格右侧同一组还有几格；本格不是这一组最左的格子（左右都不连的也算最左），
-     *         或下面根本不是普通玻璃时返回 -1（不画）
      */
     private static int getMergedGlassRightBlocks(Level world, BlockPos pos, Direction facing) {
         EnumSide side = getMergedGlassSide(world, pos, facing);
@@ -816,13 +760,8 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         final boolean airRight = isNotPersistent && IBlock.getStatePropertySafe(state, BlockTrdmPSDTop.AIR_RIGHT);
         RenderTrains.scheduleRender(ClientData.DATA_CACHE.getColorStrip(platformId).resourceLocation, false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matrices, vertexConsumer) -> {
             storedMatrixTransformations.transform(matrices);
-            IDrawing.drawTexture(matrices, vertexConsumer, airLeft ? 0.625F : 0, COLOR_STRIP_START, 0, airRight ? 0.375F : 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
-            if (airLeft) {
-                IDrawing.drawTexture(matrices, vertexConsumer, END_FRONT_OFFSET, COLOR_STRIP_START, -0.625F - END_FRONT_OFFSET, 0.75F + END_FRONT_OFFSET, COLOR_STRIP_END, 0.125F - END_FRONT_OFFSET, facing, -1, light);
-            }
-            if (airRight) {
-                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F - END_FRONT_OFFSET, COLOR_STRIP_START, 0.125F - END_FRONT_OFFSET, 1 - END_FRONT_OFFSET, COLOR_STRIP_END, -0.625F - END_FRONT_OFFSET, facing, -1, light);
-            }
+            // 直角端头：色带整幅铺满正面
+            IDrawing.drawTexture(matrices, vertexConsumer, 0, COLOR_STRIP_START, 0, 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
             matrices.popPose();
         });
     }

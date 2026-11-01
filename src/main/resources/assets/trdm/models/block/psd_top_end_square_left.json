@@ -1,0 +1,74 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "particle": "mtr:block/psd_top",
+    "main": "mtr:block/psd_top",
+    "edge": "mtr:block/psd_top_edge"
+  },
+  "elements": [
+    {
+      "from": [
+        2,
+        0,
+        0
+      ],
+      "to": [
+        4,
+        16,
+        16
+      ],
+      "faces": {
+        "down": {
+          "texture": "#edge"
+        },
+        "up": {
+          "texture": "#edge"
+        },
+        "north": {
+          "texture": "#main"
+        },
+        "south": {
+          "texture": "#main"
+        },
+        "east": {
+          "texture": "#edge"
+        },
+        "west": {
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        0,
+        14
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "down": {
+          "texture": "#edge"
+        },
+        "up": {
+          "texture": "#edge"
+        },
+        "north": {
+          "texture": "#main"
+        },
+        "south": {
+          "texture": "#main"
+        },
+        "east": {
+          "texture": "#edge"
+        },
+        "west": {
+          "texture": "#edge"
+        }
+      }
+    }
+  ]
+}
