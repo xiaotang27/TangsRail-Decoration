@@ -31,25 +31,25 @@
         },
         "east": {
           "uv": [
+            0,
+            0,
             16,
-            0,
-            0,
             16
           ],
           "texture": "#front"
         },
         "west": {
           "uv": [
+            0,
+            0,
             16,
-            0,
-            0,
             16
           ],
           "texture": "#back"
         },
-        "south": {
+        "north": {
           "texture": "#light",
-          "cullface": "south"
+          "cullface": "north"
         }
       }
     },
