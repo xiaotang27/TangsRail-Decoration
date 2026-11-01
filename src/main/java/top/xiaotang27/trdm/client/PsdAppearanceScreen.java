@@ -23,12 +23,14 @@ public class PsdAppearanceScreen extends TrdmScreenBase {
     private final BlockPos headerPos;
     private int headerStyle;
     private int bandStyle;
+    private boolean endGate;
 
-    public PsdAppearanceScreen(BlockPos headerPos, int headerStyle, int bandStyle) {
+    public PsdAppearanceScreen(BlockPos headerPos, int headerStyle, int bandStyle, boolean endGate) {
         super(null, Component.translatable("block.trdm.psd_door_1"));
         this.headerPos = headerPos;
         this.headerStyle = headerStyle;
         this.bandStyle = bandStyle;
+        this.endGate = endGate;
     }
 
     private float headerRowsTop() {
@@ -41,6 +43,10 @@ public class PsdAppearanceScreen extends TrdmScreenBase {
 
     private float bandRowsTop() {
         return bandSectionY() + ROWS_TOP_OFFSET;
+    }
+
+    private float endGateSectionY() {
+        return bandRowsTop() + PsdStyles.BAND_STYLES.length * ROW_H + SECTION_GAP;
     }
 
     @Override
@@ -57,6 +63,15 @@ public class PsdAppearanceScreen extends TrdmScreenBase {
 
         section(guiGraphics, "gui.trdm.psd_style.band_label", bandSectionY());
         renderOptions(guiGraphics, bandRowsTop(), PsdStyles.BAND_STYLES, bandStyle, false, mx, my);
+
+        // 端门开关
+        final float rowTop = endGateSectionY() + ROWS_TOP_OFFSET;
+        final boolean hovered = mx >= CONTENT_X && mx < CONTENT_RIGHT && my >= rowTop && my < rowTop + ROW_H;
+        row(guiGraphics, CONTENT_X, rowTop, CONTENT_W, ROW_H - 2F, endGate, hovered);
+        text(guiGraphics, Component.translatable("gui.trdm.psd_style.end_gate"),
+                CONTENT_X + 9F, rowTop + 6F, FONT_ROW, COLOR_TEXT);
+        textRight(guiGraphics, Component.translatable(endGate ? "gui.trdm.psd_style.on" : "gui.trdm.psd_style.off"),
+                CONTENT_RIGHT - 10F, rowTop + 8F, FONT_SUB, COLOR_TEXT);
     }
 
     private void renderOptions(GuiGraphics guiGraphics, float rowsTop, int[] options, int selected, boolean isHeader,
@@ -86,7 +101,16 @@ public class PsdAppearanceScreen extends TrdmScreenBase {
         if (select(my, headerRowsTop(), PsdStyles.HEADER_STYLES, true)) {
             return true;
         }
-        return select(my, bandRowsTop(), PsdStyles.BAND_STYLES, false);
+        if (select(my, bandRowsTop(), PsdStyles.BAND_STYLES, false)) {
+            return true;
+        }
+        final float rowTop = endGateSectionY() + ROWS_TOP_OFFSET;
+        if (my >= rowTop && my < rowTop + ROW_H) {
+            endGate = !endGate;
+            top.xiaotang27.trdm.client.TrdmControlClient.sendEndGate(headerPos.below(), endGate);
+            return true;
+        }
+        return false;
     }
 
     private boolean select(float my, float rowsTop, int[] options, boolean isHeader) {

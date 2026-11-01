@@ -119,7 +119,7 @@ public final class TrdmControlClient {
         if (debug) {
             top.xiaotang27.trdm.Trdm.LOGGER.info("[psd appearance] opening screen header={} band={}", headerStyle, bandStyle);
         }
-        Minecraft.getInstance().setScreen(new PsdAppearanceScreen(headerPos, headerStyle, bandStyle));
+        Minecraft.getInstance().setScreen(new PsdAppearanceScreen(headerPos, headerStyle, bandStyle, false));
     }
 
     /** 大站名牌：把选中的出口名发回服务端（空串 = 清除）。 */
@@ -159,6 +159,14 @@ public final class TrdmControlClient {
      * 门楣：吊版样式 + 玻璃装饰线样式，整排门楣一起改。
      * 样式是方块状态，服务端改完会自动同步回来（一个来回），客户端不预测。
      */
+    /** 端门开关：把玻璃格的端门标记发回服务端。 */
+    public static void sendEndGate(BlockPos glassPos, boolean endGate) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(glassPos);
+        buf.writeBoolean(endGate);
+        ClientPlayNetworking.send(top.xiaotang27.trdm.net.TrdmControlNetwork.PSD_END_GATE, buf);
+    }
+
     public static void sendPsdAppearance(BlockPos headerPos, int headerStyle, int bandStyle) {
         final FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBlockPos(headerPos);
