@@ -97,6 +97,7 @@ public class Trdm implements ModInitializer {
         registerBlock("hung_big_station_sign", HUNG_SIGN);
         registerBlock("pis", PIS);
         registerBlock("pis_pole", PIS_POLE);
+        registerBlock("psd_end_gate", PSD_END_GATE);
 
         registerItem("psd_door_1", PSD_DOOR_ITEM_1);
         registerItem("psd_glass_1", PSD_GLASS_ITEM_1);
@@ -107,6 +108,7 @@ public class Trdm implements ModInitializer {
         registerItem("hung_big_station_sign", HUNG_SIGN_ITEM);
         registerItem("pis", PIS_ITEM);
         registerItem("pis_pole", PIS_POLE_ITEM);
+        registerItem("psd_end_gate", PSD_END_GATE_ITEM);
 
         PSD_DOOR_1_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_door_1"),
                 BlockEntityType.Builder.of(BlockTrdmPSDDoor.TileEntityTrdmPSDDoor::new, PSD_DOOR_1).build(null));
