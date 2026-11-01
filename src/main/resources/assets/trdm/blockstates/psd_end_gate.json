@@ -1,33 +1,63 @@
 {
   "variants": {
-    "facing=west,open=false": {
-      "model": "trdm:block/psd_end_gate_closed"
+    "door=false,facing=west,open=false": {
+      "model": "trdm:block/psd_end_gate_glass"
     },
-    "facing=west,open=true": {
-      "model": "trdm:block/psd_end_gate_open"
+    "door=false,facing=west,open=true": {
+      "model": "trdm:block/psd_end_gate_glass"
     },
-    "facing=north,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
+    "door=true,facing=west,open=false": {
+      "model": "trdm:block/psd_end_gate_door_closed"
+    },
+    "door=true,facing=west,open=true": {
+      "model": "trdm:block/psd_end_gate_door_open"
+    },
+    "door=false,facing=north,open=false": {
+      "model": "trdm:block/psd_end_gate_glass",
       "y": 90
     },
-    "facing=north,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
+    "door=false,facing=north,open=true": {
+      "model": "trdm:block/psd_end_gate_glass",
       "y": 90
     },
-    "facing=east,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
+    "door=true,facing=north,open=false": {
+      "model": "trdm:block/psd_end_gate_door_closed",
+      "y": 90
+    },
+    "door=true,facing=north,open=true": {
+      "model": "trdm:block/psd_end_gate_door_open",
+      "y": 90
+    },
+    "door=false,facing=east,open=false": {
+      "model": "trdm:block/psd_end_gate_glass",
       "y": 180
     },
-    "facing=east,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
+    "door=false,facing=east,open=true": {
+      "model": "trdm:block/psd_end_gate_glass",
       "y": 180
     },
-    "facing=south,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
+    "door=true,facing=east,open=false": {
+      "model": "trdm:block/psd_end_gate_door_closed",
+      "y": 180
+    },
+    "door=true,facing=east,open=true": {
+      "model": "trdm:block/psd_end_gate_door_open",
+      "y": 180
+    },
+    "door=false,facing=south,open=false": {
+      "model": "trdm:block/psd_end_gate_glass",
       "y": 270
     },
-    "facing=south,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
+    "door=false,facing=south,open=true": {
+      "model": "trdm:block/psd_end_gate_glass",
+      "y": 270
+    },
+    "door=true,facing=south,open=false": {
+      "model": "trdm:block/psd_end_gate_door_closed",
+      "y": 270
+    },
+    "door=true,facing=south,open=true": {
+      "model": "trdm:block/psd_end_gate_door_open",
       "y": 270
     }
   }

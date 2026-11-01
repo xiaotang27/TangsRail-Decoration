@@ -32,16 +32,18 @@ import top.xiaotang27.trdm.Trdm;
 public class BlockTrdmPSDEndGate extends BlockDirectionalMapper implements EntityBlockMapper {
 
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
+    /** 这一格是门（true）还是玻璃（false），按整段长度由服务端写入。 */
+    public static final BooleanProperty DOOR = BooleanProperty.create("door");
     private static final int MAX_RUN = 64;
 
     public BlockTrdmPSDEndGate() {
         super(Properties.of().strength(1.5F).noOcclusion());
-        registerDefaultState(defaultBlockState().setValue(OPEN, false));
+        registerDefaultState(defaultBlockState().setValue(OPEN, false).setValue(DOOR, false));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(HorizontalDirectionalBlock.FACING, OPEN);
+        builder.add(HorizontalDirectionalBlock.FACING, OPEN, DOOR);
     }
 
     /** 这一格所属整段：返回 (段首, 段长)。 */
@@ -67,8 +69,38 @@ public class BlockTrdmPSDEndGate extends BlockDirectionalMapper implements Entit
                 && IBlock.getStatePropertySafe(state, HorizontalDirectionalBlock.FACING) == facing;
     }
 
-    /** 段内这一格是门（true）还是玻璃（false）。 */
+    /** 段内这一格是门还是玻璃：直接读状态里写好的 DOOR。 */
     public static boolean isDoorPart(BlockGetter world, BlockPos pos, Direction facing) {
+        final BlockState state = world.getBlockState(pos);
+        return state.getBlock() instanceof BlockTrdmPSDEndGate
+                && IBlock.getStatePropertySafe(state, DOOR);
+    }
+
+    /** 按整段重新给每一格写 DOOR。 */
+    public static void refreshRun(Level world, BlockPos pos) {
+        final BlockState state = world.getBlockState(pos);
+        if (!(state.getBlock() instanceof BlockTrdmPSDEndGate)) {
+            return;
+        }
+        final Direction facing = IBlock.getStatePropertySafe(state, HorizontalDirectionalBlock.FACING);
+        final Tuple<BlockPos, Integer> run = run(world, pos, facing);
+        final int length = run.getB();
+        final int doorWidth = length < 2 ? 0 : doorWidth(length);
+        final Direction across = facing.getCounterClockWise();
+        BlockPos current = run.getA();
+        for (int i = 0; i < length; i++) {
+            final BlockState target = world.getBlockState(current);
+            if (target.getBlock() instanceof BlockTrdmPSDEndGate) {
+                final boolean isDoor = i * 16 < doorWidth;
+                if (IBlock.getStatePropertySafe(target, DOOR) != isDoor) {
+                    world.setBlockAndUpdate(current, target.setValue(DOOR, isDoor));
+                }
+            }
+            current = current.relative(across);
+        }
+    }
+
+    private static boolean unusedIsDoorPart(BlockGetter world, BlockPos pos, Direction facing) {
         final Tuple<BlockPos, Integer> run = run(world, pos, facing);
         final int length = run.getB();
         if (length < 2) {
@@ -134,6 +166,23 @@ public class BlockTrdmPSDEndGate extends BlockDirectionalMapper implements Entit
     @Override
     public BlockEntityMapper createBlockEntity(BlockPos pos, BlockState state) {
         return new TileEntityTrdmPSDEndGate(pos, state);
+    }
+
+    @Override
+    public void onPlace(BlockState state, Level world, BlockPos pos, BlockState oldState, boolean moved) {
+        super.onPlace(state, world, pos, oldState, moved);
+        if (!world.isClientSide) {
+            refreshRun(world, pos);
+        }
+    }
+
+    @Override
+    public void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block block,
+                                BlockPos fromPos, boolean moved) {
+        super.neighborChanged(state, world, pos, block, fromPos, moved);
+        if (!world.isClientSide) {
+            refreshRun(world, pos);
+        }
     }
 
     @Override
