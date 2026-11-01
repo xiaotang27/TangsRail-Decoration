@@ -47,9 +47,9 @@
           ],
           "texture": "#back"
         },
-        "south": {
+        "north": {
           "texture": "#light",
-          "cullface": "south"
+          "cullface": "north"
         }
       }
     },
