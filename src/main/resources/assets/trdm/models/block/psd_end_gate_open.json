@@ -1,10 +1,14 @@
 {
   "parent": "block/block",
   "textures": {
-    "particle": "trdm:block/psd_metal",
-    "metal": "trdm:block/psd_metal",
-    "glass": "mtr:block/psd_glass_bottom_1",
-    "lamp_off": "trdm:block/psd_metal"
+    "particle": "mtr:block/psd_top",
+    "top": "mtr:block/psd_top",
+    "edge": "mtr:block/psd_top_edge",
+    "frame": "mtr:block/psd_side_light",
+    "front": "mtr:block/psd_glass_bottom_1",
+    "back": "mtr:block/psd_glass_bottom_back_1",
+    "black": "mtr:block/black",
+    "lamp": "mtr:block/psd_top_edge"
   },
   "elements": [
     {
@@ -20,22 +24,22 @@
       ],
       "faces": {
         "down": {
-          "texture": "#metal"
+          "texture": "#edge"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#top"
         },
         "north": {
-          "texture": "#metal"
+          "texture": "#top"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#top"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#edge"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#edge"
         }
       }
     },
@@ -51,29 +55,29 @@
         13
       ],
       "faces": {
-        "down": {
-          "texture": "#lamp_off"
-        },
-        "up": {
-          "texture": "#lamp_off"
-        },
         "north": {
-          "texture": "#lamp_off"
+          "texture": "#edge"
         },
         "south": {
-          "texture": "#lamp_off"
+          "texture": "#edge"
+        },
+        "down": {
+          "texture": "#edge"
+        },
+        "up": {
+          "texture": "#edge"
         },
         "east": {
-          "texture": "#lamp_off"
+          "texture": "#edge"
         },
         "west": {
-          "texture": "#lamp_off"
+          "texture": "#edge"
         }
       }
     },
     {
       "from": [
-        0,
+        4,
         0,
         14
       ],
@@ -84,22 +88,46 @@
       ],
       "faces": {
         "down": {
-          "texture": "#glass"
+          "texture": "#black"
         },
         "up": {
-          "texture": "#glass"
+          "texture": "#black"
         },
         "north": {
-          "texture": "#glass"
+          "uv": [
+            0,
+            0,
+            16,
+            12
+          ],
+          "texture": "#front"
         },
         "south": {
-          "texture": "#glass"
+          "uv": [
+            16,
+            0,
+            0,
+            12
+          ],
+          "texture": "#back"
         },
         "east": {
-          "texture": "#glass"
+          "uv": [
+            0,
+            0,
+            2,
+            12
+          ],
+          "texture": "#frame"
         },
         "west": {
-          "texture": "#glass"
+          "uv": [
+            0,
+            0,
+            2,
+            12
+          ],
+          "texture": "#frame"
         }
       }
     },
@@ -107,7 +135,7 @@
       "from": [
         0,
         0,
-        13
+        2
       ],
       "to": [
         2,
@@ -116,22 +144,46 @@
       ],
       "faces": {
         "down": {
-          "texture": "#glass"
+          "texture": "#black"
         },
         "up": {
-          "texture": "#glass"
+          "texture": "#black"
         },
         "north": {
-          "texture": "#glass"
+          "uv": [
+            0,
+            0,
+            16,
+            12
+          ],
+          "texture": "#front"
         },
         "south": {
-          "texture": "#glass"
+          "uv": [
+            16,
+            0,
+            0,
+            12
+          ],
+          "texture": "#back"
         },
         "east": {
-          "texture": "#glass"
+          "uv": [
+            0,
+            0,
+            2,
+            12
+          ],
+          "texture": "#frame"
         },
         "west": {
-          "texture": "#glass"
+          "uv": [
+            0,
+            0,
+            2,
+            12
+          ],
+          "texture": "#frame"
         }
       }
     }
