@@ -29,11 +29,17 @@ public class BlockTrdmPSDGlass extends BlockPSDAPGGlassBase implements EntityBlo
 
     /** 该格是否是端门。 */
     public static boolean isEndGate(BlockGetter world, BlockPos pos) {
+        if (world instanceof Level level && level.isClientSide) {
+            return top.xiaotang27.trdm.client.ClientEndGates.is(pos);
+        }
         return world.getBlockEntity(pos) instanceof TileEntityTrdmPSDGlass glass && glass.isEndGate();
     }
 
     /** 该格端门是否开着。 */
     public static boolean isOpen(BlockGetter world, BlockPos pos) {
+        if (world instanceof Level level && level.isClientSide) {
+            return top.xiaotang27.trdm.client.ClientEndGates.isOpen(pos);
+        }
         return world.getBlockEntity(pos) instanceof TileEntityTrdmPSDGlass glass && glass.isOpen();
     }
 

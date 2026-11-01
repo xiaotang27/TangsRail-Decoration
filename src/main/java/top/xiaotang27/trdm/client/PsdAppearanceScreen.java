@@ -64,14 +64,13 @@ public class PsdAppearanceScreen extends TrdmScreenBase {
         section(guiGraphics, "gui.trdm.psd_style.band_label", bandSectionY());
         renderOptions(guiGraphics, bandRowsTop(), PsdStyles.BAND_STYLES, bandStyle, false, mx, my);
 
-        // 端门开关
+        // 端门开关（沿用预设 toggle 样式）
         final float rowTop = endGateSectionY() + ROWS_TOP_OFFSET;
-        final boolean hovered = mx >= CONTENT_X && mx < CONTENT_RIGHT && my >= rowTop && my < rowTop + ROW_H;
-        row(guiGraphics, CONTENT_X, rowTop, CONTENT_W, ROW_H - 2F, endGate, hovered);
         text(guiGraphics, Component.translatable("gui.trdm.psd_style.end_gate"),
-                CONTENT_X + 9F, rowTop + 6F, FONT_ROW, COLOR_TEXT);
-        textRight(guiGraphics, Component.translatable(endGate ? "gui.trdm.psd_style.on" : "gui.trdm.psd_style.off"),
-                CONTENT_RIGHT - 10F, rowTop + 8F, FONT_SUB, COLOR_TEXT);
+                CONTENT_X + 2F, rowTop + 2F, FONT_ROW, COLOR_TEXT);
+        text(guiGraphics, Component.translatable("gui.trdm.psd_style.end_gate_hint"),
+                CONTENT_X + 2F, rowTop + 18F, FONT_SUB, COLOR_TEXT);
+        toggle(guiGraphics, CONTENT_RIGHT - TOGGLE_W - 2F, rowTop, endGate);
     }
 
     private void renderOptions(GuiGraphics guiGraphics, float rowsTop, int[] options, int selected, boolean isHeader,

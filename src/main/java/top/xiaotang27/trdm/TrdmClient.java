@@ -96,6 +96,13 @@ public class TrdmClient implements ClientModInitializer {
             top.xiaotang27.trdm.render.TrdmPisVideo.clear();
         });
 
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+                top.xiaotang27.trdm.net.TrdmControlNetwork.PSD_END_GATE_SYNC, (client, handler, buf, responseSender) -> {
+                    final BlockPos pos = buf.readBlockPos();
+                    final boolean endGate = buf.readBoolean();
+                    client.execute(() -> top.xiaotang27.trdm.client.ClientEndGates.set(pos, endGate));
+                });
+
         UseBlockCallback.EVENT.register(TrdmClient::onUseBlock);
     }
 

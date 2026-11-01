@@ -44,6 +44,7 @@ public final class TrdmControlNetwork {
     /** C2S：BlockPos（门楣位置）+ 吊版样式 + 玻璃装饰线样式。 */
     public static final ResourceLocation PSD_APPEARANCE = Trdm.id("psd_appearance");
     public static final ResourceLocation PSD_END_GATE = Trdm.id("psd_end_gate");
+    public static final ResourceLocation PSD_END_GATE_SYNC = Trdm.id("psd_end_gate_sync");
 
     /** C2S：BlockPos（PIS 屏幕）+ 跑马文字 + 广告开关 + 广告覆盖项。 */
     public static final ResourceLocation PIS_SETTINGS = Trdm.id("pis_settings");
@@ -84,9 +85,19 @@ public final class TrdmControlNetwork {
             final boolean endGate = buf.readBoolean();
             server.execute(() -> {
                 final net.minecraft.server.level.ServerLevel world = (net.minecraft.server.level.ServerLevel) player.level();
-                if (world.getBlockEntity(pos) instanceof top.xiaotang27.trdm.block.BlockTrdmPSDGlass.TileEntityTrdmPSDGlass glass) {
-                    glass.setEndGate(endGate);
-                    world.sendBlockUpdated(pos, glass.getBlockState(), glass.getBlockState(), 3);
+                BlockPos target = null;
+                for (final BlockPos candidate : new BlockPos[]{pos, pos.above(), pos.below()}) {
+                    if (world.getBlockEntity(candidate) instanceof top.xiaotang27.trdm.block.BlockTrdmPSDGlass.TileEntityTrdmPSDGlass glass) {
+                        glass.setEndGate(endGate);
+                        target = candidate;
+                        break;
+                    }
+                }
+                if (target != null) {
+                    final net.minecraft.network.FriendlyByteBuf out = net.fabricmc.fabric.api.networking.v1.PacketByteBufs.create();
+                    out.writeBlockPos(target);
+                    out.writeBoolean(endGate);
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, PSD_END_GATE_SYNC, out);
                 }
             });
         });
