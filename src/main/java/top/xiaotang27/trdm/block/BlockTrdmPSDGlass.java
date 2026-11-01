@@ -44,6 +44,13 @@ public class BlockTrdmPSDGlass extends BlockPSDAPGGlassBase implements EntityBlo
         if (appearance != null) {
             return appearance;
         }
+        if (!world.isClientSide && player.isShiftKeyDown()
+                && world.getBlockEntity(pos) instanceof TileEntityTrdmPSDGlass glass0) {
+            // 空手蹲右键：切换端门标记
+            glass0.setEndGate(!glass0.isEndGate());
+            world.sendBlockUpdated(pos, state, state, 3);
+            return InteractionResult.SUCCESS;
+        }
         if (!world.isClientSide && world.getBlockEntity(pos) instanceof TileEntityTrdmPSDGlass glass && glass.isEndGate()) {
             glass.setOpen(!glass.isOpen());
             world.sendBlockUpdated(pos, state, state, 3);
