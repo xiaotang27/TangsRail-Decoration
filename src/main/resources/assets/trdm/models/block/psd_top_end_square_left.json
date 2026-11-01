@@ -1,9 +1,9 @@
 {
   "parent": "block/block",
   "textures": {
-    "particle": "mtr:block/psd_top",
-    "main": "mtr:block/psd_top",
-    "edge": "mtr:block/psd_top_edge"
+    "particle": "trdm:block/psd_metal",
+    "main": "trdm:block/psd_metal",
+    "edge": "trdm:block/psd_metal"
   },
   "elements": [
     {
