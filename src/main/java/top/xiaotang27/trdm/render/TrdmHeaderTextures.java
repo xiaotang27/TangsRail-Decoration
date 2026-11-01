@@ -480,7 +480,20 @@ public final class TrdmHeaderTextures {
         }
     }
 
+    /** 客户端关闭中：不再碰 TextureManager，避免 close() 遍历时被并发修改。 */
+    private static volatile boolean SHUTTING_DOWN;
+
+    public static void shutdown() {
+        SHUTTING_DOWN = true;
+        TASKS.clear();
+        PENDING.clear();
+    }
+
     private static void register(String key, NativeImage image) {
+        if (SHUTTING_DOWN) {
+            PENDING.remove(key);
+            return;
+        }
         PENDING.remove(key);
         if (image == null) {
             return;

@@ -1,5 +1,6 @@
 package top.xiaotang27.trdm;
 
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
@@ -90,6 +91,11 @@ public class TrdmClient implements ClientModInitializer {
         // 「蹲下 + 刷子右键屏蔽门」→ 外观设置。
         // 走 UseBlockCallback 而不是只挂在方块的 use 上：这个回调在「方块自己的 use」之前触发，
         // 门被刷子/其他逻辑先吃掉的情况也能拦到；返回 SUCCESS 后原版不会再把这个交互发给服务端，
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            top.xiaotang27.trdm.render.TrdmHeaderTextures.shutdown();
+            top.xiaotang27.trdm.render.TrdmPisVideo.clear();
+        });
+
         UseBlockCallback.EVENT.register(TrdmClient::onUseBlock);
     }
 
