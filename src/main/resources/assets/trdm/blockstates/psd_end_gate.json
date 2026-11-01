@@ -1,33 +1,33 @@
 {
   "variants": {
     "facing=west,open=false": {
-      "model": "trdm:block/psd_end_gate_closed"
+      "model": "trdm:block/psd_end_gate_empty"
     },
     "facing=west,open=true": {
-      "model": "trdm:block/psd_end_gate_open"
+      "model": "trdm:block/psd_end_gate_empty"
     },
     "facing=north,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
+      "model": "trdm:block/psd_end_gate_empty",
       "y": 90
     },
     "facing=north,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
+      "model": "trdm:block/psd_end_gate_empty",
       "y": 90
     },
     "facing=east,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
+      "model": "trdm:block/psd_end_gate_empty",
       "y": 180
     },
     "facing=east,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
+      "model": "trdm:block/psd_end_gate_empty",
       "y": 180
     },
     "facing=south,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
+      "model": "trdm:block/psd_end_gate_empty",
       "y": 270
     },
     "facing=south,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
+      "model": "trdm:block/psd_end_gate_empty",
       "y": 270
     }
   }
