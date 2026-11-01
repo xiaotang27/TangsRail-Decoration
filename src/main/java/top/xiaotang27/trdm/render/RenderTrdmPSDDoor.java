@@ -146,7 +146,9 @@ public class RenderTrdmPSDDoor<T extends BlockTrdmPSDDoor.TileEntityTrdmPSDDoor>
                 matricesNew.popPose();
             });
         } else {
-            RenderTrains.scheduleRender(new ResourceLocation(String.format("mtr:textures/block/psd_door_%s_%s_%s.png", half ? "top" : "bottom", side ? "right" : "left", style == 0 ? "1" : "2")), false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matricesNew, vertexConsumer) -> {
+            RenderTrains.scheduleRender(new ResourceLocation(half
+                ? String.format("trdm:textures/block/psd_door_top_%s_1.png", side ? "right" : "left")
+                : String.format("mtr:textures/block/psd_door_bottom_%s_1.png", side ? "right" : "left")), false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matricesNew, vertexConsumer) -> {
                 storedMatrixTransformations.transform(matricesNew);
                 MODEL_PSD.renderToBuffer(matricesNew, vertexConsumer, light, overlay, 1, 1, 1, 1);
                 matricesNew.popPose();

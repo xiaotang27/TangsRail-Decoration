@@ -37,7 +37,6 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import mtr.render.MoreRenderLayers;
 import top.xiaotang27.trdm.Trdm;
-import top.xiaotang27.trdm.block.BlockTrdmPSDGlass;
 import top.xiaotang27.trdm.block.BlockTrdmPSDDoor;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 
@@ -183,10 +182,7 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             renderRouteMap(storedMatrixTransformations, world, pos, platformId, state, facing, leftBlocks, rightBlocks, quadFacing, color, light);
         }
 
-        // 端门格不绘制装饰条（灯由门楣模型/渲染负责）
-        if (!BlockTrdmPSDGlass.isEndGate(world, pos.below())) {
-            renderColorStrip(storedMatrixTransformations, platformId, state, quadFacing, color, light);
-        }
+        renderColorStrip(storedMatrixTransformations, platformId, state, quadFacing, color, light);
 
         // 玻璃上的装饰带：按「合并后的整块玻璃」分段 —— 一段 = 刷子连起来的一组玻璃，
         // 由这一组的左端那一格画完整一条；整段都没合并过的玻璃视同合并的一整块。

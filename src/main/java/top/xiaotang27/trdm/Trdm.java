@@ -81,7 +81,6 @@ public class Trdm implements ModInitializer {
     public static BlockEntityType<BlockTrdmStationSign.TileEntityTrdmStationSign> STATION_SIGN_BE;
     public static BlockEntityType<BlockTrdmBigStationSign.TileEntityTrdmBigStationSign> BIG_SIGN_1_BE;
     public static BlockEntityType<BlockTrdmHungBigSign.TileEntityTrdmHungBigSign> HUNG_SIGN_BE;
-    public static BlockEntityType<BlockTrdmPSDGlass.TileEntityTrdmPSDGlass> PSD_GLASS_BE;
     public static BlockEntityType<BlockTrdmPis.TileEntityTrdmPis> PIS_BE;
     public static BlockEntityType<BlockTrdmPSDEndGate.TileEntityTrdmPSDEndGate> PSD_END_GATE_BE;
 
@@ -124,8 +123,6 @@ public class Trdm implements ModInitializer {
                 BlockEntityType.Builder.of(BlockTrdmBigStationSign.TileEntityTrdmBigStationSign::new, BIG_SIGN_1).build(null));
         HUNG_SIGN_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("hung_big_station_sign"),
                 BlockEntityType.Builder.of(BlockTrdmHungBigSign.TileEntityTrdmHungBigSign::new, HUNG_SIGN).build(null));
-        PSD_GLASS_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_glass_1"),
-                BlockEntityType.Builder.of(BlockTrdmPSDGlass.TileEntityTrdmPSDGlass::new, PSD_GLASS_1).build(null));
         PIS_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("pis"),
                 BlockEntityType.Builder.of(BlockTrdmPis.TileEntityTrdmPis::new, PIS).build(null));
         PSD_END_GATE_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_end_gate"),
