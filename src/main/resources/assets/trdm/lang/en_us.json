@@ -121,5 +121,7 @@
   "gui.trdm.psd_style.end_gate": "End Gate",
   "gui.trdm.psd_style.on": "On",
   "gui.trdm.psd_style.off": "Off",
-  "gui.trdm.psd_style.end_gate_hint": "Mark this glass as a platform end gate"
+  "gui.trdm.psd_style.end_gate_hint": "Mark this glass as a platform end gate",
+  "block.trdm.psd_end_gate": "PSD End Gate",
+  "item.trdm.psd_end_gate": "PSD End Gate"
 }

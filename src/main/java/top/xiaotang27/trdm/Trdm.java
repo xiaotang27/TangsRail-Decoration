@@ -25,6 +25,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDGlass;
 import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.BlockTrdmPis;
+import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPisPole;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
@@ -58,6 +59,8 @@ public class Trdm implements ModInitializer {
     public static final BlockTrdmPis PIS = new BlockTrdmPis();
     /** 显示屏柱：单独一格的立杆，用来把 PIS 架高。 */
     public static final BlockTrdmPisPole PIS_POLE = new BlockTrdmPisPole();
+    /** 屏蔽门端门：玻璃面板 + 上方不动门楣。 */
+    public static final BlockTrdmPSDEndGate PSD_END_GATE = new BlockTrdmPSDEndGate();
     /** 屏蔽门端门：门楣 + 可旋开的门 + 固定玻璃。 */
 
     // 物品（与 MTR 一致：门楣没有独立物品，用玻璃物品放置）
@@ -70,6 +73,7 @@ public class Trdm implements ModInitializer {
     public static final Item HUNG_SIGN_ITEM = new ItemTrdmBigSign(HUNG_SIGN);
     public static final Item PIS_ITEM = new BlockItem(PIS, new Item.Properties());
     public static final Item PIS_POLE_ITEM = new BlockItem(PIS_POLE, new Item.Properties());
+    public static final Item PSD_END_GATE_ITEM = new BlockItem(PSD_END_GATE, new Item.Properties());
 
     public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
     public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
@@ -79,6 +83,7 @@ public class Trdm implements ModInitializer {
     public static BlockEntityType<BlockTrdmHungBigSign.TileEntityTrdmHungBigSign> HUNG_SIGN_BE;
     public static BlockEntityType<BlockTrdmPSDGlass.TileEntityTrdmPSDGlass> PSD_GLASS_BE;
     public static BlockEntityType<BlockTrdmPis.TileEntityTrdmPis> PIS_BE;
+    public static BlockEntityType<BlockTrdmPSDEndGate.TileEntityTrdmPSDEndGate> PSD_END_GATE_BE;
 
     public static CreativeModeTab CREATIVE_TAB;
 
@@ -94,6 +99,7 @@ public class Trdm implements ModInitializer {
         registerBlock("hung_big_station_sign", HUNG_SIGN);
         registerBlock("pis", PIS);
         registerBlock("pis_pole", PIS_POLE);
+        registerBlock("psd_end_gate", PSD_END_GATE);
 
         registerItem("psd_door_1", PSD_DOOR_ITEM_1);
         registerItem("psd_glass_1", PSD_GLASS_ITEM_1);
@@ -104,6 +110,7 @@ public class Trdm implements ModInitializer {
         registerItem("hung_big_station_sign", HUNG_SIGN_ITEM);
         registerItem("pis", PIS_ITEM);
         registerItem("pis_pole", PIS_POLE_ITEM);
+        registerItem("psd_end_gate", PSD_END_GATE_ITEM);
 
         PSD_DOOR_1_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_door_1"),
                 BlockEntityType.Builder.of(BlockTrdmPSDDoor.TileEntityTrdmPSDDoor::new, PSD_DOOR_1).build(null));
@@ -121,6 +128,8 @@ public class Trdm implements ModInitializer {
                 BlockEntityType.Builder.of(BlockTrdmPSDGlass.TileEntityTrdmPSDGlass::new, PSD_GLASS_1).build(null));
         PIS_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("pis"),
                 BlockEntityType.Builder.of(BlockTrdmPis.TileEntityTrdmPis::new, PIS).build(null));
+        PSD_END_GATE_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_end_gate"),
+                BlockEntityType.Builder.of(BlockTrdmPSDEndGate.TileEntityTrdmPSDEndGate::new, PSD_END_GATE).build(null));
 
         // C2S：刷子右键选完站台 → 写回集控装置；门楣外观 / 大站名牌选项同理
         TrdmControlNetwork.registerServer();
@@ -143,6 +152,7 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(HUNG_SIGN_ITEM));
                     entries.accept(new ItemStack(PIS_ITEM));
                     entries.accept(new ItemStack(PIS_POLE_ITEM));
+                    entries.accept(new ItemStack(PSD_END_GATE_ITEM));
                 });
 
         LOGGER.info("TangsRail Decoration initialized —— Version DEV_0.01");
