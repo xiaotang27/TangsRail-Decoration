@@ -82,7 +82,6 @@ public class TrdmClient implements ClientModInitializer {
 
         // PIS 乘客信息屏：16:9，实时到站数据 + 连续滚动的跑马灯
         BlockEntityRendererRegistry.register(Trdm.PIS_BE, context -> new RenderTrdmPis<>());
-        BlockEntityRendererRegistry.register(Trdm.PSD_END_GATE_BE, context -> new top.xiaotang27.trdm.render.RenderTrdmPSDEndGate<>(null));
 
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_DOOR_1, RenderType.cutout());
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_GLASS_1, RenderType.cutout());
