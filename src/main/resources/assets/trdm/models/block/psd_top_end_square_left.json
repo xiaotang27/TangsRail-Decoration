@@ -7,11 +7,11 @@
   },
   "elements": [
     {
-      "from": [4, 0, 14],
+      "from": [4, 12, 14],
       "to": [16, 16, 16],
       "faces": {
         "down": { "texture": "#edge" },
-        "up": { "texture": "#edge" },
+        "up": { "texture": "#main" },
         "north": { "texture": "#main" },
         "south": { "texture": "#main" },
         "east": { "texture": "#edge" },
