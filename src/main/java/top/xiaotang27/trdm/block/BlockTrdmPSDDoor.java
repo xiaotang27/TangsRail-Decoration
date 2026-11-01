@@ -3,6 +3,8 @@ package top.xiaotang27.trdm.block;
 import mtr.block.BlockPSDAPGDoorBase;
 import mtr.mappings.BlockEntityMapper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -30,6 +32,22 @@ public class BlockTrdmPSDDoor extends BlockPSDAPGDoorBase {
             return appearance;
         }
         return super.use(state, world, pos, player, hand, hitResult);
+    }
+
+    @Override
+    public BlockState updateShape(BlockState state, Direction direction, BlockState newState, LevelAccessor world,
+                                  BlockPos pos, BlockPos posFrom) {
+        final BlockState updated = super.updateShape(state, direction, newState, world, pos, posFrom);
+        if (!updated.hasProperty(END) || !updated.getValue(END)) {
+            return updated;
+        }
+        // 邻接直角端头玻璃时按普通门处理（END 只影响外观/交互分支）
+        for (final Direction horizontal : Direction.Plane.HORIZONTAL) {
+            if (world.getBlockState(pos.relative(horizontal)).getBlock() instanceof BlockTrdmPSDGlassEnd) {
+                return updated.setValue(END, false);
+            }
+        }
+        return updated;
     }
 
     @Override
