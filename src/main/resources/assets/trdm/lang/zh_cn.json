@@ -117,7 +117,5 @@
   "gui.trdm.psd_control.on": "开",
   "gui.trdm.psd_control.off": "关",
   "gui.trdm.psd_control.isolated_on": "已开启屏蔽门隔离：%s 的门现在只受本装置控制",
-  "gui.trdm.psd_control.isolated_off": "已取消屏蔽门隔离：%s 的门交还列车自动控制",
-  "block.trdm.psd_end_gate": "屏蔽门端门",
-  "item.trdm.psd_end_gate": "屏蔽门端门"
+  "gui.trdm.psd_control.isolated_off": "已取消屏蔽门隔离：%s 的门交还列车自动控制"
 }
