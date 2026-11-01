@@ -29,7 +29,6 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import top.xiaotang27.trdm.Trdm;
 
@@ -276,18 +275,10 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter blockGetter, BlockPos pos, CollisionContext collisionContext) {
-        final boolean notPersistent = IBlock.getStatePropertySafe(state, PERSISTENT) == EnumPersistent.NONE;
-        final Direction facing = IBlock.getStatePropertySafe(state, FACING);
-        final double yBottom = notPersistent ? 0 : PERSISTENT_OFFSET;
-        VoxelShape shape = IBlock.getVoxelShapeByDirection(0, yBottom, 0, 16, 16, 6, facing);
-        // 端头：梁拐 90° 的那一节（与 psd_top_end_square_* 模型一致）
-        if (IBlock.getStatePropertySafe(state, AIR_LEFT)) {
-            shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(new double[]{12, 12, 2, 16, 16, 10}, facing));
-        }
-        if (IBlock.getStatePropertySafe(state, AIR_RIGHT)) {
-            shape = Shapes.or(shape, BlockTrdmPSDGlassEnd.cornerBox(new double[]{0, 12, 2, 4, 16, 10}, facing));
-        }
-        return shape;
+        final VoxelShape baseShape = IBlock.getVoxelShapeByDirection(0, IBlock.getStatePropertySafe(state, PERSISTENT) == EnumPersistent.NONE ? 0 : PERSISTENT_OFFSET, 0, 16, 16, 6, IBlock.getStatePropertySafe(state, FACING));
+        final boolean airLeft = IBlock.getStatePropertySafe(state, AIR_LEFT);
+        final boolean airRight = IBlock.getStatePropertySafe(state, AIR_RIGHT);
+        return airLeft || airRight ? BlockTrdmPSDGlassEnd.getEndOutlineShape(baseShape, state, 16, 6, airLeft, airRight) : baseShape;
     }
 
     @Override
