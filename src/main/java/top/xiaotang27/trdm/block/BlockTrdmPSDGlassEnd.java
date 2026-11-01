@@ -1,12 +1,18 @@
 package top.xiaotang27.trdm.block;
 
 import mtr.block.BlockPSDAPGGlassEndBase;
+import mtr.block.IBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import top.xiaotang27.trdm.Trdm;
@@ -29,6 +35,16 @@ public class BlockTrdmPSDGlassEnd extends BlockPSDAPGGlassEndBase {
             return appearance;
         }
         return super.use(state, world, pos, player, hand, hitResult);
+    }
+
+    @Override
+    public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+        return switch (IBlock.getStatePropertySafe(state, HorizontalDirectionalBlock.FACING)) {
+            case NORTH -> Block.box(0, 0, 0, 2, 16, 16);
+            case EAST -> Block.box(0, 0, 0, 16, 16, 2);
+            case SOUTH -> Block.box(14, 0, 0, 16, 16, 16);
+            default -> Block.box(0, 0, 14, 16, 16, 16);
+        };
     }
 
     @Override

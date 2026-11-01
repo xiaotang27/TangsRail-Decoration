@@ -13,7 +13,6 @@
 | Fabric Loader | 0.19.3+        |                                                                                            |
 | Fabric API | 0.92.11+1.20.1 |                                                                                            |
 | Minecraft Transit Railway | 3.2.x          | mod id `mtr`，必须                                                                            |
-| Architectury API | 9.2.14         | MTR 的运行时依赖，必须 |
 | Mod Menu | 7.2.2+         | 可选                                                                                         |
 
 ## 构建
