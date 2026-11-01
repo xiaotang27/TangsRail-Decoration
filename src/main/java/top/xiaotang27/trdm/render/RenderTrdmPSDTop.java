@@ -760,12 +760,16 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         final boolean airRight = isNotPersistent && IBlock.getStatePropertySafe(state, BlockTrdmPSDTop.AIR_RIGHT);
         RenderTrains.scheduleRender(ClientData.DATA_CACHE.getColorStrip(platformId).resourceLocation, false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matrices, vertexConsumer) -> {
             storedMatrixTransformations.transform(matrices);
-            IDrawing.drawTexture(matrices, vertexConsumer, airLeft ? 0.625F : 0, COLOR_STRIP_START, 0, airRight ? 0.375F : 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
+            // 门楣正面整幅色带
+            IDrawing.drawTexture(matrices, vertexConsumer, 0, COLOR_STRIP_START, 0, 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
+            // 端头 L 形面板的两面也铺色带（面板位于 z 14-16 / z 0-2）
             if (airLeft) {
-                IDrawing.drawTexture(matrices, vertexConsumer, END_FRONT_OFFSET, COLOR_STRIP_START, -0.625F - END_FRONT_OFFSET, 0.75F + END_FRONT_OFFSET, COLOR_STRIP_END, 0.125F - END_FRONT_OFFSET, facing, -1, light);
+                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F, COLOR_STRIP_START, 0.875F, 1, COLOR_STRIP_BOTTOM, 0.875F, facing, color, light);
+                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F, COLOR_STRIP_START, 1, 1, COLOR_STRIP_BOTTOM, 1, facing.getOpposite(), color, light);
             }
             if (airRight) {
-                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F - END_FRONT_OFFSET, COLOR_STRIP_START, 0.125F - END_FRONT_OFFSET, 1 - END_FRONT_OFFSET, COLOR_STRIP_END, -0.625F - END_FRONT_OFFSET, facing, -1, light);
+                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F, COLOR_STRIP_START, 0.125F, 1, COLOR_STRIP_BOTTOM, 0.125F, facing.getOpposite(), color, light);
+                IDrawing.drawTexture(matrices, vertexConsumer, 0.25F, COLOR_STRIP_START, 0, 1, COLOR_STRIP_BOTTOM, 0, facing, color, light);
             }
             matrices.popPose();
         });
