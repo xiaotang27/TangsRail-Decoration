@@ -22,17 +22,6 @@ import java.util.Optional;
 /**
  * PIS 广告的 <b>mp4 播放器</b>（纯 Java 解码，jar 里自带 JCodec，不依赖系统装 ffmpeg）。
  * <p>
- * <b>不用视频的时候一律不启动</b>：
- * <ul>
- *   <li>只有「当前正要播的那条广告」是 {@code .mp4 / .m4v / .mov} 时，才会读文件、建解码器、起线程；</li>
- *   <li>广告轮播切走 → {@link #keepOnly(ResourceLocation)} 立刻关掉解码器；</li>
- *   <li>超过 {@link #IDLE_MS} 没人要帧 → 工作线程自己退出；</li>
- *   <li>解码全程在后台线程，渲染线程只做一次「取当前帧」的引用；</li>
- *   <li>只保留「当前帧」一张图（不解码整片、不缓存整片），内存几 MB 以内。</li>
- * </ul>
- * 播放时钟由解码线程自己走（按容器里的帧率，读不到就按 {@link #FALLBACK_FPS}），
- * <b>不依赖容器里能不能读到总帧数</b> —— 读不到也能正常循环播。
- * 解不出来（非 H.264 / 文件坏了）就返回 null，调用方退回默认广告图，不会崩客户端。
  */
 public final class TrdmPisVideo {
 
@@ -256,9 +245,6 @@ public final class TrdmPisVideo {
         /**
          * 解码线程：自己按帧率走时钟。
          * <p>
-         * 每一帧在「本轮开始 + 帧号 / fps」这个时刻发布，所以播放速度和视频原速一致；
-         * 到片尾（{@code getNativeFrame()} 返回 null）就 seek 回开头重新计时，
-         * <b>不需要容器里的总帧数</b> —— 很多 mp4 那里读出来是 0。
          */
         private void run() {
             try {

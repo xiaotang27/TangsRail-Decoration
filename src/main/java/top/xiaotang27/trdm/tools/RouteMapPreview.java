@@ -16,9 +16,6 @@ import java.util.Locale;
 /**
  * 离线预览线路图吊板：用样例数据（天津地铁 3 号线）按指定宽高比画一张 PNG 到 {@code build/preview/}，
  * 方便不开游戏也能核对版面比例。
- * <p>
- * 用法：{@code ./gradlew previewRouteMap -Paspect=4.57 -ParrowLeft=true}
- * （不传参数就按参考图的 4.57 宽高比、箭头朝左）。游戏运行时用不到这个类。
  */
 public final class RouteMapPreview {
 

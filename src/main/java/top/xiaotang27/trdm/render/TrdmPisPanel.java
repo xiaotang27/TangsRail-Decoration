@@ -10,25 +10,6 @@ import java.awt.image.BufferedImage;
 /**
  * PIS 屏幕的版面（把 JCM 的 {@code pids_tj_custom.js} 一对一搬过来）。
  * <p>
- * 坐标系沿用 JCM 脚本的「画布单位」：整块屏 <b>136 × 72</b>（16:9），
- * 脚本里 {@code Text.create().scale(s)} 的字高 = {@code 16 × s} 画布单位，
- * {@code pos(x, y)} 是文字中心（配合 {@code centerAlign()}）。烘到贴图时整体乘一个倍数即可。
- * <pre>
- * ┌──────┬──────────────────────────────┐
- * │欢迎您 │                              │
- * │本次列车│        广告图 97×56          │
- * │ 15 分钟│        (37,3)                │
- * ├──────┤                              │
- * │下次列车│                              │
- * │ 22 分钟│                              │
- * ├──────┼──────────────────────────────┤
- * │ 20:31│  跑马灯 41..134, y=60         │
- * │ 日期  │                              │
- * ├──────┴──────────────────────────────┤
- * │        车厢示意图（头/中/尾 + 车号）    │
- * └─────────────────────────────────────┘
- * </pre>
- * 这条版面只画「一帧」，滚动 / 倒计时 / 换广告都由调用方把不同的 {@link View} 喂进来。
  */
 public final class TrdmPisPanel {
 
@@ -106,19 +87,14 @@ public final class TrdmPisPanel {
 
     /**
      * 一趟车。
-     *
      * @param etaSeconds  还有多少秒到站（≤0 = 已到站，&lt;60 = 即将进站）
-     * @param destination 终点站（MTR 的「中文|English」，这里只取中文）
-     * @param carCount    编组节数
      */
     public record Arrival(int etaSeconds, String destination, int carCount) {
     }
 
     /**
      * 一帧画面。
-     *
      * @param tickerOffset 跑马灯已经滚了多少画布单位（可以带小数：{@code TICKER_SPEED × 秒数}），
-     *                     整条文字连续平移，不再逐字跳
      */
     public record View(Arrival first, Arrival second, String clock, String date,
                        String ticker, float tickerOffset) {
@@ -129,13 +105,7 @@ public final class TrdmPisPanel {
 
     /**
      * 画一帧。
-     *
      * @param width      贴图宽（像素）
-     * @param height     贴图高（像素）
-     * @param ad         广告图（null = 不画）
-     * @param carHead    头车素材
-     * @param carMiddle  中间车素材
-     * @param carTail    尾车素材
      */
     public static BufferedImage render(int width, int height, View view, BufferedImage ad,
                                        BufferedImage carHead, BufferedImage carMiddle, BufferedImage carTail) {
@@ -267,10 +237,6 @@ public final class TrdmPisPanel {
     /**
      * 跑马灯：<b>整条文字当成一个整体连续平移</b>（不再是逐字跳）。
      * <p>
-     * 做法：把整行文字一次性画出来，用「跑马灯条」那个矩形裁剪，然后按连续的像素偏移左右平移；
-     * 一轮滚完再接着画下一份，接缝处留 {@link #TICKER_LOOP_GAP} 的空档，所以看上去是一直流动的。
-     *
-     * @param offset 已经滚过去多少画布单位（小数也有效，可以是 {@code TICKER_SPEED × 秒数}）
      */
     private static void drawTicker(Graphics2D graphics, float scale, String ticker, float offset) {
         if (ticker == null || ticker.isEmpty()) {
@@ -400,8 +366,6 @@ public final class TrdmPisPanel {
     /**
      * 跑马灯文字条：一整轮文字（文字 + 空档）烘成一条**透明底**的贴图，
      * 渲染端拿它做 UV 平移，就能连续滚动而不用每帧重烘整块屏。
-     *
-     * @param stripScale 每画布单位多少像素（和版面贴图同一个比例）
      */
     public static TickerStrip renderTickerStrip(String ticker, int stripScale) {
         final String text = ticker == null ? "" : ticker;

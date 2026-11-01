@@ -13,9 +13,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：不开游戏，直接离线烘焙几张装饰带预览图，用来对版面（人字间距、中央图大小）。
  * <p>
- * 用法：{@code ./gradlew previewBand}，输出到 {@code build/preview/band_<比例>_<L|R>.png}
- * （有 slogan 的样式）和 {@code band_only_<比例>_<L|R>.png}（只有人字纹的样式，垫了灰底才看得见）。
- * 中央图从 {@code src/main/resources/assets/trdm/textures/block/band/band_center.png} 读。
  */
 public final class BandCenterPreview {
 

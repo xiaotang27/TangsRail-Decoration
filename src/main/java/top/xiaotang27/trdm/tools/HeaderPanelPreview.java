@@ -12,8 +12,6 @@ import java.util.List;
 /**
  * 一次性小工具：不开游戏，直接烘焙几张「门楣站名吊板」预览图，用来对
  * 站名中/英字号比例（英文只比中文略小）、换乘站线路标志（含纯文字线路的长条底牌）和留白。
- * <p>
- * 用法：{@code ./gradlew previewHeaderPanel}，输出到 {@code build/preview/header_panel_*.png}。
  */
 public final class HeaderPanelPreview {
 

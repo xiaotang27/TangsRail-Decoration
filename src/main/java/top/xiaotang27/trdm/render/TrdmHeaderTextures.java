@@ -37,16 +37,6 @@ import java.util.regex.Pattern;
 /**
  * 门楣吊板的动态贴图缓存 + AWT 排版。
  * <p>
- * 一块门楣只画一张「整段」贴图，每格按自己在本段里的位置裁一条 UV —— 和 MTR 的 RenderRouteBase 一个思路，
- * 这样贴图不会被拼接缝割开，站名也就真正居中在整段中间。
- * <p>
- * 贴图内容（黑体）：
- * <ul>
- *   <li>正中：本站站名，中文一行、英文一行（全大写，带字距，照国内车站吊板的排法）；</li>
- *   <li>左右两侧：若本站是换乘站，则画本站台停靠线路的名称标志（圆角色块 = 线路色，
- *       数字放大 + 「号线」+「Line N」），左半放前半数、右半放后半数。</li>
- * </ul>
- * 生成在后台线程跑（AWT 与 GL 无关），注册贴图回到渲染线程（{@link #flush()}）。
  */
 public final class TrdmHeaderTextures {
 
@@ -140,11 +130,7 @@ public final class TrdmHeaderTextures {
 
     /**
      * 站点信息吊板：箭头 +「开往 X」+「下一站 Y」。
-     *
      * @param destination 开往的终点站（MTR 的「中文|English」原样字符串）
-     * @param nextStation 下一站（同上）
-     * @param arrowLeft   箭头是否朝左（朝右时整块版面镜像）
-     * @param blocks      这块吊板覆盖几格玻璃（3 格及以上按左右各 1/6 的边距铺开）
      */
     public static ResourceLocation getStationInfo(long platformId, String destination, String nextStation, boolean arrowLeft, int blocks, float aspect) {
         final String key = "info|" + platformId + "|" + destination + "|" + nextStation + "|" + arrowLeft + "|" + blocks + "|" + formatAspect(aspect);
@@ -163,11 +149,6 @@ public final class TrdmHeaderTextures {
     /**
      * 线路图吊板：一条粗横线（后方灰、前方线路色）+ 方向箭头 + 站点图标 + 斜排站名
      * + 换乘尖旗与文字 + 右下角图例。版面实现在 {@link TrdmRouteMap}。
-     *
-     * @param arrowLeft        行车方向是否朝左（整张线路图跟着箭头一起镜像）
-     * @param runLeftFraction  贴图左边有多少是借来的滑动门吊板（0~1），图例不跟着借
-     * @param runRightFraction 右边同理
-     * @param signature        线路数据指纹：站点/换乘/当前站一变就自动重新烘焙
      */
     public static ResourceLocation getRouteMapPanel(long platformId, float aspect, boolean arrowLeft,
                                                    float runLeftFraction, float runRightFraction, String signature) {
@@ -182,11 +163,7 @@ public final class TrdmHeaderTextures {
      */
     /**
      * 站名牌贴图（1 格宽 × 3/4 格高 = 4:3）。
-     *
      * @param stationName 本站（MTR 的「中文|English」字符串）
-     * @param nextStation 下一站（同上；本站是终点站时传 null）
-     * @param routeColor  线路色（0xRRGGBB）
-     * @param terminal    本站就是终点站
      */
     public static ResourceLocation getStationSign(String stationName, String nextStation, int routeColor, boolean terminal) {
         final String key = "sign|" + stationName + "|" + nextStation + "|"
@@ -206,13 +183,7 @@ public final class TrdmHeaderTextures {
 
     /**
      * 大站名牌贴图（牌高 3/4 格，宽度随合并段长度变，所以宽高比要传进来）。
-     *
      * @param stationName  本站（MTR 的「中文|English」）
-     * @param badges       本站所有线路的编号标识（全部画在标志旁边）
-     * @param exitName     右侧出口字母（空串 = 不画）
-     * @param zhanSuffix   true = 英文用 ZHAN，false = 用 STATION
-     * @param elevator     true = 画成「站名 + 无障碍电梯」牌：站名后面加后缀、线路标签后加图标
-     * @param aspect       牌宽 / 牌高
      */
     public static ResourceLocation getBigStationSign(String stationName, List<Badge> badges, String exitName,
                                                      boolean zhanSuffix, boolean elevator, float aspect) {
@@ -289,12 +260,6 @@ public final class TrdmHeaderTextures {
     /**
      * 普通吊板（站名 / 站点信息 / 终点站）的贴图尺寸。
      * <p>
-     * 高度从 {@link #TEXTURE_HEIGHT} 起步，宽度超过上限时<b>反过来压高度</b>：
-     * 宽高必须一起按宽高比算。之前只截宽度、高度死钉 512，玻璃段一长（4 格起就过 4096）
-     * 贴图比例就和四边形比例对不上，贴上去整块字被横向拉长。
-     * <p>
-     * 版面里的字号都是按「高度」的比例算的，所以压高度只是掉分辨率，各元素之间的比例和
-     * 相对位置不变（元素位置仍然按带宽铺开）。
      */
     public static TextureSize panelTextureSize(float aspect) {
         final float safe = Math.min(Math.max(aspect, 0.5F), 96F);
@@ -309,12 +274,7 @@ public final class TrdmHeaderTextures {
 
     /**
      * 装饰带贴图（玻璃上那条「人字纹 + 中央图文」）：底是线路色，两端人字纹，正中一张图。
-     *
      * @param style      装饰线样式（见 {@link top.xiaotang27.trdm.control.PsdStyles}）：
-     *                   0 = 有底色带 + slogan；1 = 只有人字纹、人字染线路色
-     * @param routeColor 线路色（0xRRGGBB）：一变就重新烘焙
-     * @param aspect     带宽/带高
-     * @param arrowLeft  人字朝左还是朝右（中央图文不镜像）
      */
     public static ResourceLocation getDecalBand(int style, int routeColor, float aspect, boolean arrowLeft,
                                                 boolean mirrorCentre) {
@@ -471,9 +431,6 @@ public final class TrdmHeaderTextures {
     /**
      * 当场烘焙并在这一帧注册（阻塞渲染线程）。
      * <p>
-     * 站名牌这类「玩家手改一个值，牌面必须立刻跟着变」的贴图走这条路：后台烘焙期间渲染器只能
-     * 继续画上一张（{@code LAST_TEXTURES}），牌子越长贴图越宽、烘得越久，「改了没反应」的时间
-     * 就越明显。这里直接在渲染线程烘完，改完当帧生效，代价是那一帧多花几十毫秒。
      */
     private static ResourceLocation resolveNow(String key, java.util.function.Supplier<NativeImage> supplier) {
         flush();
@@ -641,8 +598,6 @@ public final class TrdmHeaderTextures {
     /**
      * 站点信息吊板的图像本体（离线预览也走这里，保证预览和游戏里一模一样）。
      * <p>
-     * 贴图尺寸用 {@link #panelTextureSize(float)}：宽度过 4096 就压高度，不截宽度，
-     * 这样贴图宽高比永远等于吊板宽高比，字不会被横向拉伸；各元素的位置仍然按带宽铺开。
      */
     public static BufferedImage stationInfoImage(String destination, String nextStation, boolean arrowLeft, int blocks, float aspect) {
         final TextureSize size = panelTextureSize(aspect);
@@ -666,15 +621,6 @@ public final class TrdmHeaderTextures {
     /**
      * 站点信息吊板排版（照参考图）：
      * <pre>
-     * [◀]   开往曹庄              下一站   天津站
-     *       TO CAOZHUANG         Next Station  TIANJINZHAN
-     * </pre>
-     * 「开往 X」加粗、和箭头之间留明显空隙；「下一站」是比站名小一号的标签，站名英文也再小一号，
-     * 中英文按列对应（Next Station 在「下一站」下方、TIANJINZHAN 在站名下方），
-     * 这一列行距更紧凑但英文底部与左边 TO X 底部齐平。
-     * <p>
-     * 3 格及以上的玻璃段：内容从左侧 1/6 开始、下一站那列顶到右侧 1/6；
-     * 1~2 格的窄段放不下这么宽的边距，退回「整组紧凑居中」。
      */
     private static void layoutStationInfo(Graphics2D graphics, int width, int height, String destination, String nextStation, boolean arrowLeft, int blocks) {
         final String[] destinationParts = splitName(destination);
@@ -1065,9 +1011,6 @@ public final class TrdmHeaderTextures {
     /**
      * 这个线路标识要画多宽（给定高度）。
      * <p>
-     * 带数字的（「5号线 / Line 5」）是正方形；<b>纯文字线路名</b>（「津静线 / JINJING Line」）
-     * 挤在正方形里字会小得看不清，按参考图做成长条 —— 宽度<b>按文字实际宽度算</b>，
-     * 框刚好把中文那一行包住，两边各留 {@link #TEXT_PADDING} 的边距。
      */
     static float badgeWidth(Graphics2D graphics, float height, Badge badge) {
         if (!isTextOnly(badge)) {
@@ -1095,15 +1038,7 @@ public final class TrdmHeaderTextures {
 
     /**
      * 线路编号标识（可指定宽度）。
-     *
      * <p>两种画法：
-     * <ul>
-     *   <li><b>带数字的线路</b>：整块填线路色，数字 + 「号线 / Line N」反白（浅色线路用黑字）；</li>
-     *   <li><b>纯文字线路名</b>：照参考图的「津静线」——浅色底（线路色兑白）、细深色边框，
-     *       中文用压暗的线路色写、英文用深灰写，整体是纵长条而不是正方形。</li>
-     * </ul>
-     *
-     * @param outlineWidth 白色描边粗细（像素，0 = 不描边）；只对带数字的线路有效
      */
     static void drawBadge(Graphics2D graphics, int x, int y, int width, int height, Badge badge, float outlineWidth) {
         if (isTextOnly(badge)) {
@@ -1212,8 +1147,6 @@ public final class TrdmHeaderTextures {
     /**
      * 纯文字线路名的标识，照参考图里「津静线 / JINJING Line」的画法：
      * 浅粉底（线路色兑白）、白色圆角边框，<b>线路名本身用黑色或白色</b>（按底色亮度取对比色，
-     * 和带数字的线路同一套规则，不用线路色写字），中文比英文略大；
-     * <b>框宽按文字实际宽度算，刚好把最宽那一行包住</b>。
      */
     private static void drawTextBadge(Graphics2D graphics, int x, int y, int width, int height, Badge badge) {
         final String chinese = badge.chineseName() == null ? "" : badge.chineseName();
@@ -1345,8 +1278,6 @@ public final class TrdmHeaderTextures {
     /**
      * 当前中文字体的「字形墨水高度 / 字号」比例（量一次，缓存）。
      * <p>
-     * 换字体时这个比例会变（思源黑体 HW VF 的行高比系统黑体高不少），版面里一切「按设计稿
-     * 多少像素高」来的字号都要用它换算成字号，否则一换字体整套字就放大或缩小。
      */
     public static synchronized float inkRatio() {
         if (inkRatio > 0F) {
@@ -1363,8 +1294,6 @@ public final class TrdmHeaderTextures {
     /**
      * <b>PIS 屏专用</b>：jar 里打进的那份思源黑体（读不到才退回系统黑体）。
      * <p>
-     * 站名牌 / 门楣 / 吊板 <b>不要</b>用这个 —— 那些一律 {@link #font(float)}（普通黑体）+ {@link #latinFont(float)}（Arial），
-     * 只有 PIS 版面（{@link TrdmPisPanel}）用思源黑体。
      */
     public static Font pisFont(float size) {
         final Font bundled = bundledFont();

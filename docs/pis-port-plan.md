@@ -1,7 +1,7 @@
 # TJPIS（MTR4 / Joban JCM）→ TRDM（MTR3）移植计划
 
 对象：`D:\software\Minecraft\.minecraft\versions\MTR4\resourcepacks\TJPIS_1.0\assets\jsblock`
-目标：在 TRDM（Fabric 1.20.1 + YomiMTR 3.6.3，`mtr.*`）里复刻这套 PIS 的界面，并把 MTR4/JCM 的数据获取方式换成 MTR3 的实现。
+目标：在 TRDM（Fabric 1.20.1 + MTR 3.6.3，`mtr.*`）里复刻这套 PIS 的界面，并把 MTR4/JCM 的数据获取方式换成 MTR3 的实现。
 
 ---
 

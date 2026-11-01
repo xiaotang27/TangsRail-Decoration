@@ -18,9 +18,6 @@ import java.util.List;
 /**
  * 一次性小工具：不开游戏，按方块网格画出「悬挂式站外站名牌」的模型示意
  * （3 格 / 6 格正视图 + 侧视图），用来核对尺寸
- * （牌子 12/16 高、1/16 厚、吊杆 4/16、<b>吊杆只在两端</b>）和内容排版。
- * <p>
- * 用法：{@code ./gradlew previewHungSign}，输出到 {@code build/preview/hung_sign_model.png}。
  */
 public final class HungSignPreview {
 

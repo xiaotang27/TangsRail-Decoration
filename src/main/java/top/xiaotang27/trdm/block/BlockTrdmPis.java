@@ -35,10 +35,6 @@ import top.xiaotang27.trdm.Trdm;
 /**
  * PIS 乘客信息屏：外壳用模型的 {@code pids_rv}（立杆 + 两块黑挡板），
  * 屏幕是贴在挡板外表面上的动态贴图（正面 + 背面各一块，见
- * {@link top.xiaotang27.trdm.render.RenderTrdmPis}）。
- * <p>
- * 数据：到站列表走 {@code ClientData.SCHEDULES_FOR_PLATFORM}，见
- * {@link top.xiaotang27.trdm.render.TrdmPisData}。
  */
 public class BlockTrdmPis extends BaseEntityBlock {
 
@@ -166,8 +162,6 @@ public class BlockTrdmPis extends BaseEntityBlock {
     /**
      * 方块朝向 → 模型在 blockstates 里的 {@code y} 角度。
      * <p>
-     * 模型（{@code pids_rv.json}）的屏幕面板朝模型 ±X，这里要把它转到方块 facing：
-     * north = 270、east = 0、south = 90、west = 180（和 {@code blockstates/pis.json} 一一对应）。
      */
     public static int modelRotation(Direction facing) {
         return switch (facing) {

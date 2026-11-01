@@ -10,17 +10,6 @@ import java.awt.image.BufferedImage;
 /**
  * 站名牌的版面（参照 MTR 车站站名牌的排法）：
  * <pre>
- * ┌───────────────────────────┐
- * │          本站站名          │  大字（中文）
- * │          本站拼音          │  小字（缩到和中文一样宽、居中）
- * │ ══════ 线路色带 ══════ │  整幅宽
- * │ 下一站             下一站名 │  左下标签、右下站名（各带一行小字）
- * │ Next Station       BEIZHAN │
- * └───────────────────────────┘
- * </pre>
- * 字号比例照门楣吊板那一套（{@link TrdmHeaderTextures#drawStationName}）：
- * 中文一行、英文一行都水平居中，英文按字号缩放去凑中文那行的宽度，所以两行左右两端自然对齐。
- * 牌子是 1 格宽 × 3/4 格高（4:3），所以贴图也按 4:3 出。
  */
 public final class TrdmStationSignPanel {
 
@@ -62,10 +51,6 @@ public final class TrdmStationSignPanel {
     /**
      * @param stationName 本站（MTR 的「中文|English」字符串）
      * @param nextStation 下一站（同上；null = 终点站）
-     * @param routeColor  线路色（0xRRGGBB）
-     * @param terminal    本站就是这条线的终点站
-     * @param nextLabel   左下标签的中文（「下一站」/「终点站」）
-     * @param nextLabelEn 左下标签的英文
      */
     public static BufferedImage render(int width, int height, String stationName, String nextStation, int routeColor,
                                        boolean terminal, String nextLabel, String nextLabelEn) {

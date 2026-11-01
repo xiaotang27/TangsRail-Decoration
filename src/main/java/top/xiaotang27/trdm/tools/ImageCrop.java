@@ -10,9 +10,6 @@ import java.util.List;
 /**
  * 一次性小工具：把一张参考图按「名字 x y w h 倍数」的清单裁成若干放大裁剪图，用来核对排版比例。
  * <p>
- * 用法（{@code ./gradlew cropImage}）：清单文件 {@code build/preview/crops.txt}，
- * 第一行 {@code input <图片路径>} 指定输入，其后每行 {@code 名字 x y 宽 高 放大倍数}，{@code #} 开头为注释。
- * 只在本地跑，游戏运行时用不到。
  */
 public final class ImageCrop {
 

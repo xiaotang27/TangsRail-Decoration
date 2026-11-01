@@ -12,10 +12,6 @@ import java.util.List;
 /**
  * 大站名牌的设置界面（刷子右键大站名牌打开）。分两段：
  * <ul>
- *   <li><b>牌子设置</b>：站名后缀（STATION / ZHAN）、无障碍电梯牌，各一个开关；</li>
- *   <li><b>选择本站出口</b>：本站的出口列表（A / A1 / B1 …，带数字后缀的还会给出「A（全部）」合并选项）。</li>
- * </ul>
- * 数据全在客户端缓存 + 方块实体里，改哪样才发哪条 C2S 包，并且先本地改、当帧生效。
  */
 public class TrdmExitSelectScreen extends TrdmScreenBase {
 

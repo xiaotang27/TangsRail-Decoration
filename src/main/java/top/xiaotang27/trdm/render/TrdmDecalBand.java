@@ -19,29 +19,12 @@ import java.util.Optional;
 /**
  * 屏蔽门玻璃上的装饰带（参考图样式的「人字纹 + 中央图文」条带）。
  * <p>
- * 不是方块也不是物品：由门楣 BE 在玻璃的竖直中缝高度上叠一层四边形，所以玻璃一放下去就自动出现，
- * 数量一多就跟着整段延长（一段玻璃只画一张，接缝处不会有重复叠画）。
- * <p>
- * 版面（全部以「装饰带高度」为单位，数值量自参考图 6222x512）：
- * <ul>
- *   <li>底：线路色整条铺满；</li>
- *   <li>两端：白色人字纹，节距 0.264、横向笔画宽 0.113、上下各伸 0.377、斜度 0.423，</li>
- *       从两端边缘往里排，排到中央图文两侧的留白为止；</li>
- *   <li>正中：一张图（{@link #CENTRE_TEXTURE}），按不透明部分居中，高度 0.70，不随方向镜像。</li>
- * </ul>
- * 人字朝左还是朝右由门楣的 {@code ARROW_DIRECTION} 决定（整条装饰带跟着吊板换向），中央图永远正向。
- * <p>
- * 还有一种<b>只有人字纹</b>的样式（{@link #render} 的 {@code chevronOnly}）：不铺底色带、不画中央图文，
- * 人字本身画成线路色；人字的形状、节距、两端起点和样式1 一模一样。
  */
 public final class TrdmDecalBand {
 
     /**
      * 装饰带高度（格）。原来是 4/16（0.25 格），按要求上下收窄 1/3，现在只有 2/3：
      * 4/16 × 2/3 = 1/6 格。
-     * <p>
-     * 带内所有元素（两端人字、正中「文字 + logo」图）的尺寸都是<b>相对带宽高度的比例</b>算的，
-     * 所以改这一个数，箭头和 slogan 会跟着一起等比缩小，不会被裁掉也不会保持不变。
      */
     public static final float HEIGHT_BLOCKS = 4F / 16F * 2F / 3F;
 
@@ -129,14 +112,7 @@ public final class TrdmDecalBand {
 
     /**
      * 烘焙一整条装饰带。
-     *
      * @param width       贴图像素宽
-     * @param height      贴图像素高
-     * @param routeColor  线路色（0xRRGGBB）
-     * @param pointLeft   人字是否朝左
-     * @param centre      中央图文（可为 null，那就只画人字）
-     * @param chevronOnly true = 只有人字纹的样式：不铺底色带、不画中央图文，人字画成线路色；
-     *                    人字的位置、形状、节距和有 slogan 的版本完全一致
      */
     public static BufferedImage render(int width, int height, int routeColor, boolean pointLeft,
                                        TrdmSignAssets.Sprite centre, boolean chevronOnly) {

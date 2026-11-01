@@ -28,10 +28,6 @@ import java.util.Map;
 /**
  * 墙挂大站名牌渲染器：深灰底板 + 压在正面的贴图，牌高 3/4 格、贴墙挂。
  * <p>
- * 牌宽随合并段长度变（每格 1 格宽）：整段只由最左那格画一次，底板和贴图一起按段长居中。
- * 贴图按「牌宽 / 牌高」的比例烘焙，所以元素不会被横向拉伸。
- * 内容（站名 / 线路 / 出口 / 后缀 / 无障碍电梯）由 {@link TrdmBigSignContent} 统一解析，
- * 和悬挂款共用。
  */
 public class RenderTrdmBigStationSign<T extends BlockTrdmBigStationSign.TileEntityTrdmBigStationSign>
         implements BlockEntityRenderer<T>, IBlock, IGui {
@@ -135,11 +131,7 @@ public class RenderTrdmBigStationSign<T extends BlockTrdmBigStationSign.TileEnti
 
     /**
      * 一个朝外的矩形面。
-     *
      * @param centre  面中心
-     * @param uAxis   横轴（UV 的 u 方向）
-     * @param vAxis   纵轴（UV 的 v 方向，纹理 v=0 在上）
-     * @param outward 朝外法线
      */
     static void emitFace(Matrix4f pose, VertexConsumer vertexConsumer, Vec3 centre, Vec3 uAxis, Vec3 vAxis,
                          float halfU, float halfV, Vec3 outward, int argb, int light) {

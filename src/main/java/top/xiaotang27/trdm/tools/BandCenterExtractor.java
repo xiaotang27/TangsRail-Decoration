@@ -9,15 +9,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：从参考图里抠出装饰带中央那张「文字 + logo」图，去掉洋红底色存成透明底 PNG。
  * <p>
- * 抠图方式（参考图是纯色底 + 白字 + 红 logo，很适合这么做）：
- * <ul>
- *   <li>先取区域左上角的像素当底色；</li>
- *   <li>每个像素与底色的距离换算成 alpha（{@value #ALPHA_EDGE} 以外算不透明），
- *       这样抗锯齿边缘不会被抠成硬边；</li>
- *   <li>再按 alpha 把底色从像素里减掉（反预乘），边缘就不会挂一圈洋红；</li>
- *   <li>最后按不透明像素的包围盒裁一刀，四周不留无用的透明边。</li>
- * </ul>
- * 用法：{@code ./gradlew extractBandCenter -Pinput=<参考图> -Pout=<输出png> -Pbox=x0,y0,x1,y1}
  */
 public final class BandCenterExtractor {
 

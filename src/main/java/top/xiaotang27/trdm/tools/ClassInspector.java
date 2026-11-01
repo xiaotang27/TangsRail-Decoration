@@ -7,10 +7,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 /**
- * 一次性小工具：打印若干类（含嵌套类）的字段与方法签名 —— 用来确认 YMTR 里
+ * 一次性小工具：打印若干类（含嵌套类）的字段与方法签名 —— 用来确认 MTR 里
  * 客户端缓存的数据结构到底给了哪些信息（例如线路/站台方向），不靠猜。
- * <p>
- * 用法：{@code ./gradlew inspectClass -Pcls=mtr.client.ClientCache$PlatformRouteDetails}
  */
 public final class ClassInspector {
 

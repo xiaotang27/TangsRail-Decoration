@@ -26,8 +26,6 @@ import java.util.List;
 /**
  * 集控装置的网络包：只有一条 C2S —— 「把这个装置的站台设成 X」。
  * <p>
- * 站台列表是客户端用 MTR 的客户端缓存自己列的（只列本装置所在车站），
- * 服务端这里再做一次同样的车站范围校验，改包也选不到别的车站的站台。
  */
 public final class TrdmControlNetwork {
 

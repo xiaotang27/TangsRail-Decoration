@@ -25,9 +25,6 @@ import java.util.Optional;
 /**
  * 极简的「原版方块模型」（{@code .json} 里的 elements / faces）加载与绘制。
  * <p>
- * 用来把 DoJ 的 PIDS 模型（{@code pids_rv.json} / {@code rv_pids_pole_extended.json}）
- * 直接搬进自绘渲染器：模型里的 UV 是 0~16 的方块纹理坐标，这里换算成 0~1。
- * 只支持 {@code from}/{@code to}/六面 {@code faces}（不含 rotation），够这套模型用。
  */
 public final class TrdmModel {
 
@@ -158,11 +155,7 @@ public final class TrdmModel {
 
     /**
      * 画一整个模型。
-     *
      * @param origin  方块原点（世界坐标，方块最小角）
-     * @param yawOffset 朝向：模型本身按「屏幕朝 ±X」做的，这里按方块 facing 旋转
-     * @param skipName 跳过该名字的元素（避免两套模型里重复的立杆打架）
-     * @param scale    整体缩放（1 = 原大小）
      */
     public static void render(PoseStack matrices, List<Element> elements, Vec3 origin, Direction facing,
                               String skipName, float scale, int light, Map<ResourceLocation, List<Face>> out) {
@@ -206,8 +199,6 @@ public final class TrdmModel {
     /**
      * 把「模型坐标」按方块 facing 旋转到世界方向。
      * <p>
-     * 和原版 blockstate 的 {@code "y": 0/90/180/270} 严格对应（north 不转、east 转 90°、
-     * south 转 180°、west 转 270°），这样 JCM 那套 blockstate 怎么转，这里的屏幕就怎么转。
      */
     private static Vec3 rotate(float[] point, Direction facing) {
         // 屏幕在模型里朝 ±X，为了让屏幕朝着方块 facing（也就是放下去时朝着玩家），

@@ -11,9 +11,6 @@ import java.util.List;
 /**
  * 一次性小工具：把 {@code assets/trdm/textures/block/sign/} 下的素材全读一遍，
  * 打印尺寸、透明度统计和一张粗粒度的「墨水遮罩」示意图 —— 用来确认这些 PNG 到底是
- * 「透明背景 + 图形」还是「不透明白底 + 图形」，渲染端要按这个决定按 alpha 还是按亮度取蒙版。
- * <p>
- * 只在本地跑（{@code ./gradlew inspectSignAssets}），游戏运行时用不到。
  */
 public final class SignAssetInspector {
 

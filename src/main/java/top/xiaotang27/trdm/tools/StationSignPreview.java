@@ -10,8 +10,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：不开游戏，直接烘焙几张站名牌预览图，用来核对排版
  * （本站大字 + 拼音、线路色带、左下「下一站」、右下下一站名）。
- * <p>
- * 用法：{@code ./gradlew previewStationSign}，输出 {@code build/preview/station_sign*.png}。
  */
 public final class StationSignPreview {
 

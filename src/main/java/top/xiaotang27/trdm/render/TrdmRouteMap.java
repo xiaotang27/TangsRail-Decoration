@@ -17,21 +17,6 @@ import java.util.Set;
 /**
  * 线路图吊板的绘制。
  * <p>
- * <b>固定比例</b>：站距、字号、图标全部按吊板高度取固定比例（{@link #PITCH} 等），
- * 吊板再宽也只是两边多留空、整组水平居中，绝不横向拉伸；吊板太窄时由调用方借旁边滑动门的吊板来加宽。
- * <p>
- * 版面（从左到右、从上到下）：
- * <pre>
- *      ╱站名中文        ← 站名按 31° 斜着排，中文在上、英文在下
- *    ╱ XIEMING
- *  ⊙──────●──────⊚──────◀──────⊚──────○──────⊙      线路（后方灰色 / 前方线路色）+ 方向箭头
- *                 │            │
- *               红色尖旗      黄|紫
- *              换乘1号线    换乘2号线
- *              Transfer…    Transfer…
- *                                    图例：◀当前站 ○站点 ⊚换乘站 ⊙始终站 ▉前方到站 ▉驶过车站 [3号线]
- * </pre>
- * 图例固定钉在玻璃吊板那一侧（不跟着线路图内容漂移），借用了滑动门吊板时也不会跑到门上去。
  */
 public final class TrdmRouteMap {
 
@@ -45,9 +30,7 @@ public final class TrdmRouteMap {
 
     /**
      * 整块吊板的数据。
-     *
      * @param currentIndex 本站在线路里的序号
-     * @param arrowLeft    行车方向是否朝左（朝左时整张线路图镜像，箭头贴左端）
      */
     public record Model(List<Station> stations, int currentIndex, int routeColor,
                         String routeChinese, String routeEnglish, boolean arrowLeft) {
@@ -126,9 +109,7 @@ public final class TrdmRouteMap {
 
     /**
      * 画一整块线路图吊板。
-     *
      * @param runLeftFraction  这块贴图左边有多少是「借用」来的滑动门吊板（0~1）
-     * @param runRightFraction 右边同理；图例钉在玻璃吊板那一侧，不钉在借用来的位置
      */
     public static BufferedImage render(int width, int height, Model model,
                                        float runLeftFraction, float runRightFraction) {

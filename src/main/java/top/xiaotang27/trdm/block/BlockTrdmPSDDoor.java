@@ -15,9 +15,6 @@ import top.xiaotang27.trdm.Trdm;
 /**
  * TRD 全高屏蔽门（门扇），与 MTR 的 BlockPSDDoor 完全一致（独立 BE）。
  * 默认状态保持 MTR 原样：UNLOCKED = false，需要先用 mtr:brush 点一下解锁，列车才会开门。
- * <p>
- * 额外多一条交互：<b>蹲下 + 刷子右键</b>打开「屏蔽门外观设置」（吊版 / 玻璃装饰线样式），
- * 改的是这一整排门楣上的记录（见 {@link BlockTrdmPSDTop#openAppearanceOnShiftBrush}）。
  */
 public class BlockTrdmPSDDoor extends BlockPSDAPGDoorBase {
 

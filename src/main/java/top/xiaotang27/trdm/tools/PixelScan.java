@@ -10,9 +10,6 @@ import java.util.List;
 /**
  * 一次性小工具：沿水平/垂直方向扫一条线，把颜色按类归并成「区间」打印出来，
  * 用来精确量参考图里线宽、圆点直径、站距、色块位置这些尺寸（不靠眼睛估）。
- * <p>
- * 用法（{@code ./gradlew pixelScan}）：清单 {@code build/preview/scan.txt}，
- * 第一行 {@code input <图片路径>}，之后每行 {@code h y x0 x1} 或 {@code v x y0 y1}。
  */
 public final class PixelScan {
 

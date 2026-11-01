@@ -19,22 +19,6 @@ import java.util.Optional;
 /**
  * PIS 广告资源：<b>由资源包驱动</b>。
  * <pre>
- * assets/trdm/pis_ads.json
- * {
- *   "pis_ads": {
- *     "xxx": { "name": "xxx.png", "time": 1000 },
- *     "gif1": { "name": "ad1.gif", "time": 10000 }
- *   }
- * }
- * assets/trdm/textures/block/pis/ads/xxx.png
- * assets/trdm/textures/block/pis/ads/ad1.gif
- * </pre>
- * {@code time} 是这张广告停留多久（毫秒），到期换下一张。json 里的顺序就是播放顺序；
- * 屏幕自己的方块实体里可以再覆盖「启用/停用」「停留时长」「顺序」。
- * <p>
- * {@code name} 写 {@code .gif} 就是动图：播放期间按 gif 自己的帧间隔循环，
- * 帧率上限跟版面烘焙频率一致（10 Hz，见 {@code RenderTrdmPis.PLATE_INTERVAL_MS}）。
- * 没写扩展名按 {@code .png} 处理。
  */
 public final class TrdmPisAds {
 
@@ -45,11 +29,7 @@ public final class TrdmPisAds {
 
     /**
      * 一条广告。
-     *
      * @param id        json 里的键
-     * @param name      文件名（png / gif / mp4，只写文件名）
-     * @param timeMs    停留多久（毫秒）
-     * @param texture   实际贴图 id
      */
     public record Ad(String id, String name, int timeMs, ResourceLocation texture) {
 
@@ -172,9 +152,7 @@ public final class TrdmPisAds {
 
     /**
      * 按「启用 + 顺序 + 每张自己的 time」算当前该放哪张。
-     *
      * @param ids     顺序（可能是屏幕里覆盖过的顺序）
-     * @return 当前广告；没有可用的就返回 null
      */
     public static Ad current(List<String> ids, Map<String, Boolean> enabled, Map<String, Integer> times) {
         final Map<String, Ad> byId = new LinkedHashMap<>();

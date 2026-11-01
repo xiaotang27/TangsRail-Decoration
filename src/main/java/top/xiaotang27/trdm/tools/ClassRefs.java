@@ -11,11 +11,6 @@ import java.util.zip.ZipFile;
 /**
  * 一次性小工具：直接读 class 文件的常量池，列出某个类引用了哪些成员（字段/方法）。
  * <p>
- * 用来确认第三方 mod 的<b>实际字节码</b>里到底有没有读某个状态位
- * （例如 MTR 的 {@code TrainServer} 有没有读 {@code BlockPSDAPGDoorBase.UNLOCKED}），
- * 免得只凭源码分支的推测。
- * <p>
- * 用法：{@code ./gradlew classRefs -Pjar=… -Pentry=mtr/data/TrainServer.class -Pfilter=UNLOCKED}
  */
 public final class ClassRefs {
 

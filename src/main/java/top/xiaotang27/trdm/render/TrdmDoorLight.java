@@ -8,12 +8,6 @@ import java.util.WeakHashMap;
 /**
  * 屏蔽门警示灯状态：<b>只在门真的在动的时候闪</b>。
  * <p>
- * 两个输入：服务器同步来的目标开度 {@code targetValue}（0~MAX_OPEN_VALUE）和
- * 「插值开度有没有追上目标」这个布尔量 {@code moving}。门在动 → 按世界 tick 量化地闪
- * （20 tick = 1 秒，亮半秒灭半秒）；门停稳 → 按目标定格：开着常亮、关着熄灭。
- * <p>
- * 所以<b>门完全关上之后灯就灭了</b>，不会再多闪两秒；指示灯的明灭节奏与世界 tick 绑定，
- * 不看逐帧插值，一个 tick 内状态恒定，不会抽搐。
  */
 final class TrdmDoorLight {
 
@@ -29,8 +23,6 @@ final class TrdmDoorLight {
     /**
      * @param key         门（用方块实体当键，一扇门一条状态）
      * @param targetValue 目标开度（0 = 关，MAX_OPEN_VALUE = 全开）
-     * @param moving      门的插值开度还没追上目标（= 门正在动）
-     * @param gameTime    世界 tick
      */
     static boolean isOn(Object key, int targetValue, boolean moving, long gameTime) {
         final State state;

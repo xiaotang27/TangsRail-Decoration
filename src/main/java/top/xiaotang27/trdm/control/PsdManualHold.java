@@ -20,19 +20,6 @@ import java.util.Set;
 /**
  * 屏蔽门「接管」驱动，两种模式共用一个机制：
  * <ul>
- *   <li><b>手动保持开</b>（{@code open = true}）：集控装置手动开门后保持开启；</li>
- *   <li><b>隔离</b>（{@code open = false}）：站台锁死，门只能由本装置控制。</li>
- * </ul>
- * 两件事保证 MTR 影响不到这些门：
- * <ol>
- *   <li><b>掐掉列车的写入</b>：{@code TrainServerDoorMixin} 把 MTR
- *       {@code TrainServer.openDoors(...)} 里针对这些门的调用整个跳过
- *       （那是 MTR 唯一写门开度的地方，进站开门和排定自动关门都在里面）。
- *       因此门上的 {@code UNLOCKED} 不动 —— MTR 的「锁定贴纸」只在刷子锁门时出现；</li>
- *   <li><b>自己每 tick 压值</b>：表里存的是<b>门的位置</b>，所以装置所在区块卸载了也照样能驱动。</li>
- * </ol>
- * 开/关都按 MTR 的列车开门速度逐 tick 爬（{@link Train#DOOR_MOVE_TIME}），不是瞬移，
- * 所以手动开关门和列车自动开关门看起来一样快。
  */
 public final class PsdManualHold {
 
@@ -42,11 +29,6 @@ public final class PsdManualHold {
     /**
      * 一个 tick 门开度推进多少（0~1）。
      * <p>
-     * 照 MTR 列车开门的算法反推的：列车每 tick 让 {@code doorValue} 走
-     * {@code 1 / DOOR_MOVE_TIME}（= 1/64），写进门的是
-     * {@code clamp(doorValue * DOOR_MOVE_TIME, 0, MAX_OPEN_VALUE)}，
-     * 也就是每 tick 正好 <b>1 个开度单位</b>、{@code MAX_OPEN_VALUE}（32）tick 走完全行程。
-     * 所以这里用 {@code 1 / MAX_OPEN_VALUE}，手动开关门和列车自动开关门速度一致。
      */
     private static final float STEP_PER_TICK = 1F / BlockPSDAPGDoorBase.MAX_OPEN_VALUE;
 
@@ -133,9 +115,7 @@ public final class PsdManualHold {
 
     /**
      * 开始 / 更新接管：记下门位置，目标状态由 {@code open} 决定，门会从当前开度按列车速度爬过去。
-     *
      * @param open true = 保持开启，false = 保持关闭（隔离）
-     * @return 这次接管了几扇门
      */
     public static int hold(ServerLevel world, BlockPos devicePos, long platformId, List<BlockPos> doors, boolean open) {
         final Entry entry = HELD.computeIfAbsent(GlobalPos.of(world.dimension(), devicePos), key -> new Entry(platformId));
@@ -159,10 +139,7 @@ public final class PsdManualHold {
 
     /**
      * 结束接管（交还 MTR 的列车逻辑）。
-     *
      * @param closeDoors true = 先把门关回去（按列车速度关，关完才撤表）；
-     *                   false = 立刻撤表，门保持现状等 MTR 处理（取消隔离时用）
-     * @return 这次有多少扇门进入关闭流程
      */
     public static int release(ServerLevel world, BlockPos devicePos, boolean closeDoors) {
         final GlobalPos key = GlobalPos.of(world.dimension(), devicePos);

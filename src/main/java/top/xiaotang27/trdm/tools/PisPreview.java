@@ -12,8 +12,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：不开游戏，用固定假数据把 PIS 屏幕整块烘出来（16:9，136×72 画布放大 8 倍），
  * 用来和 JCM 版（MTR4）逐项对比版面：到站倒计时、开往站、时钟日期、广告位、跑马灯、车厢图。
- * <p>
- * 用法：{@code ./gradlew previewPis}，输出到 {@code build/preview/pis_*.png}。
  */
 public final class PisPreview {
 

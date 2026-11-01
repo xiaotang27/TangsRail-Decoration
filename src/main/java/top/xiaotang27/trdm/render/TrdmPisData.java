@@ -18,15 +18,6 @@ import java.util.Map;
 /**
  * PIS 屏幕的数据层：把 MTR3 的到站信息换成 {@link TrdmPisPanel} 要的一帧数据。
  * <p>
- * 数据源就是 MTR3 自己那块 PIDS 用的东西：
- * <ul>
- *   <li>到站列表：{@code ClientData.SCHEDULES_FOR_PLATFORM}（站台 id → 到站条目，按 {@code arrivalMillis} 排序）</li>
- *   <li>终点站：{@code ClientData.DATA_CACHE.routeIdMap.get(routeId)} +
- *       {@code ClientData.DATA_CACHE.getFormattedRouteDestination(route, currentStationIndex, ...)}</li>
- *   <li>编组节数：{@link ScheduleEntry#trainCars}</li>
- * </ul>
- * 倒计时直接由 {@code arrivalMillis - System.currentTimeMillis()} 算，和 MTR4 版
- * （JCM 的 {@code arrivalTime()}）语义完全一样。
  */
 public final class TrdmPisData {
 
@@ -60,8 +51,6 @@ public final class TrdmPisData {
     /**
      * 这个站台的到站列表（按到达时间升序）。
      * <p>
-     * {@code SCHEDULES_FOR_PLATFORM} 里每个站台对应一个集合，元素是 {@link ScheduleEntry}；
-     * 这里不依赖它的具体泛型（List / Set 都行），逐个挑出 {@code ScheduleEntry} 再排序。
      */
     @SuppressWarnings("unchecked")
     public static List<ScheduleEntry> arrivals(long platformId) {

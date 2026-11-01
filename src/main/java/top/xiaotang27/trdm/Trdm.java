@@ -35,14 +35,6 @@ import top.xiaotang27.trdm.net.TrdmControlNetwork;
 /**
  * TangsRail Decoration (TRD) — 主入口。
  * <p>
- * 第一版内容：把 MTR 的整套全高屏蔽门（门扇 / 玻璃 / 端头玻璃 / 门楣）移植到 TRD 自己的命名空间。
- * 方块仍然继承 MTR 的 BlockPSDAPGDoorBase / BlockPSDAPGGlassBase / BlockPSDAPGGlassEndBase
- * （TrainServer 的开门逻辑认的是这些基类），但类本身、BE、渲染器、blockstate 全部归 TRD 所有，
- * 后续可以独立修改。
- * <p>
- * 只保留一套站台门（{@code TRD站台门}）；以前那套「样式 2」的门扇 / 玻璃 / 端头玻璃已经删除，
- * 注册 id 沿用 {@code psd_door_1} 之类，老存档里已经放下的方块照常工作 —— 物品名不再带样式号。
- * 吊版 / 玻璃装饰线的具体样式不在这里注册，而是<b>每个门楣单独选</b>（蹲下 + 刷子右键屏蔽门）。
  */
 public class Trdm implements ModInitializer {
 

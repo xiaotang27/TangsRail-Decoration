@@ -9,8 +9,6 @@ import java.util.Map;
 /**
  * 车站范围判定（客户端 / 服务端通用，纯函数，不碰 Level）。
  * <p>
- * 集控装置只允许控制「它所在车站」的站台：站台 → 车站用 MTR 自己建好的
- * {@code platformIdToStation} 映射，位置 → 车站用 {@link Station#inArea(int, int)}（MTR 的站区范围）。
  */
 public final class StationScope {
 

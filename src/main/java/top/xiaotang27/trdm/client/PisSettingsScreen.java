@@ -18,12 +18,6 @@ import java.util.Map;
 /**
  * PIS 屏幕设置界面（刷子右键屏幕打开）。分三段：
  * <ol>
- *   <li>标题 + 两行灰字（本站 / 已加载几个广告资源包），右上角「重新扫描」「完成」；</li>
- *   <li><b>屏幕跑马信息显示</b>：本屏一段、全局一段，各带灰字说明；</li>
- *   <li><b>广告显示设置</b>：一行一条广告 —— 勾选框 + id +（视频的橙色提示）
- *       + 时长框 + <code>−/＋</code> 倍增减 + <code>▲/▼</code> 排序。</li>
- * </ol>
- * 点时长框直接键入选秒数；所有改动即时发给服务端并本地先生效。
  */
 public class PisSettingsScreen extends TrdmScreenBase {
 

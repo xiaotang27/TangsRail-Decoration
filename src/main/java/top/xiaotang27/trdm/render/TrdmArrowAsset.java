@@ -13,14 +13,6 @@ import java.util.Optional;
 /**
  * 吊板用的图标素材（箭头 / 地铁标识）。
  * <p>
- * 素材路径固定在 {@code assets/trdm/textures/block/sign/} 下，读成一张「黑色 + 透明度」的蒙版后再整体着色：
- * <ul>
- *   <li>图里有透明像素 → 直接拿 alpha 当蒙版（黑色箭头、白色图标都能用）；</li>
- *   <li>图是不透明背景（白底黑图 / 黑底白图）→ 按亮度判正负：平均亮度亮的取「暗=不透明」，暗的反过来。</li>
- * </ul>
- * 素材缺失时返回 null，调用方自行退回矢量绘制。
- * <p>
- * 必须在渲染线程第一次调用（{@link #getArrow()} / {@link #getSubway()}），读到的图会缓存给后台烘焙线程用。
  */
 final class TrdmArrowAsset {
 

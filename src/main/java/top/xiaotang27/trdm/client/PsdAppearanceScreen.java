@@ -8,10 +8,6 @@ import top.xiaotang27.trdm.control.PsdStyles;
 /**
  * 站台门外观设置（蹲下 + 刷子右键屏蔽门 / 玻璃 / 端头玻璃打开），分两段：
  * <ul>
- *   <li><b>吊版</b>：门楣上那几块板的样式；</li>
- *   <li><b>玻璃装饰线</b>：玻璃上那条线路色带（人字纹 + 中央图文）的样式。</li>
- * </ul>
- * 样式记在门楣的方块状态上，并且按「一段连续门楣」整段写，所以刷过合并的一整段门楣会一起换。
  */
 public class PsdAppearanceScreen extends TrdmScreenBase {
 

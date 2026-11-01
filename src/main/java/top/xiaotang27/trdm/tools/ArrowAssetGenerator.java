@@ -13,11 +13,6 @@ import java.nio.file.Path;
 /**
  * 生成吊板用的图标素材（{@code assets/trdm/textures/block/sign/}）：
  * <ul>
- *   <li>{@code arrow.png} —— 站点信息吊板的箭头（朝右）；</li>
- *   <li>{@code subway.png} —— 线路图起点站 / 终点站的地铁标识（拱门 + 列车）。</li>
- * </ul>
- * 只是本机构建时跑一次的小工具（{@code ./gradlew generateArrowAsset}），游戏运行时用不到它。
- * 生成出来的 PNG 都可以直接替换掉（同尺寸或任意尺寸都行），渲染端把它们当剪影蒙版用。
  */
 public final class ArrowAssetGenerator {
 

@@ -14,9 +14,6 @@ import top.xiaotang27.trdm.Trdm;
 /**
  * TRD 屏蔽门端头玻璃（移植自 MTR 的 BlockPSDGlassEnd）。
  * TOUCHING_LEFT / TOUCHING_RIGHT 由 MTR 的 BlockPSDAPGGlassEndBase.updateShape 自动推断
- * （air / door / none 三种），blockstate 据此挑选带弯角的端头模型。
- * <p>
- * 额外多一条交互：<b>蹲下 + 刷子右键</b>打开「屏蔽门外观设置」。
  */
 public class BlockTrdmPSDGlassEnd extends BlockPSDAPGGlassEndBase {
 

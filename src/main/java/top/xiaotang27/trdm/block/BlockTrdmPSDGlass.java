@@ -14,9 +14,6 @@ import top.xiaotang27.trdm.Trdm;
 /**
  * TRD 屏蔽门玻璃，与 MTR 的 BlockPSDGlass 完全一致。
  * 横向拼接（SIDE_EXTENDED 的 left/right/middle/single）完全由 MTR 的
- * BlockPSDAPGGlassBase.use 里的刷子逻辑（connectGlass）驱动，放置时一律 single。
- * <p>
- * 额外多一条交互：<b>蹲下 + 刷子右键</b>打开「屏蔽门外观设置」（吊版 / 玻璃装饰线样式）。
  */
 public class BlockTrdmPSDGlass extends BlockPSDAPGGlassBase {
 

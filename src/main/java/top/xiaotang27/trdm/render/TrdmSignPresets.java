@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * 内置的 MTR 指示牌预设，格式和 {@code mtr_custom_resources.json} 的 {@code custom_signs} 一致：
  * <pre>
- * assets/trdm/sign_presets.json
- * { "custom_signs": { "id": { "texture_id": "trdm:textures/block/sign/x.png",
- *                             "custom_text": "中文|English", "flip_custom_text": false, "small": true } } }
- * </pre>
- * 贴图在 {@code assets/trdm/textures/block/sign/}，由本 mod 自带，不依赖外部资源包。
  */
 public final class TrdmSignPresets {
 
@@ -32,12 +27,7 @@ public final class TrdmSignPresets {
 
     /**
      * 一条预设。
-     *
      * @param id       mtr 里的标志 id
-     * @param texture  贴图
-     * @param text     「中文|English」，可为空
-     * @param flip     是否左右翻转（同一张贴图的正反两份）
-     * @param small    是否小号标志
      */
     public record Entry(String id, ResourceLocation texture, String text, boolean flip, boolean small) {
     }

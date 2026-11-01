@@ -33,15 +33,6 @@ import top.xiaotang27.trdm.client.TrdmControlClient;
 /**
  * 大站名牌：横向大牌，深灰底板 + 地铁标志 + 线路编号块 + 本站站名 + 右边出口字母，
  * 牌高 3/4 格、贴墙挂。
- * <p>
- * 只有一种物品。刷子右键开设置界面（{@link top.xiaotang27.trdm.client.TrdmExitSelectScreen}）：
- * <ul>
- *   <li><b>站名后缀</b>：STATION / ZHAN（以前是两个物品，现在一个开关）；</li>
- *   <li><b>无障碍电梯牌</b>：站名后面加「无障碍电梯」/「Accessible Elevator」，线路标签后加图标；</li>
- *   <li><b>出口</b>：本站任意入口（A / A1 / B1 …）。</li>
- * </ul>
- * 连续放几格就合并成一整块牌，牌宽随合并段变长（元素从左到右排，空间不够整组等比缩小）；
- * 整段共用的数据（出口、两个开关）按段读写，改哪一格都当场生效。
  */
 public class BlockTrdmBigStationSign extends BaseEntityBlock {
 

@@ -35,14 +35,6 @@ import top.xiaotang27.trdm.Trdm;
 /**
  * TRD 屏蔽门门楣（第三格），逻辑主体照抄 MTR 的 BlockPSDTop，差异有三条（都是本 mod 的需求）：
  * <ol>
- *   <li>下方是<b>普通玻璃</b>时，门楣恒定平直（AIR_LEFT/RIGHT 恒 false），
- *       并且横向侧别改由「左右相邻门楣」推断 —— 放下门楣时会自动按邻居连成
- *       left/middle/right，不需要刷子；</li>
- *   <li>下方是门扇或端头玻璃时，完全保持 MTR 语义：侧别取自下方方块，
- *       只有端头玻璃才可能让门楣收窄，刷子仍然是切换方向箭头；</li>
- *   <li><b>蹲下 + 刷子右键</b>不是合并门楣，而是打开「屏蔽门外观设置」
- *       （吊版样式 + 玻璃装饰线样式，见 {@link #openAppearanceOnShiftBrush}）。</li>
- * </ol>
  */
 public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlockMapper, IBlock {
 
@@ -109,11 +101,6 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
     /**
      * 「蹲下 + 刷子右键」屏蔽门 / 玻璃 / 端头玻璃：打开这一段的「屏蔽门外观设置」
      * （吊版样式 + 玻璃装饰线样式）。
-     * <p>
-     * 样式记在门楣的<b>方块状态</b>上（门楣才是真正画吊板和装饰线的那一格），所以这里只是把界面打开：
-     * 客户端往上找到门楣再弹界面，服务端不需要做事。
-     *
-     * @return null = 这次交互不归它管，调用方照常走 MTR 自己的逻辑
      */
     public static InteractionResult openAppearanceOnShiftBrush(Level world, BlockPos pos, Player player) {
         if (!player.isShiftKeyDown() || !BlockTrdmPSDControl.isHoldingBrush(player)) {
@@ -177,11 +164,6 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
     /**
      * 判断这一格门楣是否应该画「站点信息吊板」。
      * <p>
-     * 规则：从整排门楣的左端往右数「普通玻璃门楣」的分组，第 1、3、5……组是站点信息吊板，
-     * 第 2、4、6……组还是线路图。所以一堵墙的顺序是
-     * 站点信息 - 滑动门 - 线路图 - 滑动门 - 站点信息 - …
-     * <p>
-     * 服务端（刷子交互）和客户端（渲染）都用这一份判定，保证两边看到的是同一块吊板。
      */
     public static boolean isStationInfoPanel(BlockGetter world, BlockPos pos, Direction facing) {
         if (!isPlainGlassHeader(world, pos)) {
@@ -338,15 +320,6 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
     /**
      * 门楣状态推导，和 MTR 原版一致：
      * <ul>
-     *   <li>朝向取自下方方块；</li>
-     *   <li>侧别（left/middle/right/single）一律由左右相邻门楣推断 —— 普通玻璃单独一格时是 single，
-     *       对应的模型是 {@code psd_top_left_edge} + {@code psd_top_right_edge}，那才是原版「平直」的样子；
-     *       （middle 只在两侧都有邻居时出现，是拼成一整排用的）</li>
-     *   <li>AIR_LEFT / AIR_RIGHT：只有下方是<b>端头玻璃</b>、且那一侧没有相邻门楣时才为 true，
-     *       对应模型 {@code psd_top_left_end} / {@code psd_top_right_end}（弯曲端头）。</li>
-     *   <li>MTR 的弯曲端头模型只有 persistent = none 的版本，所以 persistent 时不做弯曲，
-     *       免得贴图和模型对不上。</li>
-     * </ul>
      */
     public static BlockState getActualState(BlockGetter world, BlockPos pos) {
         Direction facing = null;

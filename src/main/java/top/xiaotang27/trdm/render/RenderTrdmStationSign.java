@@ -32,12 +32,6 @@ import java.util.List;
 /**
  * 站名牌渲染器：一块白底板 + 压在它正面的贴图，画在「合并段水平中点」上。
  * <p>
- * 合并规则：同朝向、沿牌面横向相邻的站名牌算一段（放置时直接挨着就行，不用刷子）。
- * 整段只由最左那格画一次，底板和贴图一起按段长偏移 —— 所以两块时牌面骑在中缝、
- * 三块时在正中间，看起来就是「一块印着字的板子」挂在合并段中间。
- * <p>
- * 内容全部来自 MTR 的客户端缓存：站台 → 站名 + 主线路的下一站 + 线路色。
- * 站台优先用方块实体里手动选的，没选就用「离标牌最近的站台」。
  */
 public class RenderTrdmStationSign<T extends BlockTrdmStationSign.TileEntityTrdmStationSign>
         implements BlockEntityRenderer<T>, IBlock, IGui {
@@ -159,11 +153,7 @@ public class RenderTrdmStationSign<T extends BlockTrdmStationSign.TileEntityTrdm
 
     /**
      * 一个朝外的矩形面。
-     *
      * @param centre   面中心
-     * @param uAxis    横轴（UV 的 u 方向）
-     * @param vAxis    纵轴（UV 的 v 方向，纹理 v=0 在上）
-     * @param outward  朝外法线
      */
     private static void emitFace(Matrix4f pose, VertexConsumer vertexConsumer, Vec3 centre, Vec3 uAxis, Vec3 vAxis,
                                  float halfU, float halfV, Vec3 outward, int argb, int light) {

@@ -28,15 +28,6 @@ import java.util.List;
 /**
  * 屏蔽门集控装置：一台用于手动开关某个站台全部屏蔽门的控制设备。
  * <ul>
- *   <li><b>拿着刷子右键</b>：打开站台选择界面（只列本装置所在车站的站台）；</li>
- *   <li><b>空手右键</b>：手动开门 → <b>一直保持开启</b>，再右键一次才关掉并交还给列车自动逻辑。</li>
- * </ul>
- * 「保持开启」是靠方块实体自己的 ticker 每 tick 把门的 open 值重新压回
- * {@code MAX_OPEN_VALUE}：列车进站/离站时 MTR 会把门设成关闭值，下一个 tick 就被我们改回来，
- * 所以手动开的门只有再右键一次才关。
- * <p>
- * 客户端界面只能从客户端分支打开，所以这里引用客户端类是被 {@code level.isClientSide} 挡住的：
- * 专用服务器永远不会执行到那一行，也就不会去加载 {@code net.minecraft.client.*}。
  */
 public class BlockTrdmPSDControl extends BaseEntityBlock {
 
@@ -197,8 +188,6 @@ public class BlockTrdmPSDControl extends BaseEntityBlock {
         /**
          * 屏蔽门隔离开关。隔离开着时这个站台的门只受本装置控制：
          * 手动开着就一直开，手动关着（或没手动开）就一直关，MTR 的列车逻辑完全改不动。
-         *
-         * @return 切换后的状态
          */
         public boolean toggleIsolated(ServerLevel world) {
             isolated = !isolated;
@@ -211,9 +200,6 @@ public class BlockTrdmPSDControl extends BaseEntityBlock {
         /**
          * 按当前状态重新压一次门：
          * 手动开 / 隔离 任一开着就进保持表（目标值 = 手动开 ? 开 : 关），否则退出保持表。
-         *
-         * @param closeDoorsWhenReleasing 退出保持时要不要顺手把门关回去
-         * @return 这次动了几扇门
          */
         private int applyHold(ServerLevel world, boolean closeDoorsWhenReleasing) {
             if (!manualOpen && !isolated) {

@@ -10,10 +10,6 @@ import java.util.Set;
 /**
  * 车站出口名的选项集。
  * <p>
- * MTR 里的出口经常是 {@code A1 / A2 / B1} 这种带数字后缀的（一个出入口分好几个口），
- * 但大站名牌上只有一个字母的位置，所以选择列表里除了 {@code A1}、{@code A2}，
- * 还要给出 {@code A}、{@code B} 这种「整个出入口」的选项；列表顺序也按
- * {@code A→A1→A2→B→B1} 排，而不是纯字符串排序把 {@code A1} 排在 {@code A} 前面。
  */
 public final class ExitNames {
 

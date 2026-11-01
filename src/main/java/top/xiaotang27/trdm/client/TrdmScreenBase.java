@@ -12,11 +12,6 @@ import java.util.function.Consumer;
 /**
  * TRDM 界面基类：960×540 设计坐标、等比缩放（480×270 保底）、左侧栏目栏、页脚版本号，
  * 以及开关 / 列表行 / 分组标题 / 灰字说明 / 单行输入框这些公共控件的绘制与命中判定。
- * <p>
- * 子类只需要实现 {@link #renderPage} 和 {@link #clickPage}，按设计坐标画内容即可。
- * 输入框不用 {@code EditBox}（那套是 GUI 坐标、不跟设计坐标缩放），基类自带一个
- * 设计坐标下的单行输入框：{@link #beginField} 激活，{@link #field} 绘制，
- * 回车提交、Esc 取消，输入与按键由基类接管。
  */
 public abstract class TrdmScreenBase extends Screen {
 

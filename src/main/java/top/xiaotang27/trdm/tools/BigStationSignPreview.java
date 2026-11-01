@@ -12,8 +12,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：不开游戏，直接烘焙几张「大站名牌」预览图，用来核对排版
  * （地铁标志 + 线路编号块 + 无障碍电梯图标 + 站名 + 出口字母，中文/英文字距与等比缩放）。
- * <p>
- * 用法：{@code ./gradlew previewBigStationSign}，输出到 {@code build/preview/big_sign*.png}。
  */
 public final class BigStationSignPreview {
 

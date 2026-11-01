@@ -13,10 +13,6 @@ import java.util.List;
 /**
  * 一次性小工具：量站名牌贴图「烘一张要多久」。
  * <p>
- * 站名牌改成同步烘焙（改完当帧生效）之后，这一帧的耗时就是牌子的卡顿时长，
- * 所以牌越宽（贴图越宽）越要盯着这个数。
- * <p>
- * 用法：{@code ./gradlew benchSignBake}。
  */
 public final class SignBakeBench {
 

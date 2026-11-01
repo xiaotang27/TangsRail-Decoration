@@ -18,18 +18,12 @@ import java.util.Map;
 /**
  * 大站名牌（墙挂 / 悬挂两款共用）的「内容」：站名、本站所有线路的编号块、出口字母、
  * 站名后缀（STATION / ZHAN）、无障碍电梯牌开关。
- * <p>
- * 两项数据和出口一样都是<b>整段牌共用</b>：段里哪一格被设置过就以它为准
- * （刚刚放下、还没设置过的格子不会把整段打回默认）。
  */
 public final class TrdmBigSignContent {
 
     /**
      * @param stationName 本站（MTR 的「中文|English」）
      * @param badges      本站所有线路的编号标识，按线路名排序
-     * @param exitName    出口名（空串 = 不画）
-     * @param zhanStyle   true = 英文后缀 ZHAN
-     * @param elevator    true = 画成「站名 + 无障碍电梯」牌
      */
     public record Content(String stationName, List<TrdmHeaderTextures.Badge> badges, String exitName,
                           boolean zhanStyle, boolean elevator) {

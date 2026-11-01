@@ -33,12 +33,6 @@ import top.xiaotang27.trdm.client.TrdmControlClient;
 /**
  * 站名牌：白底挂牌，显示本站站名（中文 + 拼音）+ 线路色带 + 下一站，排版照 MTR 的车站站名牌。
  * <ul>
- *   <li>默认自动显示「标牌附近的站台」（离它最近的 MTR 站台）；</li>
- *   <li>拿刷子右键 → 打开和集控装置同一套站台选择界面，只能选本站车站的站台；</li>
- *   <li>连续放两格及以上的同朝向站名牌会自动并成一块，牌子本身仍是 1 格宽 × 3/4 格高，
- *       画在合并段的水平中点上 —— 所以两格是骑在中缝，三格是正中间那格。</li>
- * </ul>
- * 方块本身用 {@link RenderShape#INVISIBLE}，画面全部由 {@code RenderTrdmStationSign} 画。
  */
 public class BlockTrdmStationSign extends BaseEntityBlock {
 

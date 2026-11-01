@@ -3,8 +3,6 @@ package top.xiaotang27.trdm.control;
 /**
  * 屏蔽门外观样式表：吊版（门楣上那几块板）和玻璃装饰线各自可选，样式 id 存在门楣的方块实体里。
  * <p>
- * 目前各只有一种（就是原有的那套），界面上照样把名字列出来，以后加新样式只要在这里加一个 id
- * 和对应的语言表条目，渲染端再按 id 分支即可。
  */
 public final class PsdStyles {
 

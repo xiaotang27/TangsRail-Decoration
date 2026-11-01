@@ -20,7 +20,7 @@ def localPath = { String key, String environment, String fallback ->
     file(localProps.getProperty(key) ?: System.getenv(environment) ?: fallback)
 }
 
-def yomimtrJar = localPath('yomimtr_jar', 'YOMIMTR_JAR', '../libs/MTR-fabric-1.20.1-3.6.3.jar')
+def mtrJar = localPath('mtr_jar', 'MTR_JAR', '../libs/MTR-fabric-1.20.1-3.6.3.jar')
 def architecturyJar = localPath('architectury_jar', 'ARCHITECTURY_JAR', '../libs/architectury-9.2.14-fabric.jar')
 def pisFontSource = localPath('pis_font_source', 'PIS_FONT_SOURCE', '../fonts/SourceHanSansHWSC-VF.ttf')
 def jcmPisTextures = localPath('jcm_pis_textures', 'JCM_PIS_TEXTURES',
@@ -54,15 +54,12 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:0.19.3"
     modImplementation "net.fabricmc.fabric-api:fabric-api:0.92.11+1.20.1"
 
-    // YomiMTR（mod id "mtr"）：生产版 jar 由 Loom 从 intermediary 重映射到 named。
-    // 路径来自 local.properties 的 yomimtr_jar。
-    modImplementation files(requireJar(yomimtrJar, 'yomimtr_jar'))
+    // MTR（mod id "mtr"）：生产版 jar，Loom 会从 intermediary 重映射到 named。
+    // 路径来自 local.properties 的 mtr_jar。
+    modImplementation files(requireJar(mtrJar, 'mtr_jar'))
 
-    // YMTR 自己的 fabric.mod.json 没声明 Architectury，但它的客户端入口
-    // mtr.MTRFabricClient -> mtr.MTRClient.init -> RegistryUtilitiesClient.registerClientTickEvent
-    // 直接引用 dev.architectury.event.events.client.ClientTickEvent。
-    // 少了它 runClient 会在 client 入口阶段崩（NoClassDefFoundError）。
-    // 正式游戏实例里玩家也是手动装 architectury，这里等价地把 9.2.14 放进开发 runtime。
+    // MTR 的 fabric.mod.json 没声明 Architectury，但它的客户端入口会直接引用
+    // dev.architectury.event.events.client.ClientTickEvent，缺了会在客户端入口崩。
     modImplementation files(requireJar(architecturyJar, 'architectury_jar'))
 
     // PIS 广告的 mp4 播放：JCodec 纯 Java 解 H.264/MP4，不带任何原生库。
@@ -140,7 +137,7 @@ tasks.register('pixelScan', JavaExec) {
     }
 }
 
-// 一次性工具：打印 YMTR 里某个类（含嵌套类）的字段/方法签名。
+// 一次性工具：打印 MTR 里某个类（含嵌套类）的字段/方法签名。
 tasks.register('inspectClass', JavaExec) {
     group = 'trdm'
     description = 'Prints fields and methods of the given classes (-Pcls=a,b)'

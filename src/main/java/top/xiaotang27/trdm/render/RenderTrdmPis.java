@@ -31,15 +31,6 @@ import java.util.Map;
 /**
  * PIS 屏幕渲染器：<b>模型 + 镜像复制出来的另一半 + 铺在面板上的动态贴图</b>，全部在这里画。
  * <p>
- * 模型 {@code pids_rv.json}（16 像素 = 1 格）本身只是<b>半个屏幕</b>，所以整份模型画两遍：
- * 左半块整体沿挡板宽度方向平移，右半块关于方块中心镜像，两块拼成一块完整屏幕
- * （挡板 12 像素 × 2 = 24 像素宽 × 14 像素高，≈ 16:9）。
- * <p>
- * 外壳完全由模型文件驱动（元素坐标 + 每个面的 UV + 贴图），和原版模型渲染器看到的一致；
- * 只有屏幕内容是我们烘的动态贴图，盖在挡板外表面上，正面一块、背面一块，<b>不做任何旋转</b>。
- * <p>
- * 方块朝向 → 模型角度（和 {@code blockstates/pis.json} 一一对应，让模型里朝 ±X 的面板转到 facing）：
- * north = 270、east = 0、south = 90、west = 180。
  */
 public class RenderTrdmPis<T extends BlockTrdmPis.TileEntityTrdmPis>
         implements BlockEntityRenderer<T>, IBlock, IGui {
@@ -248,12 +239,6 @@ public class RenderTrdmPis<T extends BlockTrdmPis.TileEntityTrdmPis>
     /**
      * 把模型里的每个元素画两遍（左半块 / 右半块），每个面按模型文件里的 UV 和贴图取样。
      * <p>
-     * 模型挡板是 z 0..12、板心在 z=6，方块中心是 z=8，所以单看半边板心偏 2 像素：
-     * 左半块整体沿挡板宽度方向平移 8 像素（板心落到中心左侧 6 像素），
-     * 右半块关于方块中心镜像（板心落到中心右侧 6 像素），两块正好拼成 24 像素宽。
-     * <p>
-     * 名字是 {@link #ROD_ELEMENT} 的元素就是吊杆接口，位置完全照模型（x 7.5..8.5、z 8.5..9.5），
-     * 高度往上接到 {@link #ROD_TOP_PX}，这样两半各一根、正好架起整块屏。
      */
     private static void emitModel(Matrix4f pose, MultiBufferSource buffers, List<TrdmModel.Element> elements,
                                   Vec3 origin, Vec3 normal, Vec3 right, Vec3 up, int light) {
@@ -409,12 +394,6 @@ public class RenderTrdmPis<T extends BlockTrdmPis.TileEntityTrdmPis>
     /**
      * 三段式烘焙（跑马灯滚动丝不丝滑就看这个分工）：
      * <ol>
-     *   <li><b>版面底图</b>（背景 / 到站 / 时钟 / 车厢，<b>不含广告、不含跑马灯</b>）—— 10 Hz；</li>
-     *   <li><b>合成</b>（底图 + 广告当前帧 + 跑马灯文字）—— <b>30 Hz</b>，
-     *       跑马灯的偏移量每帧重算，所以滚动是 30fps 的，不再一格一格跳；</li>
-     *   <li>上传贴图 —— 复用同一张 NativeImage，原地写像素。</li>
-     * </ol>
-     * 跑马灯每次只是「在合成图上按当前偏移画一遍字」，比每帧重画整张版面便宜得多。
      */
     private static void updatePlate(Holder holder, TrdmPisPanel.View view, TrdmPisAds.Ad ad, boolean adsEnabled) {
         final long now = System.currentTimeMillis();

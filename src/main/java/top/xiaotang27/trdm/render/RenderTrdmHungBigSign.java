@@ -26,15 +26,6 @@ import java.util.Map;
 /**
  * 悬挂式站外站名牌渲染器：一块深灰灯箱牌吊在天花板下面。
  * <p>
- * 和墙挂款的差别只有几何 + 光照：
- * <ul>
- *   <li>牌子在方块下方 3/4 格，上方 4/16 是吊杆（<b>只在牌子的两端各一根</b>，位置跟着牌面两端走，
- *       牌宽 8 格封顶后段再长吊杆也不会跑出牌面）；</li>
- *   <li>牌子 2/16 厚（比墙挂款厚一倍，像灯箱）、居中悬空，<b>只有朝 facing 那一面有字</b>，背面就是深灰板；</li>
- *   <li><b>自发光</b>：顶点亮度用满亮（{@code 0xF000F0}）、颜色不做方向明暗，
- *       所以不看环境光，像灯箱一样始终是亮的。</li>
- * </ul>
- * 合并段、牌宽、贴图宽高比和内容解析全部沿用墙挂款（{@link TrdmBigSignContent}）。
  */
 public class RenderTrdmHungBigSign<T extends BlockTrdmHungBigSign.TileEntityTrdmHungBigSign>
         implements BlockEntityRenderer<T>, IBlock, IGui {

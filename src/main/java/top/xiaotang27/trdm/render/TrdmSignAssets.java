@@ -23,15 +23,6 @@ import java.util.Set;
 /**
  * 吊板用的图标素材（{@code assets/trdm/textures/block/sign/}）。
  * <p>
- * 全部按<b>原图</b>缓存（不像 {@link TrdmArrowAsset} 那样只取剪影蒙版）：这些素材自带颜色
- * （黑色圆环、多色转向箭头、白色圆面），直接叠在白色吊板上就行。需要按线路色着色的
- * （尖旗、线路色块、方向箭头）走 {@link #tinted(String, int)}：只保留 alpha，其余填成目标色。
- * <p>
- * 每张图还会算一次「墨水外框」（非透明像素的包围盒），用来把素材的不透明部分精确对齐到目标位置
- * ——比如方向箭头的底边要对齐线路下沿，这样即使素材四周留白也不会偏。
- * <p>
- * 素材缺失时返回 null，调用方自行跳过。第一次读要在渲染线程做（{@link #sprite(String)}），
- * 之后后台烘焙线程只读缓存。
  */
 public final class TrdmSignAssets {
 

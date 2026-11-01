@@ -16,15 +16,6 @@ import java.util.List;
 /**
  * 屏蔽门集控装置的服务端逻辑：找门、按开/关值驱动门、算车站范围。
  * <p>
- * 只认 MTR 的公开事实，不碰私有方法：
- * <ul>
- *   <li>门扇方块是 {@link BlockPSDAPGDoorBase}，开关由它的 BE
- *       {@link BlockPSDAPGDoorBase.TileEntityPSDAPGDoorBase#setOpen(int)} 驱动
- *       （{@code MAX_OPEN_VALUE} = 完全打开，0 = 完全关闭），BE 自己会把状态 sync 给客户端。
- *       这个判据 <b>同时覆盖 TRDM 自己的门和 MTR 原版的门</b>（TRDM 的门就是继承它的）；</li>
- *   <li>站台的范围就是 MTR 站台对象的两端标记（{@link Platform#getOrderedPositions}），
- *       站台本身不知道自己的门在哪，所以按「门离哪个站台最近」来认领。</li>
- * </ul>
  */
 public final class PsdDoorControl {
 
@@ -113,8 +104,6 @@ public final class PsdDoorControl {
     /**
      * 把一组门设成指定的开度（0 = 全关，{@link BlockPSDAPGDoorBase#MAX_OPEN_VALUE} = 全开）。
      * 集控装置按 tick 逐步调这个值，门才会像列车自动开关那样慢慢动。
-     *
-     * @return 真的找到并设置了的门扇数量
      */
     public static int apply(ServerLevel world, List<BlockPos> doors, int openValue) {
         final int value = Mth.clamp(openValue, 0, BlockPSDAPGDoorBase.MAX_OPEN_VALUE);

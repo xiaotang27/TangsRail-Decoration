@@ -90,7 +90,6 @@ public class TrdmClient implements ClientModInitializer {
         // 「蹲下 + 刷子右键屏蔽门」→ 外观设置。
         // 走 UseBlockCallback 而不是只挂在方块的 use 上：这个回调在「方块自己的 use」之前触发，
         // 门被刷子/其他逻辑先吃掉的情况也能拦到；返回 SUCCESS 后原版不会再把这个交互发给服务端，
-        // 所以蹲下 + 刷子不会顺手把门解锁。
         UseBlockCallback.EVENT.register(TrdmClient::onUseBlock);
     }
 

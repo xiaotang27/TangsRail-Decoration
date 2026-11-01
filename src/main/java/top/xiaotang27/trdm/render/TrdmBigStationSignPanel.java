@@ -10,18 +10,6 @@ import java.awt.image.BufferedImage;
 /**
  * 大站名牌的版面（照参考图那种横向大牌）：
  * <pre>
- * ┌────────────────────────────────────────────────────────────┐
- * │ [地铁标志] [⓷ 3|号线|Line 3]     大 学 城 站        A      │
- * │                                 DAXUECHENG ZHAN           │
- * └────────────────────────────────────────────────────────────┘
- * </pre>
- * 深灰底、白字；左边标志和线路编号块、中间站名（中文大字 + 英文小字）、右边站台字母。
- * <ul>
- *   <li>所有尺寸都以牌子高度 H 为单位，量自参考图 1301×178；</li>
- *   <li>元素按位置从左到右排，总宽超出牌宽时<b>整组等比缩小</b>；</li>
- *   <li>中文和英文的宽度对不齐时，<b>加大中文字间距</b>（最多到 0.45 倍字号）去凑英文那一行，
- *       而不是把英文缩得更小 —— 参考图就是这么排的。</li>
- * </ul>
  */
 public final class TrdmBigStationSignPanel {
 
@@ -46,12 +34,6 @@ public final class TrdmBigStationSignPanel {
     /**
      * @param width     贴图宽（像素）
      * @param height    贴图高（像素）
-     * @param cjk       站名中文（已含「站」；无障碍电梯牌还含「无障碍电梯」）
-     * @param latin     站名英文（已含 STATION / ZHAN 后缀）
-     * @param badges    本站所有线路的编号标识（按线路名排序，全部画出来）
-     * @param letter    右侧出口字母
-     * @param logo      地铁标志素材
-     * @param elevator  无障碍电梯图标（在线路标签后面；null = 不画，也不占位）
      */
     public static BufferedImage render(int width, int height, String cjk, String latin,
                                         java.util.List<TrdmHeaderTextures.Badge> badges, String letter,

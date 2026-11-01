@@ -12,13 +12,6 @@ import java.nio.file.Path;
 /**
  * PIS 的<b>全局跑马灯</b>：所有 PIS 都先滚这段，再滚各屏自己的文字。
  * <p>
- * 存在客户端配置文件 {@code config/trdm.json}：
- * <pre>
- * { "pis_global_ticker": "天津地铁提醒您：请先下后上，注意站台与列车之间的空隙" }
- * </pre>
- * 也可以直接编辑这个文件（改完重进世界 / 重开界面就生效）。
- * <p>
- * 跑马灯只在客户端渲染，所以放客户端配置里 —— 不需要网络包、也不占方块 NBT。
  */
 public final class TrdmPisGlobal {
 

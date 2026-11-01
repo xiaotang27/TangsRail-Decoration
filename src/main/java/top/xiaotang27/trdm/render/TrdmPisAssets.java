@@ -20,14 +20,6 @@ import java.util.Set;
 /**
  * PIS 屏幕用的位图素材。
  * <p>
- * 内置素材（背景 {@code tjpids}、车厢 {@code tc/zj/0tc}、默认广告 {@code adsdef}）
- * 放在 {@code assets/trdm/textures/block/pis/}。
- * <p>
- * 广告图可以由资源包替换：资源包在 {@code assets/trdm/} 下放图片 + {@code pis_ads.json}，
- * 这里按 {@link ResourceLocation} 读任意命名空间的图（和背景同一套缓存）。
- * <p>
- * 第一次读要在渲染线程（{@link #image(String)} / {@link #ad(ResourceLocation)}），之后烘焙线程只读缓存；
- * 素材缺失时返回 null，调用方跳过即可。
  */
 public final class TrdmPisAssets {
 
@@ -65,10 +57,7 @@ public final class TrdmPisAssets {
 
     /**
      * 一张动图：所有帧 + 每帧停留毫秒。
-     *
      * @param frames  帧
-     * @param delays  每帧停留多久（毫秒，和 {@code frames} 等长）
-     * @param totalMs 一轮总时长
      */
     public record Gif(List<BufferedImage> frames, int[] delays, int totalMs) {
 
@@ -137,8 +126,6 @@ public final class TrdmPisAssets {
     /**
      * 广告图当前这一帧：静态图直接返回整张，<b>gif 返回按时间算出来的那一帧</b>，
      * <b>mp4 走 {@link TrdmPisVideo}</b>（第一帧还没解出来时返回 null，调用方退回默认广告图）。
-     *
-     * @param nowMs 墙钟毫秒（动图 / 视频循环按它算）
      */
     public static synchronized BufferedImage ad(ResourceLocation location, long nowMs) {
         if (TrdmPisVideo.isVideo(location)) {
@@ -249,8 +236,6 @@ public final class TrdmPisAssets {
     /**
      * 把一个 gif 拆成帧：用 JDK 自带的 gif 解码器逐帧读，帧间隔从
      * {@code GraphicControlExtension.delayTime}（百分之一秒）里取。
-     * <p>
-     * Java 的 gif 解码器会把「只更新局部矩形」的帧合成到整幅画布上，所以拿到的每帧都是完整的。
      */
     private static Gif readGif(ResourceLocation location) {
         try {

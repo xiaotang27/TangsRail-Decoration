@@ -10,8 +10,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：离线烘焙「开往 / 下一站」站点信息吊板，用来核对长玻璃段下有没有被横向拉伸。
  * <p>
- * 用法：{@code ./gradlew previewStationInfo}，输出 {@code build/preview/info_<格数>_<L|R>.png}，
- * 并把每块的贴图尺寸和宽高比打在控制台上（宽高比应当等于吊板宽高比）。
  */
 public final class StationInfoPreview {
 

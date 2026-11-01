@@ -20,10 +20,6 @@ import java.nio.file.Path;
 /**
  * 生成 PIS 广告示例资源包：两张 png + 一个 mp4，外面套好 {@code pis_ads.json} 和 {@code pack.mcmeta}。
  * <p>
- * 用法：{@code gradlew makeSamplePack -Pout=build/sample-pack/trdm-pis-sample}
- * <p>
- * 广告区比例是 5:3（版面上 90 × 54 画布单位 = 贴图 720 × 432），所以 png 一律按 720×432 出，
- * 视频按 320×192（同样 5:3）出，避免拉伸。
  */
 public final class SamplePackGenerator {
 

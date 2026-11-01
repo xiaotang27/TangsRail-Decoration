@@ -15,9 +15,6 @@ import java.util.Arrays;
 /**
  * 一次性小工具：不开游戏，把集控装置的站台选择界面按同样的坐标/配色画成 PNG，
  * 用来核对排版（线路色块 + 线路名 + 开往终点站、站台编号、隔离开关）。
- * <p>
- * 用法：{@code ./gradlew previewControlUi}，输出 {@code build/preview/psd_control_ui.png}。
- * 字体用系统里的中文字体近似 MC 的字形宽度，只用来眼睛核对，不代表游戏里的真实字形。
  */
 public final class ControlUiPreview {
 

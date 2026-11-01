@@ -7,9 +7,6 @@ import java.nio.file.Path;
 /**
  * 一次性小工具：量 PIS 背景图（tjpids.png，1920×1080 设计稿）里
  * 「天津地铁欢迎您」那行白字所占的水平范围，算出<b>「铁」字的中心 x</b>，
- * 换算成画布单位（1 单位 = 15 设计像素），用来把左栏所有文字对齐到同一条竖中线上。
- * <p>
- * 用法：{@code ./gradlew measurePisBackground}
  */
 public final class PisMeasure {
 

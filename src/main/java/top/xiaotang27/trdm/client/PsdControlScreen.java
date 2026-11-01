@@ -19,14 +19,6 @@ import java.util.regex.Pattern;
 /**
  * 站台选择界面：屏蔽门集控装置和站名牌共用，只有底部多一行隔离开关的区别。
  * <p>
- * 列表只列<b>装置所在车站</b>的站台（{@link StationScope}），每个站台一行：左边是站台编号，
- * 右边按线路逐条排「线路色块 + 线路名 + 开往 终点站」：
- * <pre>
- *   站台 1
- *   [1] 1号线|Line 1
- *       开往 人民广场
- * </pre>
- * 数据全来自 MTR 的客户端缓存；点一行才发一条 C2S 包把站台 id 写回装置。
  */
 public class PsdControlScreen extends TrdmScreenBase {
 
@@ -79,8 +71,6 @@ public class PsdControlScreen extends TrdmScreenBase {
     /**
      * @param targetPos          打开界面的那个方块（集控装置 / 站名牌）的位置，选完写回它
      * @param selectedPlatformId 它当前选的站台（0 = 没选，用来高亮）
-     * @param isolated           集控装置当前是否处于屏蔽门隔离（站名牌恒为 false）
-     * @param mode               集控装置（带隔离开关）还是站名牌（只有列表）
      */
     public PsdControlScreen(BlockPos targetPos, long selectedPlatformId, boolean isolated,
                             TrdmControlClient.SelectMode mode) {

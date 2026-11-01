@@ -10,8 +10,6 @@ import java.util.zip.ZipFile;
 /**
  * 一次性小工具：列出/导出 jar 里的资源条目，模型只打印精简摘要（每个 element 的 from/to），
  * 用来确认 MTR 原版模型到底长什么样（是不是半块、端头怎么弯）。
- * <p>
- * 用法：{@code ./gradlew jarDump -Pjar=<jar路径> -Pprefix=assets/mtr/models/block/psd_top}
  */
 public final class JarDump {
 
