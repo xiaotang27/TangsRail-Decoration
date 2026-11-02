@@ -20,6 +20,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDGlass;
 import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmControlClient;
+import top.xiaotang27.trdm.client.TrdmEndGateDrag;
 import top.xiaotang27.trdm.render.RenderTrdmPSDDoor;
 import top.xiaotang27.trdm.render.RenderTrdmPSDEndGate;
 import top.xiaotang27.trdm.render.RenderTrdmPSDTop;
@@ -68,6 +69,8 @@ public class TrdmClient implements ClientModInitializer {
             while (configKey.consumeClick()) {
                 client.setScreen(new top.xiaotang27.trdm.client.TrdmConfigScreen(null));
             }
+            // 端门「按住右键拖动调开度」的状态机
+            TrdmEndGateDrag.tick(client);
         });
 
         // 门楣：线路图 / 站名 / 方向箭头 / 站台色带 + 玻璃上的装饰带
@@ -107,11 +110,22 @@ public class TrdmClient implements ClientModInitializer {
     }
 
     private static InteractionResult onUseBlock(Player player, Level world, InteractionHand hand, BlockHitResult hitResult) {
-        if (!world.isClientSide || !player.isShiftKeyDown()) {
+        if (!world.isClientSide) {
             return InteractionResult.PASS;
         }
         final BlockPos pos = hitResult.getBlockPos();
         final Block block = world.getBlockState(pos).getBlock();
+        // 端门：右键按下先记一次「候选拖动」——
+        // 没拖动就松手 = 短按（开/关），按住向下拖 = 调开度（状态机见 TrdmEndGateDrag）。
+        if (!player.isShiftKeyDown() && hand == InteractionHand.MAIN_HAND
+                && block instanceof BlockTrdmPSDEndGate
+                && !BlockTrdmPSDControl.isHoldingBrush(player)) {
+            TrdmEndGateDrag.begin(pos, world.getBlockState(pos));
+            return InteractionResult.SUCCESS;
+        }
+        if (!player.isShiftKeyDown()) {
+            return InteractionResult.PASS;
+        }
         final boolean psd = block instanceof BlockTrdmPSDDoor || block instanceof BlockTrdmPSDGlass
                 || block instanceof BlockTrdmPSDGlassEnd || block instanceof BlockTrdmPSDTop
                 || block instanceof BlockTrdmPSDEndGate;

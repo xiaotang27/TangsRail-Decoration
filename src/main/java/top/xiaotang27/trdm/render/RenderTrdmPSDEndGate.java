@@ -29,6 +29,7 @@ import java.util.List;
 
 import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
+import top.xiaotang27.trdm.client.TrdmEndGateDrag;
 
 /**
  * 屏蔽门端门的渲染器，管三件事（都从「铰链那一格的下半格」画一次）：
@@ -78,6 +79,17 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     private static final ResourceLocation LAMP_ON = new ResourceLocation("mtr", "textures/block/light_on.png");
     private static final ResourceLocation LAMP_OFF = new ResourceLocation("mtr", "textures/block/light_off.png");
 
+    // ===== 拖动时的开度指示条（门旁 3D 竖条）=====
+    /** 纯白贴图，用来配合顶点色画纯色面。 */
+    private static final ResourceLocation WHITE = new ResourceLocation("trdm", "textures/block/white.png");
+    /** 指示条整体高度（格）、宽（半宽，格）、离地高度。 */
+    private static final float INDICATOR_HEIGHT = 1.1F;
+    private static final float INDICATOR_HALF_WIDTH = 3F / 16F;
+    private static final float INDICATOR_BOTTOM = 4F / 16F;
+    /** 底色（深灰）与填充色（天蓝）。 */
+    private static final int INDICATOR_BACK_COLOR = 0xFF23272F;
+    private static final int INDICATOR_FILL_COLOR = 0xFF48B0F7;
+
     public RenderTrdmPSDEndGate(BlockEntityRenderDispatcher dispatcher) {
         super(dispatcher);
     }
@@ -118,7 +130,9 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
             return;
         }
 
-        final boolean open = BlockTrdmPSDEndGate.isOpen(state);
+        final int step = BlockTrdmPSDEndGate.openStep(state);
+        // 连续角度：拖动这一段时按鼠标位置现算（20 Hz 之外也能平滑），否则用状态里的量化角
+        final float angleDegrees = TrdmEndGateDrag.angleDegrees(state, pos);
 
         // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上
         double pivotX = hingeCell.getX() + 0.5D + facing.getStepX() * PANE_MID_OFFSET;
@@ -130,12 +144,12 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
             pivotZ = hingeCell.getZ() + (intoRun.getStepZ() > 0 ? 0D : 1D);
         }
 
-        // 门扇 + 装饰条共用同一套变换：开着时绕铰链转，关着时不动
+        // 门扇 + 装饰条共用同一套变换：按当前角度绕铰链转（0° = 关着不动）
         matrices.pushPose();
-        if (open) {
-            final float angle = swingAngle(intoRun, facing);
+        if (step > 0) {
+            final float signedAngle = Math.copySign(angleDegrees, swingAngle(intoRun, facing));
             matrices.translate(pivotX - pos.getX(), 0D, pivotZ - pos.getZ());
-            matrices.mulPose(Axis.YP.rotationDegrees(angle));
+            matrices.mulPose(Axis.YP.rotationDegrees(signedAngle));
             matrices.translate(-(pivotX - pos.getX()), 0D, -(pivotZ - pos.getZ()));
             renderLeaf(world, pos, facing, back, forth, matrices, vertexConsumers, light, overlay);
         }
@@ -143,7 +157,45 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         matrices.popPose();
 
         // 灯挂在门楣上，不跟门转
-        renderLamp(world, pos, facing, back, forth, open, matrices, vertexConsumers, light);
+        renderLamp(world, pos, facing, back, forth, step > 0, matrices, vertexConsumers, light);
+
+        // 拖动时在门旁画一根竖直开度指示条（跟着整段一起只由铰链那一格画）
+        if (TrdmEndGateDrag.indicatorAt(pos)) {
+            renderIndicator(pos, facing, intoRun, angleDegrees, matrices, vertexConsumers, light);
+        }
+    }
+
+    /**
+     * 拖动时的开度指示条：挂在**门旁一格**、朝站台面的竖直条，
+     * 底下一个深灰的槽、上面按开度从下往上填天蓝色（0% = 空，100% = 满）。
+     * 只在拖动那段时间出现，跟着整段门走（由铰链那一格画一次）。
+     */
+    private void renderIndicator(BlockPos pos, Direction facing, Direction intoRun, float angleDegrees,
+                                 PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
+        final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entitySolid(WHITE));
+        final Direction runDir = facing.getClockWise();
+        final Direction out = intoRun.getOpposite();
+        final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
+        final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
+        final float[] normal = {-facingAxis[0], 0F, -facingAxis[2]};
+        // 门旁一格（铰链那一格再往外一格）的中心，贴到玻璃朝站台那个面
+        final float centreX = 0.5F + out.getStepX() + facingAxis[0] * GLASS_SURFACE_4;
+        final float centreZ = 0.5F + out.getStepZ() + facingAxis[2] * GLASS_SURFACE_4;
+
+        final float[] backCentre = {centreX, INDICATOR_BOTTOM + INDICATOR_HEIGHT / 2F, centreZ};
+        emitQuad(matrices.last().pose(), consumer, backCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
+                INDICATOR_HEIGHT / 2F, normal, light, INDICATOR_BACK_COLOR);
+
+        final float fraction = Math.max(0F, Math.min(1F, angleDegrees / TrdmEndGateDrag.MAX_ANGLE));
+        if (fraction > 0.001F) {
+            final float fillHeight = INDICATOR_HEIGHT * fraction;
+            // 往站台外让一丝，避免和槽共面打架
+            final float[] fillCentre = {centreX - facingAxis[0] * 0.004F,
+                    INDICATOR_BOTTOM + fillHeight / 2F,
+                    centreZ - facingAxis[2] * 0.004F};
+            emitQuad(matrices.last().pose(), consumer, fillCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
+                    fillHeight / 2F, normal, light, INDICATOR_FILL_COLOR);
+        }
     }
 
     /** 整段门扇：逐格、上下两格各画一次「关着」那套 MTR 玻璃模型。 */
@@ -161,7 +213,7 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
                 matrices.translate(at.getX() - pos.getX(), at.getY() - pos.getY(), at.getZ() - pos.getZ());
                 // 画「关着」的状态：开着的状态在 blockstate 里指向空模型
                 Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
-                        cellState.setValue(BlockTrdmPSDEndGate.OPEN, false), matrices, vertexConsumers, light, overlay);
+                        cellState.setValue(BlockTrdmPSDEndGate.OPEN, 0), matrices, vertexConsumers, light, overlay);
                 matrices.popPose();
             }
         }

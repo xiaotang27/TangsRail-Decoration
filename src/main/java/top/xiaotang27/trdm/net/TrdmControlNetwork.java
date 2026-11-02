@@ -47,6 +47,18 @@ public final class TrdmControlNetwork {
     /** C2S：BlockPos（PIS 屏幕）+ 跑马文字 + 广告开关 + 广告覆盖项。 */
     public static final ResourceLocation PIS_SETTINGS = Trdm.id("pis_settings");
 
+    /**
+     * C2S：BlockPos（端门任意一格）+ 开度档位（0 = 全关，{@code BlockTrdmPSDEndGate.OPEN_STEPS} = 全开）。
+     * <p>
+     * 端门的开合<b>完全由客户端决定</b>：短按右键 = 全开/全关，按住右键向下拖动 = 连续给档位
+     * （客户端本地按连续角度显示，见 {@code TrdmEndGateDrag}）。
+     * 服务端只做距离和方块类型的最小校验，然后整段一起改。
+     */
+    public static final ResourceLocation END_GATE_OPEN = Trdm.id("psd_end_gate_open");
+
+    /** 端门允许远程操作的半径（格，平方后比较）。 */
+    private static final double END_GATE_MAX_DISTANCE_SQR = 8 * 8;
+
     /** 配置必须在装置旁边操作（防止改包远程改别人的装置）。 */
     private static final double MAX_SELECT_DISTANCE_SQR = 64 * 64;
 
@@ -83,6 +95,11 @@ public final class TrdmControlNetwork {
             final int headerStyle = buf.readVarInt();
             final int bandStyle = buf.readVarInt();
             server.execute(() -> handlePsdAppearance(player, pos, headerStyle, bandStyle));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(END_GATE_OPEN, (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final int step = buf.readVarInt();
+            server.execute(() -> handleEndGateOpen(player, pos, step));
         });
         ServerPlayNetworking.registerGlobalReceiver(PIS_SETTINGS, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();
@@ -158,9 +175,26 @@ public final class TrdmControlNetwork {
         player.displayClientMessage(Component.translatable("gui.trdm.psd_style.applied"), true);
     }
 
+    /**
+     * 端门：改开度档位（0 = 全关）。只校验「玩家在旁边 + 那格真是端门」，然后整段一起改。
+     * 合并后的端门是一扇门，所以点任意一格都是整段动。
+     */
+    private static void handleEndGateOpen(ServerPlayer player, BlockPos pos, int step) {
+        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > END_GATE_MAX_DISTANCE_SQR) {
+            return;
+        }
+        if (!(player.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        if (!(serverLevel.getBlockState(pos).getBlock()
+                instanceof top.xiaotang27.trdm.block.BlockTrdmPSDEndGate)) {
+            return;
+        }
+        top.xiaotang27.trdm.block.BlockTrdmPSDEndGate.setOpenAround(serverLevel, pos, step);
+    }
+
     /** 大站名牌：选「本车站的出口」，服务端只做长度/归属的最小校验。 */
-    private static void handleExitSelection(ServerPlayer player, BlockPos pos, String exitName) {
-        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > MAX_SELECT_DISTANCE_SQR) {
+    private static void handleExitSelection(ServerPlayer player, BlockPos pos, String exitName) {        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > MAX_SELECT_DISTANCE_SQR) {
             return;
         }
         if (!(player.level() instanceof ServerLevel serverLevel)

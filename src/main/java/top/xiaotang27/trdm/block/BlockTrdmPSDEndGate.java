@@ -5,6 +5,7 @@ import mtr.block.IBlock;
 import mtr.mappings.BlockEntityMapper;
 import mtr.mappings.EntityBlockMapper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -18,7 +19,7 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -49,15 +50,24 @@ import top.xiaotang27.trdm.Trdm;
  */
 public class BlockTrdmPSDEndGate extends BlockPSDAPGGlassBase implements EntityBlockMapper {
 
-    /** 开门状态。开门时门扇绕铰链旋 90°，整段共享同一个值。 */
-    public static final BooleanProperty OPEN = BooleanProperty.create("open");
+    /** 开度状态的最大档位：0 = 全关，{@code OPEN_STEPS} = 全开（每档 6°）。 */
+    public static final int OPEN_STEPS = 15;
+
+    /**
+     * 开门开度，量化成 {@link #OPEN_STEPS} 档（0 = 全关，15 = 全开），整段共享同一个值。
+     * <p>
+     * 为什么是状态而不是方块实体里的浮点：状态是现成的同步手段（别人也看得见），不用加同步通道。
+     * 拖动时客户端另外在本地按连续角度显示（见 {@code TrdmEndGateDrag}），松手落到最近一档，
+     * 所以手感是平滑的、状态仍是离散的。
+     */
+    public static final IntegerProperty OPEN = IntegerProperty.create("open", 0, OPEN_STEPS);
 
     /** 沿门排横向传播的上限，纯粹防死循环。 */
     private static final int MAX_RUN_LENGTH = 256;
 
     public BlockTrdmPSDEndGate() {
         super();
-        registerDefaultState(defaultBlockState().setValue(OPEN, false));
+        registerDefaultState(defaultBlockState().setValue(OPEN, 0));
     }
 
     @Override
@@ -87,9 +97,8 @@ public class BlockTrdmPSDEndGate extends BlockPSDAPGGlassBase implements EntityB
             // 刷子：交给 MTR 的 connectGlass 焊接左右邻格（与普通玻璃同一套合并逻辑）
             return super.use(state, world, pos, player, hand, hitResult);
         }
-        if (!world.isClientSide) {
-            setOpenAround(world, pos, !isOpen(state));
-        }
+        // 开合 / 开度由客户端在「松开右键」时发 C2S 包决定（短按 = 全开/全关，按住拖动 = 给开度）：
+        // 服务端这里不做任何事 —— 原版按住右键每 4 tick 会重复触发 use，服务端一改就会来回跳。
         return InteractionResult.SUCCESS;
     }
 
@@ -107,43 +116,49 @@ public class BlockTrdmPSDEndGate extends BlockPSDAPGGlassBase implements EntityB
         return isOpen(state) ? Shapes.empty() : super.getShape(state, world, pos, context);
     }
 
-    /** 这一格是不是开着。 */
-    public static boolean isOpen(BlockState state) {
+    /** 这一格当前的开度档位（0 = 全关，{@link #OPEN_STEPS} = 全开）。 */
+    public static int openStep(BlockState state) {
         return IBlock.getStatePropertySafe(state, OPEN);
     }
 
+    /** 这一格是不是开着（任意档位 > 0）。 */
+    public static boolean isOpen(BlockState state) {
+        return openStep(state) > 0;
+    }
+
     /**
-     * 点任意一格开关门：这一格 + 它的上下半格 + 左右连着的整段一起翻。
+     * 点任意一格改开度：这一格 + 它的上下半格 + 左右连着的整段一起改。
      * 合并后整段共享同一个 {@link #OPEN}（开门时整段玻璃一起动）。
      */
-    public static void setOpenAround(Level world, BlockPos pos, boolean open) {
+    public static void setOpenAround(Level world, BlockPos pos, int step) {
         final BlockState state = world.getBlockState(pos);
         if (!(state.getBlock() instanceof BlockTrdmPSDEndGate)) {
             return;
         }
+        final int target = Mth.clamp(step, 0, OPEN_STEPS);
         final Direction facing = IBlock.getStatePropertySafe(state, HorizontalDirectionalBlock.FACING);
         final DoubleBlockHalf half = IBlock.getStatePropertySafe(state, IBlock.HALF);
         final BlockPos otherHalf = half == DoubleBlockHalf.UPPER ? pos.below() : pos.above();
-        applyOpen(world, pos, open);
-        applyOpen(world, otherHalf, open);
+        applyOpen(world, pos, target);
+        applyOpen(world, otherHalf, target);
         // 上下半格各自沿门排传播（两个半格不是同一格，得分开走）
         for (final BlockPos from : new BlockPos[]{pos, otherHalf}) {
-            propagateOpen(world, from, facing, facing.getClockWise(), open);
-            propagateOpen(world, from, facing, facing.getCounterClockWise(), open);
+            propagateOpen(world, from, facing, facing.getClockWise(), target);
+            propagateOpen(world, from, facing, facing.getCounterClockWise(), target);
         }
     }
 
     /** 只改一格；不是端门 / 已经是目标值就跳过。 */
-    private static void applyOpen(Level world, BlockPos pos, boolean open) {
+    private static void applyOpen(Level world, BlockPos pos, int step) {
         final BlockState state = world.getBlockState(pos);
-        if (!(state.getBlock() instanceof BlockTrdmPSDEndGate) || isOpen(state) == open) {
+        if (!(state.getBlock() instanceof BlockTrdmPSDEndGate) || openStep(state) == step) {
             return;
         }
-        world.setBlockAndUpdate(pos, state.setValue(OPEN, open));
+        world.setBlockAndUpdate(pos, state.setValue(OPEN, step));
     }
 
     /** 从 from 沿 direction 一路改，碰到不是同方向端门的格子就停。 */
-    private static void propagateOpen(Level world, BlockPos from, Direction facing, Direction direction, boolean open) {
+    private static void propagateOpen(Level world, BlockPos from, Direction facing, Direction direction, int step) {
         BlockPos current = from.relative(direction);
         for (int i = 0; i < MAX_RUN_LENGTH; i++) {
             final BlockState state = world.getBlockState(current);
@@ -151,7 +166,7 @@ public class BlockTrdmPSDEndGate extends BlockPSDAPGGlassBase implements EntityB
                     || IBlock.getStatePropertySafe(state, HorizontalDirectionalBlock.FACING) != facing) {
                 return;
             }
-            applyOpen(world, current, open);
+            applyOpen(world, current, step);
             current = current.relative(direction);
         }
     }

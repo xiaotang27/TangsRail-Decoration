@@ -174,6 +174,17 @@ public final class TrdmControlClient {
         ClientPlayNetworking.send(TrdmControlNetwork.SELECT_PLATFORM, buf);
     }
 
+    /**
+     * 端门：把开度档位（0 = 全关）发给服务端。短按给 0 / 满档，拖动时按档位变化发。
+     * 服务端改的是方块状态，会自动同步回来。
+     */
+    public static void sendEndGateOpen(BlockPos gatePos, int step) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(gatePos);
+        buf.writeVarInt(step);
+        ClientPlayNetworking.send(TrdmControlNetwork.END_GATE_OPEN, buf);
+    }
+
     public static void sendToggleIsolate(BlockPos targetPos) {
         final FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBlockPos(targetPos);
