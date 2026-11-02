@@ -46,6 +46,15 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     /** 玻璃板中面离方块中心的距离（沿 facing 量）：模型里玻璃在 x 2~4，中面 3/16。 */
     private static final double PANE_MID_OFFSET = 0.5D - 3D / 16D;
 
+    /**
+     * 端门的玻璃 / 门楣模型整体沿<b>模型 z 轴</b>挪了多少像素（现在是 +2，用来和端头玻璃接上）。
+     * 渲染端所有跟模型绑定的东西（铰链轴、装饰条、门灯）都要跟着挪同样的量，否则会和模型错开。
+     * 模型 +z 对应世界里的「{@code facing} 的逆时针方向」。
+     */
+    private static final float MODEL_Z_SHIFT = 2F / 16F;
+
+    private static final float[] UP_AXIS = {0F, 1F, 0F};
+
     /** 一段门排最多几格（纯粹防死循环）。 */
     private static final int MAX_RUN = 64;
 
@@ -109,7 +118,9 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
 
         final boolean open = BlockTrdmPSDEndGate.isOpen(state);
 
-        // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上
+        // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上；
+        // 再跟着模型那 +2 像素的 z 偏移一起挪（模型 +z = facing 的逆时针方向）
+        final Direction modelZ = facing.getCounterClockWise();
         double pivotX = hingeCell.getX() + 0.5D + facing.getStepX() * PANE_MID_OFFSET;
         double pivotZ = hingeCell.getZ() + 0.5D + facing.getStepZ() * PANE_MID_OFFSET;
         if (facing.getAxis() == Direction.Axis.Z) {
@@ -118,6 +129,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         } else {
             pivotZ = hingeCell.getZ() + (intoRun.getStepZ() > 0 ? 0D : 1D);
         }
+        pivotX += modelZ.getStepX() * MODEL_Z_SHIFT;
+        pivotZ += modelZ.getStepZ() * MODEL_Z_SHIFT;
 
         // 门扇 + 装饰条共用同一套变换：开着时绕铰链转，关着时不动
         matrices.pushPose();
@@ -188,9 +201,12 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
 
         final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entityCutout(texture));
         final Direction runDir = facing.getClockWise();
-        // 沿门排的中心（格数坐标里 pos 自己中心是 0）
+        final Direction modelZ = facing.getCounterClockWise();
+        // 沿门排的中心（格数坐标里 pos 自己中心是 0），再跟模型那 +2 像素的 z 偏移
         final float midAlong = (forth - back) / 2F;
         final float[] uAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
+        final float zShiftX = modelZ.getStepX() * MODEL_Z_SHIFT;
+        final float zShiftZ = modelZ.getStepZ() * MODEL_Z_SHIFT;
         // 玻璃两个面：朝站台那面（法线 = -facing）和朝轨道那面（法线 = facing）
         for (final boolean platformFace : new boolean[]{true, false}) {
             final float distance = platformFace ? GLASS_SURFACE_4 - BAND_NUDGE : GLASS_SURFACE_6 + BAND_NUDGE;
@@ -198,10 +214,10 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
                     ? new float[]{-facing.getStepX(), 0F, -facing.getStepZ()}
                     : new float[]{facing.getStepX(), 0F, facing.getStepZ()};
             final float[] centre = {
-                    0.5F + uAxis[0] * midAlong + facing.getStepX() * distance,
+                    0.5F + uAxis[0] * midAlong + zShiftX + facing.getStepX() * distance,
                     BAND_CENTRE_Y,
-                    0.5F + uAxis[2] * midAlong + facing.getStepZ() * distance};
-            emitQuad(matrices.last().pose(), consumer, centre, uAxis, span / 2F, BAND_HEIGHT / 2F, normal,
+                    0.5F + uAxis[2] * midAlong + zShiftZ + facing.getStepZ() * distance};
+            emitQuad(matrices.last().pose(), consumer, centre, uAxis, span / 2F, UP_AXIS, BAND_HEIGHT / 2F, normal,
                     light, 0xFFFFFFFF);
         }
     }
@@ -209,6 +225,9 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     /**
      * 门楣灯：和滑动门同一种门灯 —— MTR 的 {@code light_on/light_off} 贴图 + 一个小立方体，
      * 贴在门楣朝站台那面的下沿，沿整段居中；开门亮（打满亮度）、关门灭。
+     * <p>
+     * 立方体<b>六个面全画</b>：只画四个侧面时，从下面往上看会看穿（背面被剔除），
+     * 看起来就像模型炸了。
      */
     private void renderLamp(Level world, BlockPos pos, Direction facing, int back, int forth, boolean open,
                             PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
@@ -218,41 +237,55 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         final ResourceLocation texture = open ? LAMP_ON : LAMP_OFF;
         final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entityCutout(texture));
         final Direction runDir = facing.getClockWise();
+        final Direction backDir = facing.getCounterClockWise();
         final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
         final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
+        final float[] upAxis = {0F, 1F, 0F};
         final float midAlong = (forth - back) / 2F;
         // 门楣模型厚 6/16，且贴在方块 x/z 的 0 侧：朝站台那面在中心往 -facing 方向 2/16 处
         final float distance = 2F / 16F;
+        // 门楣模型整体沿模型 z 轴挪了 MODEL_Z_SHIFT（对齐端头玻璃），灯也跟着挪：
+        // 模型 +z 对应「facing 的逆时针」，所以这里沿 backDir 偏。
+        final float zShift = MODEL_Z_SHIFT;
         final float[] centre = {
-                0.5F + runAxis[0] * midAlong + facingAxis[0] * distance,
+                0.5F + runAxis[0] * midAlong + backDir.getStepX() * zShift + facingAxis[0] * distance,
                 2F + LAMP_FROM_BOTTOM + LAMP_SIZE / 2F,
-                0.5F + runAxis[2] * midAlong + facingAxis[2] * distance};
+                0.5F + runAxis[2] * midAlong + backDir.getStepZ() * zShift + facingAxis[2] * distance};
         final float half = LAMP_SIZE / 2F;
         // 亮的时候打满亮度，看着才像在发光
         final int lampLight = open ? 0xF000F0 : light;
-        // 立方体的四个侧面（顶/底看不到，省掉）
-        final float[][] normals = {
-                {-facingAxis[0], 0F, -facingAxis[2]},
-                {facingAxis[0], 0F, facingAxis[2]},
-                {runAxis[0], 0F, runAxis[2]},
-                {-runAxis[0], 0F, -runAxis[2]}};
-        final float[][] axes = {runAxis, runAxis, facingAxis, facingAxis};
-        for (int i = 0; i < normals.length; i++) {
-            emitQuad(matrices.last().pose(), consumer, centre, axes[i], half, half, normals[i], lampLight,
-                    0xFFFFFFFF);
-        }
+        // 六个面：±站台法线、±跑向、±竖直
+        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, upAxis, half,
+                new float[]{-facingAxis[0], 0F, -facingAxis[2]}, lampLight, 0xFFFFFFFF);
+        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, upAxis, half,
+                facingAxis, lampLight, 0xFFFFFFFF);
+        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, upAxis, half,
+                runAxis, lampLight, 0xFFFFFFFF);
+        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, upAxis, half,
+                new float[]{-runAxis[0], 0F, -runAxis[2]}, lampLight, 0xFFFFFFFF);
+        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, facingAxis, half,
+                upAxis, lampLight, 0xFFFFFFFF);
+        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, facingAxis, half,
+                new float[]{0F, -1F, 0F}, lampLight, 0xFFFFFFFF);
     }
 
     /**
-     * 画一个竖直矩形面：中心 {@code centre}，水平方向 {@code uAxis}，朝外法线 {@code normal}。
-     * 绕序按右手定则现场判定，保证正面朝 {@code outward}。
+     * 画一个矩形面：中心 {@code centre}，两条边方向 {@code uAxis}/{@code vAxis}，朝外法线 {@code normal}。
+     * 绕序按右手定则现场判定，保证正面朝 {@code normal}。
      */
-    private static void emitQuad(Matrix4f pose, VertexConsumer consumer, float[] centre, float[] uAxis,
-                                 float halfU, float halfV, float[] normal, int light, int argb) {
+    private static void emitQuad(Matrix4f pose, VertexConsumer consumer, float[] centre,
+                                 float[] uAxis, float halfU, float[] vAxis, float halfV,
+                                 float[] normal, int light, int argb) {
         final float[][] corners = {
-                {centre[0] + uAxis[0] * halfU, centre[1] + halfV, centre[2] + uAxis[2] * halfU, 1F, 0F},
-                {centre[0] - uAxis[0] * halfU, centre[1] + halfV, centre[2] - uAxis[2] * halfU, 0F, 0F},
-                {centre[0] - uAxis[0] * halfU, centre[1] - halfV, centre[2] - uAxis[2] * halfU, 0F, 1F},
+                {centre[0] + uAxis[0] * halfU + vAxis[0] * halfV,
+                        centre[1] + uAxis[1] * halfU + vAxis[1] * halfV,
+                        centre[2] + uAxis[2] * halfU + vAxis[2] * halfV, 1F, 0F},
+                {centre[0] - uAxis[0] * halfU + vAxis[0] * halfV,
+                        centre[1] - uAxis[1] * halfU + vAxis[1] * halfV,
+                        centre[2] - uAxis[2] * halfU + vAxis[2] * halfV, 0F, 0F},
+                {centre[0] - uAxis[0] * halfU - vAxis[0] * halfV,
+                        centre[1] - uAxis[1] * halfU - vAxis[1] * halfV,
+                        centre[2] - uAxis[2] * halfU - vAxis[2] * halfV, 0F, 1F},
                 {centre[0] + uAxis[0] * halfU, centre[1] - halfV, centre[2] + uAxis[2] * halfU, 1F, 1F}};
 
         final float[] ab = {corners[1][0] - corners[0][0], corners[1][1] - corners[0][1], corners[1][2] - corners[0][2]};

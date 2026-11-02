@@ -1,0 +1,25 @@
+{
+  "parent": "mtr:block/psd_glass_bottom_middle_1",
+  "elements": [
+    {
+      "from": [ 2, 0, 10 ],
+      "to": [ 4, 16, 18 ],
+      "faces": {
+          "down": { "texture": "#bottom", "cullface": "down" },
+          "up": { "texture": "#top", "cullface": "up" },
+          "east": { "texture": "#front", "uv": [ 4, 0, 12, 16 ] },
+          "west": { "texture": "#back", "uv": [ 12, 0, 4, 16 ] }
+      }
+    },
+    {
+      "from": [ 2, 0, 2 ],
+      "to": [ 4, 16, 10 ],
+      "faces": {
+          "down": { "texture": "#bottom", "cullface": "down" },
+          "up": { "texture": "#top", "cullface": "up" },
+          "east": { "texture": "#front", "uv": [ 12, 0, 4, 16 ] },
+          "west": { "texture": "#back", "uv": [ 4, 0, 12, 16 ] }
+      }
+    }
+  ]
+}

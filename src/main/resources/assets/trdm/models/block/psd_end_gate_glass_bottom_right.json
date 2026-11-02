@@ -1,0 +1,16 @@
+{
+  "parent": "mtr:block/psd_glass_bottom_right_1",
+  "elements": [
+    {
+      "from": [ 2, 0, 2 ],
+      "to": [ 4, 16, 18 ],
+      "faces": {
+          "down": { "texture": "#bottom", "cullface": "down" },
+          "up": { "texture": "#top", "cullface": "up" },
+          "east": { "texture": "#front", "uv": [ 16, 0, 0, 16 ] },
+          "west": { "texture": "#back", "uv": [ 16, 0, 0, 16 ] },
+          "north": { "texture": "#light", "cullface": "north" }
+      }
+    }
+  ]
+}
