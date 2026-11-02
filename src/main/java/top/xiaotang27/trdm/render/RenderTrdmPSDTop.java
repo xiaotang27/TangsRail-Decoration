@@ -38,6 +38,7 @@ import org.joml.Matrix4f;
 import mtr.render.MoreRenderLayers;
 import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.block.BlockTrdmPSDDoor;
+import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 
 import java.util.ArrayList;
@@ -132,6 +133,11 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         }
 
         final Block blockBelow = world.getBlockState(pos.below()).getBlock();
+        // 端门门楣：不画吊板 / 线路图 / 色带 / 装饰条，只留一盏灯 ——
+        // 灯和玻璃上的装饰条都由 RenderTrdmPSDEndGate 负责（装饰条要跟着门一起转，这里画不了）。
+        if (blockBelow instanceof BlockTrdmPSDEndGate) {
+            return;
+        }
         final boolean doorBelow = blockBelow instanceof BlockPSDAPGDoorBase;
         final boolean glassBelow = blockBelow instanceof BlockPSDAPGGlassBase && !(blockBelow instanceof BlockPSDAPGGlassEndBase);
 

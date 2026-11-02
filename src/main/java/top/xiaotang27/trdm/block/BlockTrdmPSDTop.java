@@ -12,6 +12,7 @@ import mtr.mappings.BlockEntityMapper;
 import mtr.mappings.EntityBlockMapper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -50,13 +51,37 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
     /** 往上找门楣最多找几格（门扇 / 玻璃都是 2 格高，门楣在第三格）。 */
     private static final int HEADER_SEARCH_HEIGHT = 4;
 
-    /** 吊版样式（方块状态，跟箭头方向一样靠 setBlockAndUpdate 存盘和同步）。 */
-    public static final IntegerProperty HEADER_STYLE = IntegerProperty.create("header_style", 0, 15);
-    /** 玻璃装饰线样式（方块状态）。 */
-    public static final IntegerProperty BAND_STYLE = IntegerProperty.create("band_style", 0, 15);
+    /**
+     * 吊版样式（方块状态，跟箭头方向一样靠 setBlockAndUpdate 存盘和同步）。
+     * <p>
+     * <b>范围只能取实际会用到的值</b>：方块状态数是各属性取值数的<b>乘积</b>，
+     * 这里取多了会指数级放大 —— 门楣本来就有 facing(4)×side(4)×air_left(2)×air_right(2)×
+     * arrow_direction(4)×persistent(4)，所以这两个属性每多一个值，状态数就翻一倍。
+     * 之前写成 0..15 时门楣一共 262,144 个状态（加 end_gate 后 524,288），
+     * 每个状态都要在加载期建成对象再烘焙模型 —— 直接表现就是「加载本 mod 很久不动」。
+     * 现在按 {@link top.xiaotang27.trdm.control.PsdStyles#HEADER_STYLES} 的实际长度收到 0..1，
+     * 门楣状态数降到 8,192。
+     */
+    public static final IntegerProperty HEADER_STYLE = IntegerProperty.create("header_style", 0, 1);
+    /**
+     * 玻璃装饰线样式（方块状态）。范围说明同上：见 {@link top.xiaotang27.trdm.control.PsdStyles#BAND_STYLES}，
+     * 目前只有 0（天津装饰线）和 1（只画人字），所以取 0..1。
+     */
+    public static final IntegerProperty BAND_STYLE = IntegerProperty.create("band_style", 0, 1);
 
     public static final BooleanProperty AIR_LEFT = BooleanProperty.create("air_left");
     public static final BooleanProperty AIR_RIGHT = BooleanProperty.create("air_right");
+    /**
+     * 这一格门楣下面是不是<b>端门</b>。
+     * <p>
+     * 端门的门楣要满足两条普通门楣不满足的要求，所以单独走一套模型：
+     * <ul>
+     *     <li>和端头玻璃的门楣齐平：面板厚 2/16~6/16（普通门楣是 0/16~6/16，会多探出 2 像素）；</li>
+     *     <li>直角：不带 MTR 原版那种底部曲线倒角。</li>
+     * </ul>
+     * 对应 blockstate 里的 {@code trdm:block/psd_end_gate_top}。
+     */
+    public static final BooleanProperty END_GATE = BooleanProperty.create("end_gate");
     public static final IntegerProperty ARROW_DIRECTION = IntegerProperty.create("arrow_direction", 0, 3);
     public static final EnumProperty<EnumPersistent> PERSISTENT = EnumProperty.create("persistent", EnumPersistent.class);
 
@@ -297,7 +322,8 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, SIDE_EXTENDED, AIR_LEFT, AIR_RIGHT, ARROW_DIRECTION, PERSISTENT, HEADER_STYLE, BAND_STYLE);
+        builder.add(FACING, SIDE_EXTENDED, AIR_LEFT, AIR_RIGHT, ARROW_DIRECTION, PERSISTENT, HEADER_STYLE, BAND_STYLE,
+                END_GATE);
     }
 
     /** 这一格门楣当前选的吊版样式。 */
@@ -320,10 +346,14 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         if (!(state.getBlock() instanceof BlockTrdmPSDTop)) {
             return;
         }
-        if (headerStyle(state) == headerStyle && bandStyle(state) == bandStyle) {
+        // 属性范围只有 0..1（见 HEADER_STYLE 的注释），网络包送来的值先夹一下，
+        // 免得手滑或旧版客户端给出越界值直接抛 IllegalArgumentException。
+        final int header = Mth.clamp(headerStyle, 0, 1);
+        final int band = Mth.clamp(bandStyle, 0, 1);
+        if (headerStyle(state) == header && bandStyle(state) == band) {
             return;
         }
-        world.setBlockAndUpdate(pos, state.setValue(HEADER_STYLE, headerStyle).setValue(BAND_STYLE, bandStyle));
+        world.setBlockAndUpdate(pos, state.setValue(HEADER_STYLE, header).setValue(BAND_STYLE, band));
     }
 
     @Override
@@ -359,7 +389,9 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
 
         BlockState newState = (oldState.getBlock() instanceof BlockTrdmPSDTop ? oldState : Trdm.PSD_TOP.defaultBlockState())
                 .setValue(AIR_LEFT, airLeft)
-                .setValue(AIR_RIGHT, airRight);
+                .setValue(AIR_RIGHT, airRight)
+                // 下面是端门就换成「齐平 + 直角」那套门楣模型（见 END_GATE 的注释）
+                .setValue(END_GATE, blockBelow instanceof BlockTrdmPSDEndGate);
         if (facing != null) {
             newState = newState.setValue(FACING, facing);
         }

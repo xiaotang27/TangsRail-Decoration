@@ -73,7 +73,7 @@ public class Trdm implements ModInitializer {
     public static final Item HUNG_SIGN_ITEM = new ItemTrdmBigSign(HUNG_SIGN);
     public static final Item PIS_ITEM = new BlockItem(PIS, new Item.Properties());
     public static final Item PIS_POLE_ITEM = new BlockItem(PIS_POLE, new Item.Properties());
-    public static final Item PSD_END_GATE_ITEM = new BlockItem(PSD_END_GATE, new Item.Properties());
+    public static final ItemTrdmPSD PSD_END_GATE_ITEM = new ItemTrdmPSD(ItemTrdmPSD.Kind.END_GATE);
 
     public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
     public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
@@ -152,7 +152,7 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(PSD_END_GATE_ITEM));
                 });
 
-        LOGGER.info("TangsRail Decoration initialized —— Version DEV_0.01");
+        LOGGER.info("TangsRail Decoration initialized —— Version DEV_0.1");
     }
 
     public static ResourceLocation id(String path) {

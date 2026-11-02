@@ -116,6 +116,16 @@ public final class TrdmDecalBand {
      */
     public static BufferedImage render(int width, int height, int routeColor, boolean pointLeft,
                                        TrdmSignAssets.Sprite centre, boolean chevronOnly) {
+        return render(width, height, routeColor, pointLeft, centre, chevronOnly, false);
+    }
+
+    /**
+     * 烘焙一整条装饰带（可关掉两端人字纹）。
+     *
+     * @param noChevron true = 只画线路色底 + 中央 slogan，不画人字纹（端门用：spec 第 5 条）
+     */
+    public static BufferedImage render(int width, int height, int routeColor, boolean pointLeft,
+                                       TrdmSignAssets.Sprite centre, boolean chevronOnly, boolean noChevron) {
         final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         final Graphics2D graphics = image.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -141,6 +151,11 @@ public final class TrdmDecalBand {
             TrdmSignAssets.drawSpriteInk(graphics, centre,
                     (float) (width / 2D - centreWidth / 2D), (float) (midY - centre.inkH() * scale / 2D),
                     (float) centreWidth, (float) (centre.inkH() * scale));
+        }
+
+        if (noChevron) {
+            graphics.dispose();
+            return image;
         }
 
         // 两端人字纹：只画人字的样式就地染成线路色

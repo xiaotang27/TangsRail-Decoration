@@ -15,11 +15,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.BlockHitResult;
 import top.xiaotang27.trdm.block.BlockTrdmPSDControl;
 import top.xiaotang27.trdm.block.BlockTrdmPSDDoor;
+import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDGlass;
 import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmControlClient;
 import top.xiaotang27.trdm.render.RenderTrdmPSDDoor;
+import top.xiaotang27.trdm.render.RenderTrdmPSDEndGate;
 import top.xiaotang27.trdm.render.RenderTrdmPSDTop;
 import top.xiaotang27.trdm.render.RenderTrdmBigStationSign;
 import top.xiaotang27.trdm.render.RenderTrdmHungBigSign;
@@ -71,6 +73,9 @@ public class TrdmClient implements ClientModInitializer {
         // 门楣：线路图 / 站名 / 方向箭头 / 站台色带 + 玻璃上的装饰带
         BlockEntityRendererRegistry.register(Trdm.PSD_TOP_BE, context -> new RenderTrdmPSDTop(null));
 
+        // 端门：关着走静态玻璃模型，开着由这个渲染器把「整段」玻璃当一扇大门摆开 90°
+        BlockEntityRendererRegistry.register(Trdm.PSD_END_GATE_BE, context -> new RenderTrdmPSDEndGate<>(null));
+
         // 站名牌：本站 + 下一站 + 线路色带
         BlockEntityRendererRegistry.register(Trdm.STATION_SIGN_BE, context -> new RenderTrdmStationSign<>());
 
@@ -87,6 +92,8 @@ public class TrdmClient implements ClientModInitializer {
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_GLASS_1, RenderType.cutout());
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_GLASS_END_1, RenderType.cutout());
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_TOP, RenderType.cutout());
+        // 端门也是玻璃：漏了这条会按 solid 画，透明像素变成白板
+        BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_END_GATE, RenderType.cutout());
 
         // 「蹲下 + 刷子右键屏蔽门」→ 外观设置。
         // 走 UseBlockCallback 而不是只挂在方块的 use 上：这个回调在「方块自己的 use」之前触发，
@@ -106,7 +113,8 @@ public class TrdmClient implements ClientModInitializer {
         final BlockPos pos = hitResult.getBlockPos();
         final Block block = world.getBlockState(pos).getBlock();
         final boolean psd = block instanceof BlockTrdmPSDDoor || block instanceof BlockTrdmPSDGlass
-                || block instanceof BlockTrdmPSDGlassEnd || block instanceof BlockTrdmPSDTop;
+                || block instanceof BlockTrdmPSDGlassEnd || block instanceof BlockTrdmPSDTop
+                || block instanceof BlockTrdmPSDEndGate;
         if (!psd) {
             return InteractionResult.PASS;
         }

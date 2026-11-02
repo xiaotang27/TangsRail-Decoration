@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import top.xiaotang27.trdm.Trdm;
+import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 
 /**
  * 屏蔽门放置物品，与 MTR 的 ItemPSDAPGBase.useOn 一致：
@@ -20,7 +21,7 @@ import top.xiaotang27.trdm.Trdm;
 public class ItemTrdmPSD extends Item {
 
     public enum Kind {
-        DOOR, GLASS, GLASS_END
+        DOOR, GLASS, GLASS_END, END_GATE
     }
 
     private final Kind kind;
@@ -53,6 +54,8 @@ public class ItemTrdmPSD extends Item {
                 }
                 world.setBlockAndUpdate(pos.above(2), Trdm.PSD_TOP.defaultBlockState()
                         .setValue(HorizontalDirectionalBlock.FACING, facing)
+                        // 端门的门楣走「齐平 + 直角」那套模型
+                        .setValue(BlockTrdmPSDTop.END_GATE, kind == Kind.END_GATE)
                         .setValue(IBlock.SIDE_EXTENDED, kind == Kind.DOOR
                                 ? (x == 0 ? IBlock.EnumSide.LEFT : IBlock.EnumSide.RIGHT)
                                 : IBlock.EnumSide.SINGLE));
@@ -73,6 +76,15 @@ public class ItemTrdmPSD extends Item {
                 break;
             case GLASS:
                 state = Trdm.PSD_GLASS_1.defaultBlockState()
+                        .setValue(IBlock.SIDE_EXTENDED, IBlock.EnumSide.SINGLE);
+                break;
+            case END_GATE:
+                // 端门：1 格宽、2 格高的玻璃门，顶上再放一格门楣（见 useOn 的 y = 2 那次放置）
+                state = Trdm.PSD_END_GATE.defaultBlockState()
+                        .setValue(IBlock.SIDE_EXTENDED, IBlock.EnumSide.SINGLE);
+                break;
+            case GLASS_END:
+                state = Trdm.PSD_GLASS_END_1.defaultBlockState()
                         .setValue(IBlock.SIDE_EXTENDED, IBlock.EnumSide.SINGLE);
                 break;
             default:

@@ -1,34 +1,68 @@
 {
   "variants": {
-    "facing=west,open=false": {
-      "model": "trdm:block/psd_end_gate_closed"
-    },
-    "facing=west,open=true": {
-      "model": "trdm:block/psd_end_gate_open"
-    },
-    "facing=north,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
-      "y": 90
-    },
-    "facing=north,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
-      "y": 90
-    },
-    "facing=east,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
-      "y": 180
-    },
-    "facing=east,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
-      "y": 180
-    },
-    "facing=south,open=false": {
-      "model": "trdm:block/psd_end_gate_closed",
-      "y": 270
-    },
-    "facing=south,open=true": {
-      "model": "trdm:block/psd_end_gate_open",
-      "y": 270
-    }
+    "facing=west,side=left,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_left_1" },
+    "facing=west,side=left,half=lower,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=left,half=upper,open=false": { "model": "mtr:block/psd_glass_top_left_1" },
+    "facing=west,side=left,half=upper,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=right,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_right_1" },
+    "facing=west,side=right,half=lower,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=right,half=upper,open=false": { "model": "mtr:block/psd_glass_top_right_1" },
+    "facing=west,side=right,half=upper,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=middle,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_middle_1" },
+    "facing=west,side=middle,half=lower,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=middle,half=upper,open=false": { "model": "mtr:block/psd_glass_top_middle_1" },
+    "facing=west,side=middle,half=upper,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=single,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_single_1" },
+    "facing=west,side=single,half=lower,open=true": { "model": "minecraft:block/air" },
+    "facing=west,side=single,half=upper,open=false": { "model": "mtr:block/psd_glass_top_single_1" },
+    "facing=west,side=single,half=upper,open=true": { "model": "minecraft:block/air" },
+    "facing=north,side=left,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_left_1", "y": 90 },
+    "facing=north,side=left,half=lower,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=left,half=upper,open=false": { "model": "mtr:block/psd_glass_top_left_1", "y": 90 },
+    "facing=north,side=left,half=upper,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=right,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_right_1", "y": 90 },
+    "facing=north,side=right,half=lower,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=right,half=upper,open=false": { "model": "mtr:block/psd_glass_top_right_1", "y": 90 },
+    "facing=north,side=right,half=upper,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=middle,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_middle_1", "y": 90 },
+    "facing=north,side=middle,half=lower,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=middle,half=upper,open=false": { "model": "mtr:block/psd_glass_top_middle_1", "y": 90 },
+    "facing=north,side=middle,half=upper,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=single,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_single_1", "y": 90 },
+    "facing=north,side=single,half=lower,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=north,side=single,half=upper,open=false": { "model": "mtr:block/psd_glass_top_single_1", "y": 90 },
+    "facing=north,side=single,half=upper,open=true": { "model": "minecraft:block/air", "y": 90 },
+    "facing=east,side=left,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_left_1", "y": 180 },
+    "facing=east,side=left,half=lower,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=left,half=upper,open=false": { "model": "mtr:block/psd_glass_top_left_1", "y": 180 },
+    "facing=east,side=left,half=upper,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=right,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_right_1", "y": 180 },
+    "facing=east,side=right,half=lower,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=right,half=upper,open=false": { "model": "mtr:block/psd_glass_top_right_1", "y": 180 },
+    "facing=east,side=right,half=upper,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=middle,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_middle_1", "y": 180 },
+    "facing=east,side=middle,half=lower,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=middle,half=upper,open=false": { "model": "mtr:block/psd_glass_top_middle_1", "y": 180 },
+    "facing=east,side=middle,half=upper,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=single,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_single_1", "y": 180 },
+    "facing=east,side=single,half=lower,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=east,side=single,half=upper,open=false": { "model": "mtr:block/psd_glass_top_single_1", "y": 180 },
+    "facing=east,side=single,half=upper,open=true": { "model": "minecraft:block/air", "y": 180 },
+    "facing=south,side=left,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_left_1", "y": 270 },
+    "facing=south,side=left,half=lower,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=left,half=upper,open=false": { "model": "mtr:block/psd_glass_top_left_1", "y": 270 },
+    "facing=south,side=left,half=upper,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=right,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_right_1", "y": 270 },
+    "facing=south,side=right,half=lower,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=right,half=upper,open=false": { "model": "mtr:block/psd_glass_top_right_1", "y": 270 },
+    "facing=south,side=right,half=upper,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=middle,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_middle_1", "y": 270 },
+    "facing=south,side=middle,half=lower,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=middle,half=upper,open=false": { "model": "mtr:block/psd_glass_top_middle_1", "y": 270 },
+    "facing=south,side=middle,half=upper,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=single,half=lower,open=false": { "model": "mtr:block/psd_glass_bottom_single_1", "y": 270 },
+    "facing=south,side=single,half=lower,open=true": { "model": "minecraft:block/air", "y": 270 },
+    "facing=south,side=single,half=upper,open=false": { "model": "mtr:block/psd_glass_top_single_1", "y": 270 },
+    "facing=south,side=single,half=upper,open=true": { "model": "minecraft:block/air", "y": 270 }
   }
 }

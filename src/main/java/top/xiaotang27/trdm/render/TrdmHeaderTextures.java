@@ -278,9 +278,18 @@ public final class TrdmHeaderTextures {
      */
     public static ResourceLocation getDecalBand(int style, int routeColor, float aspect, boolean arrowLeft,
                                                 boolean mirrorCentre) {
+        return getDecalBand(style, routeColor, aspect, arrowLeft, mirrorCentre, false);
+    }
+
+    /**
+     * 同上，但可以关掉两端人字纹（{@code noChevron}）：
+     * 端门的装饰条只画线路色底 + 中央 slogan，spec 第 5 条明确不画人字。
+     */
+    public static ResourceLocation getDecalBand(int style, int routeColor, float aspect, boolean arrowLeft,
+                                                boolean mirrorCentre, boolean noChevron) {
         final boolean chevronOnly = style == top.xiaotang27.trdm.control.PsdStyles.BAND_CHEVRON_ONLY;
         final String key = "band|" + style + "|" + Integer.toHexString(routeColor & 0xFFFFFF) + "|"
-                + formatAspect(aspect) + "|" + arrowLeft + "|" + mirrorCentre;
+                + formatAspect(aspect) + "|" + arrowLeft + "|" + mirrorCentre + "|" + noChevron;
         // 中央图必须在渲染线程先读一次，烘焙线程只读快照（只有人字的样式用不到它）
         if (!chevronOnly) {
             TrdmDecalBand.primeCentre();
@@ -290,7 +299,7 @@ public final class TrdmHeaderTextures {
         return resolveNow(key, () -> {
             final TextureSize size = bandTextureSize(aspect);
             return toNativeImage(TrdmDecalBand.render(size.width(), size.height(), routeColor, arrowLeft, centre,
-                    chevronOnly));
+                    chevronOnly, noChevron));
         });
     }
 
