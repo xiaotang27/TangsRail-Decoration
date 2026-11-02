@@ -6,6 +6,9 @@
   "mixins": [
     "TrainServerDoorMixin"
   ],
+  "client": [
+    "MouseHandlerTurnMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

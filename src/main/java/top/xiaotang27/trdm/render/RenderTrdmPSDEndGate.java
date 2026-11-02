@@ -71,8 +71,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     private static final float BAND_END_INSET = 1F / 16F;
 
     // ===== 门楣灯 =====
-    /** 灯的边长（格）。和 MTR 滑动门的门灯本体一样是 1/16（模型里 addBox 的 1×1×1 像素）。 */
-    private static final float LAMP_SIZE = 1F / 16F;
+    /** 灯的边长（格）。MTR 滑动门门灯本体是 1/16，太小看不清，这里用 3/16。 */
+    private static final float LAMP_SIZE = 3F / 16F;
     /** 灯底边离门楣下沿多远（门楣是下半格往上第 2 格）。 */
     private static final float LAMP_FROM_BOTTOM = 3F / 16F;
     /** 和滑动门一样的门灯贴图（MTR 原版 light_on / light_off）。 */
@@ -159,42 +159,43 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         // 灯挂在门楣上，不跟门转
         renderLamp(world, pos, facing, back, forth, step > 0, matrices, vertexConsumers, light);
 
-        // 拖动时在门旁画一根竖直开度指示条（跟着整段一起只由铰链那一格画）
+        // 拖动时在门前画一根竖直开度指示条（跟着整段一起只由铰链那一格画）
         if (TrdmEndGateDrag.indicatorAt(pos)) {
-            renderIndicator(pos, facing, intoRun, angleDegrees, matrices, vertexConsumers, light);
+            renderIndicator(pos, facing, back, forth, angleDegrees, matrices, vertexConsumers, light);
         }
     }
 
     /**
-     * 拖动时的开度指示条：挂在**门旁一格**、朝站台面的竖直条，
-     * 底下一个深灰的槽、上面按开度从下往上填天蓝色（0% = 空，100% = 满）。
-     * 只在拖动那段时间出现，跟着整段门走（由铰链那一格画一次）。
+     * 拖动时的开度指示条：挂在门**前方**（站台那一侧）的竖直条 —— 不放进格子边缘，
+     * 免得被旁边的墙 / 门楣挡住。底下一个深灰的槽、上面按开度从下往上填天蓝色。
+     * 只在拖动那段时间出现，跟着整段门走（由铰链那一格画一次），两面都画，站哪边都看得见。
      */
-    private void renderIndicator(BlockPos pos, Direction facing, Direction intoRun, float angleDegrees,
+    private void renderIndicator(BlockPos pos, Direction facing, int back, int forth, float angleDegrees,
                                  PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
         final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entitySolid(WHITE));
         final Direction runDir = facing.getClockWise();
-        final Direction out = intoRun.getOpposite();
         final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
         final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
-        final float[] normal = {-facingAxis[0], 0F, -facingAxis[2]};
-        // 门旁一格（铰链那一格再往外一格）的中心，贴到玻璃朝站台那个面
-        final float centreX = 0.5F + out.getStepX() + facingAxis[0] * GLASS_SURFACE_4;
-        final float centreZ = 0.5F + out.getStepZ() + facingAxis[2] * GLASS_SURFACE_4;
-
+        // 站台那一侧 = -facing；distance 变小就是往站台外走（见 MODEL_X_OFFSET 那段的坐标约定）
+        final float distance = GLASS_SURFACE_4 - 0.55F;
+        final float centreX = 0.5F + runAxis[0] * ((forth - back) / 2F) + facingAxis[0] * distance;
+        final float centreZ = 0.5F + runAxis[2] * ((forth - back) / 2F) + facingAxis[2] * distance;
         final float[] backCentre = {centreX, INDICATOR_BOTTOM + INDICATOR_HEIGHT / 2F, centreZ};
-        emitQuad(matrices.last().pose(), consumer, backCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
-                INDICATOR_HEIGHT / 2F, normal, light, INDICATOR_BACK_COLOR);
+        final float[] normal = {-facingAxis[0], 0F, -facingAxis[2]};
+        final float[] opposite = {facingAxis[0], 0F, facingAxis[2]};
+        for (final float[] side : new float[][]{normal, opposite}) {
+            emitQuad(matrices.last().pose(), consumer, backCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
+                    INDICATOR_HEIGHT / 2F, side, light, INDICATOR_BACK_COLOR);
+        }
 
         final float fraction = Math.max(0F, Math.min(1F, angleDegrees / TrdmEndGateDrag.MAX_ANGLE));
         if (fraction > 0.001F) {
             final float fillHeight = INDICATOR_HEIGHT * fraction;
-            // 往站台外让一丝，避免和槽共面打架
-            final float[] fillCentre = {centreX - facingAxis[0] * 0.004F,
-                    INDICATOR_BOTTOM + fillHeight / 2F,
-                    centreZ - facingAxis[2] * 0.004F};
-            emitQuad(matrices.last().pose(), consumer, fillCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
-                    fillHeight / 2F, normal, light, INDICATOR_FILL_COLOR);
+            final float[] fillCentre = {centreX, INDICATOR_BOTTOM + fillHeight / 2F, centreZ};
+            for (final float[] side : new float[][]{normal, opposite}) {
+                emitQuad(matrices.last().pose(), consumer, fillCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
+                        fillHeight / 2F, side, light, INDICATOR_FILL_COLOR);
+            }
         }
     }
 
@@ -270,12 +271,14 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     }
 
     /**
-     * 门楣灯：和滑动门那块门灯<b>同一套画法</b> —— 同样的 {@code mtr:textures/block/light_on|off.png}
-     * 贴图、同样 1/16 的小立方体、同样走 MTR 自己的渲染层
-     * （{@code MoreRenderLayers.getLight} / {@code getExterior}，滑动门的灯就是这么画的）。
+     * 门楣灯：和滑动门那块门灯<b>同一张贴图</b>（`mtr:textures/block/light_on|off.png`），
+     * 画成一个小立方体，贴在门楣朝站台那面、沿整段居中；开门亮（打满亮度）、关门灭。
      * <p>
-     * 之前用 {@code RenderType.entityCutout} 直接画，贴图不是经 MTR 的渲染层绑定的，
-     * 采样会拿到别的贴图内容，看起来就是「炸了」。
+     * 渲染层只能用 {@code MoreRenderLayers.getExterior}（= {@code RenderType.entityCutout}，
+     * 顶点格式 NEW_ENTITY，和 {@link #emitQuad} 写的属性对得上）。
+     * <b>不能</b>用 {@code getLight}：它内部是 {@code RenderType.beaconBeam}，顶点格式是 BLOCK
+     * （position/color/uv/lightmap），没有 overlay/normal，按 NEW_ENTITY 写进去就是乱码 —— 这就是
+     * 之前灯一直「炸」的原因。亮的时候靠 {@code uv2 = 满亮度} 表现发光。
      */
     private void renderLamp(Level world, BlockPos pos, Direction facing, int back, int forth, boolean open,
                             PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
@@ -283,16 +286,13 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
             return;
         }
         final ResourceLocation texture = open ? LAMP_ON : LAMP_OFF;
-        final RenderType layer = open
-                ? MoreRenderLayers.getLight(texture, false)
-                : MoreRenderLayers.getExterior(texture);
-        final VertexConsumer consumer = vertexConsumers.getBuffer(layer);
+        final VertexConsumer consumer = vertexConsumers.getBuffer(MoreRenderLayers.getExterior(texture));
         final Direction runDir = facing.getClockWise();
         final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
         final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
         final float midAlong = (forth - back) / 2F;
-        // 门楣模型厚 4/16（x 0~4），朝站台那面在离中心 4/16 处
-        final float distance = 2F / 16F + MODEL_X_OFFSET;
+        // 门楣模型厚 4/16（x 0~4），朝站台那面在离中心 4/16 处；灯再往外挪半个身位，整颗凸在面外
+        final float distance = 2F / 16F + MODEL_X_OFFSET - LAMP_SIZE / 2F;
         final float[] centre = {
                 0.5F + runAxis[0] * midAlong + facingAxis[0] * distance,
                 2F + LAMP_FROM_BOTTOM + LAMP_SIZE / 2F,
