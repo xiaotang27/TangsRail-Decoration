@@ -8,6 +8,7 @@ import mtr.block.IBlock;
 import mtr.client.ClientCache;
 import mtr.client.ClientData;
 import mtr.mappings.BlockEntityRendererMapper;
+import mtr.render.MoreRenderLayers;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -43,15 +44,15 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPSDEndGate>
         extends BlockEntityRendererMapper<T> implements IBlock {
 
-    /** 玻璃板中面离方块中心的距离（沿 facing 量）：模型里玻璃在 x 2~4，中面 3/16。 */
-    private static final double PANE_MID_OFFSET = 0.5D - 3D / 16D;
-
     /**
-     * 端门的玻璃 / 门楣模型整体沿<b>模型 z 轴</b>挪了多少像素（现在是 +2，用来和端头玻璃接上）。
-     * 渲染端所有跟模型绑定的东西（铰链轴、装饰条、门灯）都要跟着挪同样的量，否则会和模型错开。
-     * 模型 +z 对应世界里的「{@code facing} 的逆时针方向」。
+     * 端门的玻璃 / 门楣模型整体比普通 PSD 玻璃沿 <b>-x</b> 多挪了 2 像素
+     * （普通玻璃是 x 2~4，端门是 x 0~2；门楣同理 0~4）。
+     * 渲染端所有「离方块中心的距离」都要加上这个偏移，否则会和模型错开。
      */
-    private static final float MODEL_Z_SHIFT = 2F / 16F;
+    private static final float MODEL_X_OFFSET = 2F / 16F;
+
+    /** 玻璃板中面离方块中心的距离（沿 facing 量）：玻璃 x 0~2，中面 1/16。 */
+    private static final double PANE_MID_OFFSET = 0.5D - 1D / 16D;
 
     private static final float[] UP_AXIS = {0F, 1F, 0F};
 
@@ -62,14 +63,15 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     private static final float BAND_HEIGHT = TrdmDecalBand.HEIGHT_BLOCKS;
     /** 装饰带竖直中心：两格玻璃的中缝（下半格往上 1 格）再抬一点。 */
     private static final float BAND_CENTRE_Y = 1F + 2F / 16F;
-    private static final float GLASS_SURFACE_6 = 6F / 16F;
-    private static final float GLASS_SURFACE_4 = 4F / 16F;
+    /** 玻璃两个面到方块中心的距离（法线朝 -facing 那面 / 朝 +facing 那面），已含端门那 2 像素偏移。 */
+    private static final float GLASS_SURFACE_4 = 4F / 16F + MODEL_X_OFFSET;
+    private static final float GLASS_SURFACE_6 = 6F / 16F + MODEL_X_OFFSET;
     private static final float BAND_NUDGE = 0.004F;
     private static final float BAND_END_INSET = 1F / 16F;
 
     // ===== 门楣灯 =====
-    /** 灯的边长（格）。MTR 门灯本体是 1/16，这里用 2/16 才看得清；想完全照搬原尺寸改成 1F/16F 即可。 */
-    private static final float LAMP_SIZE = 2F / 16F;
+    /** 灯的边长（格）。和 MTR 滑动门的门灯本体一样是 1/16（模型里 addBox 的 1×1×1 像素）。 */
+    private static final float LAMP_SIZE = 1F / 16F;
     /** 灯底边离门楣下沿多远（门楣是下半格往上第 2 格）。 */
     private static final float LAMP_FROM_BOTTOM = 3F / 16F;
     /** 和滑动门一样的门灯贴图（MTR 原版 light_on / light_off）。 */
@@ -118,9 +120,7 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
 
         final boolean open = BlockTrdmPSDEndGate.isOpen(state);
 
-        // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上；
-        // 再跟着模型那 +2 像素的 z 偏移一起挪（模型 +z = facing 的逆时针方向）
-        final Direction modelZ = facing.getCounterClockWise();
+        // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上
         double pivotX = hingeCell.getX() + 0.5D + facing.getStepX() * PANE_MID_OFFSET;
         double pivotZ = hingeCell.getZ() + 0.5D + facing.getStepZ() * PANE_MID_OFFSET;
         if (facing.getAxis() == Direction.Axis.Z) {
@@ -129,8 +129,6 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         } else {
             pivotZ = hingeCell.getZ() + (intoRun.getStepZ() > 0 ? 0D : 1D);
         }
-        pivotX += modelZ.getStepX() * MODEL_Z_SHIFT;
-        pivotZ += modelZ.getStepZ() * MODEL_Z_SHIFT;
 
         // 门扇 + 装饰条共用同一套变换：开着时绕铰链转，关着时不动
         matrices.pushPose();
@@ -201,12 +199,9 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
 
         final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entityCutout(texture));
         final Direction runDir = facing.getClockWise();
-        final Direction modelZ = facing.getCounterClockWise();
-        // 沿门排的中心（格数坐标里 pos 自己中心是 0），再跟模型那 +2 像素的 z 偏移
+        // 沿门排的中心（格数坐标里 pos 自己中心是 0）
         final float midAlong = (forth - back) / 2F;
         final float[] uAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
-        final float zShiftX = modelZ.getStepX() * MODEL_Z_SHIFT;
-        final float zShiftZ = modelZ.getStepZ() * MODEL_Z_SHIFT;
         // 玻璃两个面：朝站台那面（法线 = -facing）和朝轨道那面（法线 = facing）
         for (final boolean platformFace : new boolean[]{true, false}) {
             final float distance = platformFace ? GLASS_SURFACE_4 - BAND_NUDGE : GLASS_SURFACE_6 + BAND_NUDGE;
@@ -214,20 +209,21 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
                     ? new float[]{-facing.getStepX(), 0F, -facing.getStepZ()}
                     : new float[]{facing.getStepX(), 0F, facing.getStepZ()};
             final float[] centre = {
-                    0.5F + uAxis[0] * midAlong + zShiftX + facing.getStepX() * distance,
+                    0.5F + uAxis[0] * midAlong + facing.getStepX() * distance,
                     BAND_CENTRE_Y,
-                    0.5F + uAxis[2] * midAlong + zShiftZ + facing.getStepZ() * distance};
+                    0.5F + uAxis[2] * midAlong + facing.getStepZ() * distance};
             emitQuad(matrices.last().pose(), consumer, centre, uAxis, span / 2F, UP_AXIS, BAND_HEIGHT / 2F, normal,
                     light, 0xFFFFFFFF);
         }
     }
 
     /**
-     * 门楣灯：和滑动门同一种门灯 —— MTR 的 {@code light_on/light_off} 贴图 + 一个小立方体，
-     * 贴在门楣朝站台那面的下沿，沿整段居中；开门亮（打满亮度）、关门灭。
+     * 门楣灯：和滑动门那块门灯<b>同一套画法</b> —— 同样的 {@code mtr:textures/block/light_on|off.png}
+     * 贴图、同样 1/16 的小立方体、同样走 MTR 自己的渲染层
+     * （{@code MoreRenderLayers.getLight} / {@code getExterior}，滑动门的灯就是这么画的）。
      * <p>
-     * 立方体<b>六个面全画</b>：只画四个侧面时，从下面往上看会看穿（背面被剔除），
-     * 看起来就像模型炸了。
+     * 之前用 {@code RenderType.entityCutout} 直接画，贴图不是经 MTR 的渲染层绑定的，
+     * 采样会拿到别的贴图内容，看起来就是「炸了」。
      */
     private void renderLamp(Level world, BlockPos pos, Direction facing, int back, int forth, boolean open,
                             PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
@@ -235,36 +231,34 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
             return;
         }
         final ResourceLocation texture = open ? LAMP_ON : LAMP_OFF;
-        final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entityCutout(texture));
+        final RenderType layer = open
+                ? MoreRenderLayers.getLight(texture, false)
+                : MoreRenderLayers.getExterior(texture);
+        final VertexConsumer consumer = vertexConsumers.getBuffer(layer);
         final Direction runDir = facing.getClockWise();
-        final Direction backDir = facing.getCounterClockWise();
         final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
         final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
-        final float[] upAxis = {0F, 1F, 0F};
         final float midAlong = (forth - back) / 2F;
-        // 门楣模型厚 6/16，且贴在方块 x/z 的 0 侧：朝站台那面在中心往 -facing 方向 2/16 处
-        final float distance = 2F / 16F;
-        // 门楣模型整体沿模型 z 轴挪了 MODEL_Z_SHIFT（对齐端头玻璃），灯也跟着挪：
-        // 模型 +z 对应「facing 的逆时针」，所以这里沿 backDir 偏。
-        final float zShift = MODEL_Z_SHIFT;
+        // 门楣模型厚 4/16（x 0~4），朝站台那面在离中心 4/16 处
+        final float distance = 2F / 16F + MODEL_X_OFFSET;
         final float[] centre = {
-                0.5F + runAxis[0] * midAlong + backDir.getStepX() * zShift + facingAxis[0] * distance,
+                0.5F + runAxis[0] * midAlong + facingAxis[0] * distance,
                 2F + LAMP_FROM_BOTTOM + LAMP_SIZE / 2F,
-                0.5F + runAxis[2] * midAlong + backDir.getStepZ() * zShift + facingAxis[2] * distance};
+                0.5F + runAxis[2] * midAlong + facingAxis[2] * distance};
         final float half = LAMP_SIZE / 2F;
         // 亮的时候打满亮度，看着才像在发光
         final int lampLight = open ? 0xF000F0 : light;
-        // 六个面：±站台法线、±跑向、±竖直
-        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, upAxis, half,
+        // 六个面：±站台法线、±跑向、±竖直（上下两个面不能省，否则从下面看是空壳）
+        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, UP_AXIS, half,
                 new float[]{-facingAxis[0], 0F, -facingAxis[2]}, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, upAxis, half,
+        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, UP_AXIS, half,
                 facingAxis, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, upAxis, half,
+        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, UP_AXIS, half,
                 runAxis, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, upAxis, half,
+        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, UP_AXIS, half,
                 new float[]{-runAxis[0], 0F, -runAxis[2]}, lampLight, 0xFFFFFFFF);
         emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, facingAxis, half,
-                upAxis, lampLight, 0xFFFFFFFF);
+                UP_AXIS, lampLight, 0xFFFFFFFF);
         emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, facingAxis, half,
                 new float[]{0F, -1F, 0F}, lampLight, 0xFFFFFFFF);
     }
