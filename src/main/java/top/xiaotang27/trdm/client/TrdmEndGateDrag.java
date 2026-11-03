@@ -76,6 +76,16 @@ public final class TrdmEndGateDrag {
     }
 
     /**
+     * 当前开度进度（0~1）给 HUD 指示条用；没在拖动时返回 -1（HUD 据此不画）。
+     */
+    public static float progress() {
+        if (!dragging || pressPos == null) {
+            return -1F;
+        }
+        return Math.max(0F, Math.min(1F, angle / MAX_ANGLE));
+    }
+
+    /**
      * 鼠标位移（来自 {@code MouseHandler}，像素；y 向下为正）。
      * 向下拖 = dy > 0 = 开大。
      */

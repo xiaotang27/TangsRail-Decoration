@@ -8,8 +8,11 @@ import mtr.block.IBlock;
 import mtr.client.ClientCache;
 import mtr.client.ClientData;
 import mtr.mappings.BlockEntityRendererMapper;
+import mtr.mappings.ModelDataWrapper;
+import mtr.mappings.ModelMapper;
 import mtr.render.MoreRenderLayers;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
@@ -17,6 +20,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -71,24 +75,18 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     private static final float BAND_END_INSET = 1F / 16F;
 
     // ===== 门楣灯 =====
-    /** 灯的边长（格）。MTR 滑动门门灯本体是 1/16，太小看不清，这里用 3/16。 */
-    private static final float LAMP_SIZE = 3F / 16F;
-    /** 灯底边离门楣下沿多远（门楣是下半格往上第 2 格）。 */
+    /** 灯底边离门楣下沿多远（门楣是下半格往上第 2 格）。灯本身尺寸固定写在 {@link #MODEL_LAMP} 里。 */
     private static final float LAMP_FROM_BOTTOM = 3F / 16F;
     /** 和滑动门一样的门灯贴图（MTR 原版 light_on / light_off）。 */
     private static final ResourceLocation LAMP_ON = new ResourceLocation("mtr", "textures/block/light_on.png");
     private static final ResourceLocation LAMP_OFF = new ResourceLocation("mtr", "textures/block/light_off.png");
 
-    // ===== 拖动时的开度指示条（门旁 3D 竖条）=====
-    /** 纯白贴图，用来配合顶点色画纯色面。 */
-    private static final ResourceLocation WHITE = new ResourceLocation("trdm", "textures/block/white.png");
-    /** 指示条整体高度（格）、宽（半宽，格）、离地高度。 */
-    private static final float INDICATOR_HEIGHT = 1.1F;
-    private static final float INDICATOR_HALF_WIDTH = 3F / 16F;
-    private static final float INDICATOR_BOTTOM = 4F / 16F;
-    /** 底色（深灰）与填充色（天蓝）。 */
-    private static final int INDICATOR_BACK_COLOR = 0xFF23272F;
-    private static final int INDICATOR_FILL_COLOR = 0xFF48B0F7;
+    /**
+     * 门灯专用的固定模型：<b>3 × 1 × 1 模型像素</b>（就是滑动门左右两盏门灯拼起来的那个大小），
+     * 盒子以自身中心为原点、底面在 y = 0，方便直接摆位。
+     */
+    private static final ModelSingleCube MODEL_LAMP =
+            new ModelSingleCube(16, 16, 6.5F, 16F, 7.5F, 3, 1, 1);
 
     public RenderTrdmPSDEndGate(BlockEntityRenderDispatcher dispatcher) {
         super(dispatcher);
@@ -157,46 +155,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         matrices.popPose();
 
         // 灯挂在门楣上，不跟门转
-        renderLamp(world, pos, facing, back, forth, step > 0, matrices, vertexConsumers, light);
+        renderLamp(world, pos, facing, back, forth, step > 0, matrices, vertexConsumers, light, overlay);
 
-        // 拖动时在门前画一根竖直开度指示条（跟着整段一起只由铰链那一格画）
-        if (TrdmEndGateDrag.indicatorAt(pos)) {
-            renderIndicator(pos, facing, back, forth, angleDegrees, matrices, vertexConsumers, light);
-        }
-    }
-
-    /**
-     * 拖动时的开度指示条：挂在门**前方**（站台那一侧）的竖直条 —— 不放进格子边缘，
-     * 免得被旁边的墙 / 门楣挡住。底下一个深灰的槽、上面按开度从下往上填天蓝色。
-     * 只在拖动那段时间出现，跟着整段门走（由铰链那一格画一次），两面都画，站哪边都看得见。
-     */
-    private void renderIndicator(BlockPos pos, Direction facing, int back, int forth, float angleDegrees,
-                                 PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
-        final VertexConsumer consumer = vertexConsumers.getBuffer(RenderType.entitySolid(WHITE));
-        final Direction runDir = facing.getClockWise();
-        final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
-        final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
-        // 站台那一侧 = -facing；distance 变小就是往站台外走（见 MODEL_X_OFFSET 那段的坐标约定）
-        final float distance = GLASS_SURFACE_4 - 0.55F;
-        final float centreX = 0.5F + runAxis[0] * ((forth - back) / 2F) + facingAxis[0] * distance;
-        final float centreZ = 0.5F + runAxis[2] * ((forth - back) / 2F) + facingAxis[2] * distance;
-        final float[] backCentre = {centreX, INDICATOR_BOTTOM + INDICATOR_HEIGHT / 2F, centreZ};
-        final float[] normal = {-facingAxis[0], 0F, -facingAxis[2]};
-        final float[] opposite = {facingAxis[0], 0F, facingAxis[2]};
-        for (final float[] side : new float[][]{normal, opposite}) {
-            emitQuad(matrices.last().pose(), consumer, backCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
-                    INDICATOR_HEIGHT / 2F, side, light, INDICATOR_BACK_COLOR);
-        }
-
-        final float fraction = Math.max(0F, Math.min(1F, angleDegrees / TrdmEndGateDrag.MAX_ANGLE));
-        if (fraction > 0.001F) {
-            final float fillHeight = INDICATOR_HEIGHT * fraction;
-            final float[] fillCentre = {centreX, INDICATOR_BOTTOM + fillHeight / 2F, centreZ};
-            for (final float[] side : new float[][]{normal, opposite}) {
-                emitQuad(matrices.last().pose(), consumer, fillCentre, runAxis, INDICATOR_HALF_WIDTH, UP_AXIS,
-                        fillHeight / 2F, side, light, INDICATOR_FILL_COLOR);
-            }
-        }
     }
 
     /** 整段门扇：逐格、上下两格各画一次「关着」那套 MTR 玻璃模型。 */
@@ -271,48 +231,60 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     }
 
     /**
-     * 门楣灯：和滑动门那块门灯<b>同一张贴图</b>（`mtr:textures/block/light_on|off.png`），
-     * 画成一个小立方体，贴在门楣朝站台那面、沿整段居中；开门亮（打满亮度）、关门灭。
+     * 门楣灯：<b>专用固定模型</b>（{@link #MODEL_LAMP}，3×1×1 像素 = 滑动门左右两盏门灯拼起来那个尺寸），
+     * 用 {@link ModelSingleCube} + {@code ModelPart#renderToBuffer} 画 —— 滑动门门灯就是这条路径，
+     * 顶点属性由原版 ModelPart 自己按渲染层的格式写，不会像手写四边形那样错位。
      * <p>
-     * 渲染层只能用 {@code MoreRenderLayers.getExterior}（= {@code RenderType.entityCutout}，
-     * 顶点格式 NEW_ENTITY，和 {@link #emitQuad} 写的属性对得上）。
-     * <b>不能</b>用 {@code getLight}：它内部是 {@code RenderType.beaconBeam}，顶点格式是 BLOCK
-     * （position/color/uv/lightmap），没有 overlay/normal，按 NEW_ENTITY 写进去就是乱码 —— 这就是
-     * 之前灯一直「炸」的原因。亮的时候靠 {@code uv2 = 满亮度} 表现发光。
+     * 位置：门楣（厚 4/16）朝站台那面、下沿往上 {@link #LAMP_FROM_BOTTOM}、整段合并后按长度居中。
+     * 亮灯时把亮度打成满格（{@code 0xF000F0}），看着才像在发光。
      */
     private void renderLamp(Level world, BlockPos pos, Direction facing, int back, int forth, boolean open,
-                            PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
+                            PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
         if (!(world.getBlockState(pos.above(2)).getBlock() instanceof BlockTrdmPSDTop)) {
             return;
         }
         final ResourceLocation texture = open ? LAMP_ON : LAMP_OFF;
         final VertexConsumer consumer = vertexConsumers.getBuffer(MoreRenderLayers.getExterior(texture));
         final Direction runDir = facing.getClockWise();
-        final float[] runAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
-        final float[] facingAxis = {facing.getStepX(), 0F, facing.getStepZ()};
         final float midAlong = (forth - back) / 2F;
-        // 门楣模型厚 4/16（x 0~4），朝站台那面在离中心 4/16 处；灯再往外挪半个身位，整颗凸在面外
-        final float distance = 2F / 16F + MODEL_X_OFFSET - LAMP_SIZE / 2F;
-        final float[] centre = {
-                0.5F + runAxis[0] * midAlong + facingAxis[0] * distance,
-                2F + LAMP_FROM_BOTTOM + LAMP_SIZE / 2F,
-                0.5F + runAxis[2] * midAlong + facingAxis[2] * distance};
-        final float half = LAMP_SIZE / 2F;
-        // 亮的时候打满亮度，看着才像在发光
-        final int lampLight = open ? 0xF000F0 : light;
-        // 六个面：±站台法线、±跑向、±竖直（上下两个面不能省，否则从下面看是空壳）
-        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, UP_AXIS, half,
-                new float[]{-facingAxis[0], 0F, -facingAxis[2]}, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, UP_AXIS, half,
-                facingAxis, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, UP_AXIS, half,
-                runAxis, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, facingAxis, half, UP_AXIS, half,
-                new float[]{-runAxis[0], 0F, -runAxis[2]}, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, facingAxis, half,
-                UP_AXIS, lampLight, 0xFFFFFFFF);
-        emitQuad(matrices.last().pose(), consumer, centre, runAxis, half, facingAxis, half,
-                new float[]{0F, -1F, 0F}, lampLight, 0xFFFFFFFF);
+        // 门楣朝站台那面在离中心 4/16，灯厚 1 像素 → 再往外凸半像素
+        final float distance = 2F / 16F + MODEL_X_OFFSET - 0.5F / 16F;
+        matrices.pushPose();
+        matrices.translate(
+                0.5F + runDir.getStepX() * midAlong + facing.getStepX() * distance,
+                2F + LAMP_FROM_BOTTOM,
+                0.5F + runDir.getStepZ() * midAlong + facing.getStepZ() * distance);
+        // 让模型的 +x（灯的 3 像素长边）对准门排方向
+        matrices.mulPose(Axis.YP.rotationDegrees(-facing.toYRot()));
+        MODEL_LAMP.renderToBuffer(matrices, consumer, open ? 0xF000F0 : light, OverlayTexture.NO_OVERLAY,
+                1F, 1F, 1F, 1F);
+        matrices.popPose();
+    }
+
+    /** 单个长方体模型（照搬滑动门渲染器里的那个小工具类）。 */
+    private static class ModelSingleCube extends EntityModel<Entity> {
+
+        private final ModelMapper cube;
+
+        private ModelSingleCube(int textureWidth, int textureHeight, float x, float y, float z,
+                                int length, int height, int depth) {
+            final ModelDataWrapper modelDataWrapper = new ModelDataWrapper(this, textureWidth, textureHeight);
+            cube = new ModelMapper(modelDataWrapper);
+            cube.texOffs(0, 0).addBox(x - 8F, y - 16F, z - 8F, length, height, depth, 0, false);
+            modelDataWrapper.setModelPart(textureWidth, textureHeight);
+            cube.setModelPart();
+        }
+
+        @Override
+        public void renderToBuffer(PoseStack matrices, VertexConsumer vertices, int packedLight, int packedOverlay,
+                                   float red, float green, float blue, float alpha) {
+            cube.render(matrices, vertices, 0, 0, 0, packedLight, packedOverlay);
+        }
+
+        @Override
+        public void setupAnim(Entity entity, float limbAngle, float limbDistance, float animationProgress,
+                              float headYaw, float headPitch) {
+        }
     }
 
     /**

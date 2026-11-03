@@ -21,6 +21,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmControlClient;
 import top.xiaotang27.trdm.client.TrdmEndGateDrag;
+import top.xiaotang27.trdm.client.TrdmEndGateHud;
 import top.xiaotang27.trdm.render.RenderTrdmPSDDoor;
 import top.xiaotang27.trdm.render.RenderTrdmPSDEndGate;
 import top.xiaotang27.trdm.render.RenderTrdmPSDTop;
@@ -78,6 +79,9 @@ public class TrdmClient implements ClientModInitializer {
 
         // 端门：关着走静态玻璃模型，开着由这个渲染器把「整段」玻璃当一扇大门摆开 90°
         BlockEntityRendererRegistry.register(Trdm.PSD_END_GATE_BE, context -> new RenderTrdmPSDEndGate<>(null));
+
+        // 端门拖动时屏幕右侧的开度指示条（屏幕空间 UI）
+        TrdmEndGateHud.register();
 
         // 站名牌：本站 + 下一站 + 线路色带
         BlockEntityRendererRegistry.register(Trdm.STATION_SIGN_BE, context -> new RenderTrdmStationSign<>());
