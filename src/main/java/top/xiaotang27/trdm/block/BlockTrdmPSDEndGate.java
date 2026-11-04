@@ -107,13 +107,14 @@ public class BlockTrdmPSDEndGate extends BlockPSDAPGGlassBase implements EntityB
      * <ul>
      *     <li>{@link #getShape} 沿用 PSD 玻璃那块板 —— 原版取物（{@code ClipContext.Block.OUTLINE}）只认它，
      *         所以**不能**做成空形状，否则开门后点不到方块、关不回来；</li>
-     *     <li>{@link #getCollisionShape} 开门时给空 —— 门扇已经整段旋到格子外面（由方块实体渲染器画），
-     *         本格要让出通道。</li>
+     *     <li>{@link #getCollisionShape}：<b>只有全开（满档）才让出通道</b>。关着、半开、正在关的时候
+     *         都按玻璃板挡人 —— 半开的门缝不该能钻过去。</li>
      * </ul>
+     * 门扇旋出去的那部分落在别的格子里，方块自己的碰撞箱管不到那里，所以这里只保证「这一格」是挡住的。
      */
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
-        return isOpen(state) ? Shapes.empty() : super.getShape(state, world, pos, context);
+        return openStep(state) >= OPEN_STEPS ? Shapes.empty() : super.getShape(state, world, pos, context);
     }
 
     /** 这一格当前的开度档位（0 = 全关，{@link #OPEN_STEPS} = 全开）。 */

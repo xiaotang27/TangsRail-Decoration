@@ -31,6 +31,7 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
+import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmEndGateAnim;
@@ -130,9 +131,6 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         }
 
         final int step = BlockTrdmPSDEndGate.openStep(state);
-        // 显示角度：拖动时跟手；松开 / 单击开门时按固定角速度缓动到目标角（所以单击也有旋转动画）
-        final float angleDegrees = TrdmEndGateAnim.angleDegrees(state, pos);
-
         // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上
         double pivotX = hingeCell.getX() + 0.5D + facing.getStepX() * PANE_MID_OFFSET;
         double pivotZ = hingeCell.getZ() + 0.5D + facing.getStepZ() * PANE_MID_OFFSET;
@@ -142,25 +140,53 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         } else {
             pivotZ = hingeCell.getZ() + (intoRun.getStepZ() > 0 ? 0D : 1D);
         }
+        // 显示角度：拖动时跟手；单击开 / 关时按固定角速度缓动（所以两个方向都有动画）
+        final float angleDegrees = TrdmEndGateAnim.angleDegrees(state, pos);
+        final float signedAngle = Math.copySign(angleDegrees, swingAngle(intoRun, facing));
+        final float pivotDx = (float) (pivotX - pos.getX());
+        final float pivotDz = (float) (pivotZ - pos.getZ());
+        // 端门玻璃比普通玻璃整体往 -模型 x 挪了 2 像素，等于在世界里往 +facing 挪 2 像素；
+        // 门扇现在用「普通玻璃模型 + 这个平移」来画，所以平移必须在绕铰链旋转**之前**做。
+        final float shiftX = facing.getStepX() * MODEL_X_OFFSET;
+        final float shiftZ = facing.getStepZ() * MODEL_X_OFFSET;
 
-        // 门扇 + 装饰条共用同一套变换：按当前角度绕铰链转（0° = 关着不动）
+        // 门扇
         matrices.pushPose();
-        if (step > 0) {
-            final float signedAngle = Math.copySign(angleDegrees, swingAngle(intoRun, facing));
-            matrices.translate(pivotX - pos.getX(), 0D, pivotZ - pos.getZ());
-            matrices.mulPose(Axis.YP.rotationDegrees(signedAngle));
-            matrices.translate(-(pivotX - pos.getX()), 0D, -(pivotZ - pos.getZ()));
-            renderLeaf(world, pos, facing, back, forth, matrices, vertexConsumers, light, overlay);
-        }
+        matrices.translate(shiftX, 0F, shiftZ);
+        matrices.translate(pivotDx, 0F, pivotDz);
+        matrices.mulPose(Axis.YP.rotationDegrees(signedAngle));
+        matrices.translate(-pivotDx, 0F, -pivotDz);
+        renderLeaf(world, pos, facing, back, forth, matrices, vertexConsumers, light, overlay);
+        matrices.popPose();
+
+        // 装饰条：位置本来就按端门玻璃面算过（GLASS_SURFACE_*），不要再平移，只跟着转
+        matrices.pushPose();
+        matrices.translate(pivotDx, 0F, pivotDz);
+        matrices.mulPose(Axis.YP.rotationDegrees(signedAngle));
+        matrices.translate(-pivotDx, 0F, -pivotDz);
         renderDecalBand(world, pos, facing, back, forth, matrices, vertexConsumers, light);
         matrices.popPose();
 
         // 灯挂在门楣上，不跟门转
         renderLamp(world, pos, facing, back, forth, angleDegrees > 1F, matrices, vertexConsumers, light, overlay);
-
     }
 
-    /** 整段门扇：逐格、上下两格各画一次「关着」那套 MTR 玻璃模型。 */
+    /** 用普通 PSD 玻璃的方块状态来画端门玻璃（几何 / 贴图完全一致，那 2 像素偏移由外层 pose 补）。 */
+    private static BlockState glassStateLike(BlockState gateState) {
+        return Trdm.PSD_GLASS_1.defaultBlockState()
+                .setValue(HorizontalDirectionalBlock.FACING,
+                        IBlock.getStatePropertySafe(gateState, HorizontalDirectionalBlock.FACING))
+                .setValue(IBlock.HALF, IBlock.getStatePropertySafe(gateState, IBlock.HALF))
+                .setValue(IBlock.SIDE_EXTENDED, IBlock.getStatePropertySafe(gateState, IBlock.SIDE_EXTENDED));
+    }
+
+    /**
+     * 整段门扇：逐格、上下两格各画一次玻璃模型。
+     * <p>
+     * 门扇用的是**普通 PSD 玻璃**的方块状态（贴图、几何完全一致），
+     * 端门那 2 像素的偏移由外层 pose 的平移补上 —— 这样端门 blockstate 可以全部是空模型，
+     * 开关门两个方向都能由渲染器做动画，不会和静态玻璃重影。
+     */
     private void renderLeaf(Level world, BlockPos pos, Direction facing, int back, int forth,
                             PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
         for (int i = -back; i <= forth; i++) {
@@ -173,9 +199,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
                 }
                 matrices.pushPose();
                 matrices.translate(at.getX() - pos.getX(), at.getY() - pos.getY(), at.getZ() - pos.getZ());
-                // 画「关着」的状态：开着的状态在 blockstate 里指向空模型
                 Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
-                        cellState.setValue(BlockTrdmPSDEndGate.OPEN, 0), matrices, vertexConsumers, light, overlay);
+                        glassStateLike(cellState), matrices, vertexConsumers, light, overlay);
                 matrices.popPose();
             }
         }

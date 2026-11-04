@@ -55,12 +55,7 @@ public final class TrdmEndGateAnim {
         final long now = Util.getMillis();
         final Entry entry = CACHE.computeIfAbsent(pos.immutable(), key -> new Entry(0F, now));
 
-        // 关着：不做关闭动画（静态玻璃已经回来了），直接归零
-        if (step <= 0) {
-            entry.angle = 0F;
-            entry.atMs = now;
-            return 0F;
-        }
+        // 关着 / 开着都朝目标角缓动：门扇现在完全由渲染器画，静态玻璃不再插进来，所以两个方向都有动画
         // 拖动中：跟手，并把进度写回缓存，松手后从这里继续缓动
         if (TrdmEndGateDrag.indicatorAt(pos)) {
             final float drag = TrdmEndGateDrag.angleDegrees(state, pos);
