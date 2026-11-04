@@ -176,38 +176,33 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         renderLamp(world, pos, facing, back, forth, angleDegrees > 1F, matrices, vertexConsumers, light, overlay);
     }
 
-    /** 端门门扇模型对应的技术方块状态（只用一个 side 属性选 left / mid / right / single）。 */
-    private static BlockState leafModelState(int back, int forth) {
-        final mtr.block.IBlock.EnumSide side;
-        if (back <= 0 && forth <= 0) {
-            side = mtr.block.IBlock.EnumSide.SINGLE;
-        } else if (back > 0 && forth > 0) {
-            side = mtr.block.IBlock.EnumSide.MIDDLE;
-        } else if (back > 0) {
-            side = mtr.block.IBlock.EnumSide.RIGHT;
-        } else {
-            side = mtr.block.IBlock.EnumSide.LEFT;
-        }
-        return Trdm.PSD_END_GATE_MODELS.defaultBlockState().setValue(BlockTrdmEndGateModels.SIDE, side);
+    /**
+     * 端门门扇模型对应的技术方块状态：{@code side} 选模型（每格用**自己**的拼接状态，
+     * 也就是 MTR {@code connectGlass} 维护的那个值），{@code facing} 让方块状态表按 MTR 玻璃
+     * 同样的 {@code y} 旋转表出图（渲染器不再自己算旋转，免得坐标系搞反）。
+     */
+    private static BlockState leafModelState(Direction facing, mtr.block.IBlock.EnumSide side) {
+        return Trdm.PSD_END_GATE_MODELS.defaultBlockState()
+                .setValue(BlockTrdmEndGateModels.SIDE, side)
+                .setValue(HorizontalDirectionalBlock.FACING, facing);
     }
 
     /**
-     * 整段门扇：逐格画一次**整扇 2 格高**的门扇模型（模型自己就盖住上下两格），
-     * 每格再按 facing 转一下朝向。
+     * 整段门扇：逐格画一次**整扇 2 格高**的门扇模型（模型自己就盖住上下两格）。
+     * 朝向和左右段选型都在方块状态里，这里只做位置平移。
      */
     private void renderLeaf(Level world, BlockPos pos, Direction facing, int back, int forth,
                             PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
-        final BlockState modelState = leafModelState(back, forth);
         for (int i = -back; i <= forth; i++) {
             final BlockPos cell = pos.relative(facing.getClockWise(), i);
             final BlockState cellState = world.getBlockState(cell);
             if (!(cellState.getBlock() instanceof BlockTrdmPSDEndGate)) {
                 continue;
             }
+            final BlockState modelState = leafModelState(facing,
+                    IBlock.getStatePropertySafe(cellState, IBlock.SIDE_EXTENDED));
             matrices.pushPose();
             matrices.translate(cell.getX() - pos.getX(), cell.getY() - pos.getY(), cell.getZ() - pos.getZ());
-            // 模型是按 facing=west 摆的，按 facing 转一下朝向
-            matrices.mulPose(Axis.YP.rotationDegrees(-facing.toYRot()));
             Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
                     modelState, matrices, vertexConsumers, light, overlay);
             matrices.popPose();
