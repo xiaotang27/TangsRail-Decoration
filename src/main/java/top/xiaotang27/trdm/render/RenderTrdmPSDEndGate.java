@@ -33,6 +33,7 @@ import java.util.List;
 
 import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
+import top.xiaotang27.trdm.client.TrdmEndGateAnim;
 import top.xiaotang27.trdm.client.TrdmEndGateDrag;
 
 /**
@@ -129,8 +130,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         }
 
         final int step = BlockTrdmPSDEndGate.openStep(state);
-        // 连续角度：拖动这一段时按鼠标位置现算（20 Hz 之外也能平滑），否则用状态里的量化角
-        final float angleDegrees = TrdmEndGateDrag.angleDegrees(state, pos);
+        // 显示角度：拖动时跟手；松开 / 单击开门时按固定角速度缓动到目标角（所以单击也有旋转动画）
+        final float angleDegrees = TrdmEndGateAnim.angleDegrees(state, pos);
 
         // 铰链竖轴：沿 facing 让到玻璃板中面，沿门排落在铰链那一格的边界上
         double pivotX = hingeCell.getX() + 0.5D + facing.getStepX() * PANE_MID_OFFSET;
@@ -155,7 +156,7 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         matrices.popPose();
 
         // 灯挂在门楣上，不跟门转
-        renderLamp(world, pos, facing, back, forth, step > 0, matrices, vertexConsumers, light, overlay);
+        renderLamp(world, pos, facing, back, forth, angleDegrees > 1F, matrices, vertexConsumers, light, overlay);
 
     }
 
