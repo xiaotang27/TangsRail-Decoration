@@ -2,8 +2,8 @@
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
 	"textures": {
-		"0": "mtr:block/psd_glass_bottom_1",
-		"1": "mtr:block/psd_glass_top_1",
+		"0": "trdm:block/gate_mid_glass_bottom_1",
+		"1": "trdm:block/gate_mid_glass_top_1",
 		"2": "trdm:block/green",
 		"particle": "mtr:block/psd_glass_bottom_1"
 	},

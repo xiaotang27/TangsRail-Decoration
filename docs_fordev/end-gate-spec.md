@@ -82,7 +82,7 @@
 | 单格端门 | `trdm:block/psd_end_gate_door_single` | `gate_glass_bottom_single.png` / `gate_glass_top_single.png`（两侧 6 像素边框） |
 | 门排左端 | `trdm:block/psd_end_gate_door_left` | `gate_glass_bottom_1.png` / `gate_glass_top_1.png`（一侧 8 像素边框） |
 | 门排右端 | `trdm:block/psd_end_gate_door_right` | 同上（UV 镜像） |
-| 门排中间 | `trdm:block/psd_end_gate_door_mid` | 仍用 `mtr:block/psd_glass_*`（无边框，接在中间） |
+| 门排中间 | `trdm:block/psd_end_gate_door_mid` | `gate_mid_glass_bottom_1.png` / `gate_mid_glass_top_1.png`（只有上下边框、无侧边框，接在中间） |
 
 - 模型本身 **2 格高（y 0~32）**、玻璃板在 **x 0~2**，所以渲染时**每格只画一次**、从下半格画；
 - 模型由**技术方块** `trdm:psd_end_gate_models`（`side` 属性 4 值）挂进模型管理器 ——
