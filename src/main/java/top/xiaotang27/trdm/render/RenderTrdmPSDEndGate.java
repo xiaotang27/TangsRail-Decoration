@@ -60,10 +60,16 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     private static final float MODEL_X_OFFSET = 2F / 16F;
 
     /**
-     * 玻璃板中面离方块中心的距离（沿 facing 量）。门扇模型整体转了 180°（前后对调），
-     * 所以玻璃现在贴在格子的<b>另一侧</b>：模型 x 14~16，中面 15/16，偏移要取<b>负</b>。
+     * 玻璃板中面离方块中心的距离（沿 facing 量）。模型转过 180° 之后本来会跑到格子另一侧，
+     * 但渲染时又把门扇平移了 {@link #MODEL_LEAF_X_SHIFT} 拉回 x=0 那个边界，
+     * 所以玻璃仍贴在「方块 x=0 边界」这一侧：中面 1/16。
      */
-    private static final double PANE_MID_OFFSET = -(0.5D - 1D / 16D);
+    private static final double PANE_MID_OFFSET = 0.5D - 1D / 16D;
+    /**
+     * 门扇模型沿模型 x 轴回拉的像素数。模型转过 180° 后玻璃落在 x 14~16，
+     * 往 +facing 方向挪 14 像素就能让它重新贴着方块边界（模型 x 0~2）。
+     */
+    private static final float MODEL_LEAF_X_SHIFT = 14F / 16F;
 
     private static final float[] UP_AXIS = {0F, 1F, 0F};
 
@@ -206,6 +212,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
                     IBlock.getStatePropertySafe(cellState, IBlock.SIDE_EXTENDED));
             matrices.pushPose();
             matrices.translate(cell.getX() - pos.getX(), cell.getY() - pos.getY(), cell.getZ() - pos.getZ());
+            // 模型转过 180°，玻璃会落在格子另一侧；往 +facing 回拉 14 像素，让它重新贴着方块边界
+            matrices.translate(facing.getStepX() * MODEL_LEAF_X_SHIFT, 0F, facing.getStepZ() * MODEL_LEAF_X_SHIFT);
             Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
                     modelState, matrices, vertexConsumers, light, overlay);
             matrices.popPose();
@@ -249,8 +257,7 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         final float[] uAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
         // 玻璃两个面：朝站台那面（法线 = -facing）和朝轨道那面（法线 = facing）
         for (final boolean platformFace : new boolean[]{true, false}) {
-            // 模型翻转后门扇在格子另一侧：平台面是 8/16 那个面、轨道面是 6/16 那个面，偏移取负
-            final float distance = platformFace ? -(GLASS_SURFACE_6 + BAND_NUDGE) : -(GLASS_SURFACE_4 - BAND_NUDGE);
+            final float distance = platformFace ? GLASS_SURFACE_4 - BAND_NUDGE : GLASS_SURFACE_6 + BAND_NUDGE;
             final float[] normal = platformFace
                     ? new float[]{-facing.getStepX(), 0F, -facing.getStepZ()}
                     : new float[]{facing.getStepX(), 0F, facing.getStepZ()};
