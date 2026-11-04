@@ -85,6 +85,9 @@
 | 门排中间 | `trdm:block/psd_end_gate_door_mid` | `gate_mid_glass_bottom_1.png` / `gate_mid_glass_top_1.png`（只有上下边框、无侧边框，接在中间） |
 
 - 模型本身 **2 格高（y 0~32）**、玻璃板在 **x 0~2**，所以渲染时**每格只画一次**、从下半格画；
+- 门扇模型整体转到 180 度（前后对调）：玻璃因此贴在格子另一侧（模型 x 14~16），
+  渲染端的铰链中面偏移 PANE_MID_OFFSET 和装饰条两个面都是负方向；
+  模型朝向仍由 blockstate 的 y 旋转表负责（west 180 / north 270 / east 0 / south 90）。
 - 模型由**技术方块** `trdm:psd_end_gate_models`（`side` 属性 4 值）挂进模型管理器 ——
   端门自己的 blockstate 必须全是空模型（否则关门的静态玻璃会和动画重影）；
 - **装饰条**贴着透明窗：窗在每格 z 3/16~13/16、竖直从 y=5 到 30.5 像素，

@@ -59,8 +59,11 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
      */
     private static final float MODEL_X_OFFSET = 2F / 16F;
 
-    /** 玻璃板中面离方块中心的距离（沿 facing 量）：玻璃 x 0~2，中面 1/16。 */
-    private static final double PANE_MID_OFFSET = 0.5D - 1D / 16D;
+    /**
+     * 玻璃板中面离方块中心的距离（沿 facing 量）。门扇模型整体转了 180°（前后对调），
+     * 所以玻璃现在贴在格子的<b>另一侧</b>：模型 x 14~16，中面 15/16，偏移要取<b>负</b>。
+     */
+    private static final double PANE_MID_OFFSET = -(0.5D - 1D / 16D);
 
     private static final float[] UP_AXIS = {0F, 1F, 0F};
 
@@ -246,7 +249,8 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         final float[] uAxis = {runDir.getStepX(), 0F, runDir.getStepZ()};
         // 玻璃两个面：朝站台那面（法线 = -facing）和朝轨道那面（法线 = facing）
         for (final boolean platformFace : new boolean[]{true, false}) {
-            final float distance = platformFace ? GLASS_SURFACE_4 - BAND_NUDGE : GLASS_SURFACE_6 + BAND_NUDGE;
+            // 模型翻转后门扇在格子另一侧：平台面是 8/16 那个面、轨道面是 6/16 那个面，偏移取负
+            final float distance = platformFace ? -(GLASS_SURFACE_6 + BAND_NUDGE) : -(GLASS_SURFACE_4 - BAND_NUDGE);
             final float[] normal = platformFace
                     ? new float[]{-facing.getStepX(), 0F, -facing.getStepZ()}
                     : new float[]{facing.getStepX(), 0F, facing.getStepZ()};

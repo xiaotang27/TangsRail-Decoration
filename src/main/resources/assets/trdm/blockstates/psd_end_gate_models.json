@@ -1,20 +1,20 @@
 {
   "variants": {
-    "side=left,facing=west": { "model": "trdm:block/psd_end_gate_door_left" },
-    "side=left,facing=north": { "model": "trdm:block/psd_end_gate_door_left", "y": 90 },
-    "side=left,facing=east": { "model": "trdm:block/psd_end_gate_door_left", "y": 180 },
-    "side=left,facing=south": { "model": "trdm:block/psd_end_gate_door_left", "y": 270 },
-    "side=middle,facing=west": { "model": "trdm:block/psd_end_gate_door_mid" },
-    "side=middle,facing=north": { "model": "trdm:block/psd_end_gate_door_mid", "y": 90 },
-    "side=middle,facing=east": { "model": "trdm:block/psd_end_gate_door_mid", "y": 180 },
-    "side=middle,facing=south": { "model": "trdm:block/psd_end_gate_door_mid", "y": 270 },
-    "side=right,facing=west": { "model": "trdm:block/psd_end_gate_door_right" },
-    "side=right,facing=north": { "model": "trdm:block/psd_end_gate_door_right", "y": 90 },
-    "side=right,facing=east": { "model": "trdm:block/psd_end_gate_door_right", "y": 180 },
-    "side=right,facing=south": { "model": "trdm:block/psd_end_gate_door_right", "y": 270 },
-    "side=single,facing=west": { "model": "trdm:block/psd_end_gate_door_single" },
-    "side=single,facing=north": { "model": "trdm:block/psd_end_gate_door_single", "y": 90 },
-    "side=single,facing=east": { "model": "trdm:block/psd_end_gate_door_single", "y": 180 },
-    "side=single,facing=south": { "model": "trdm:block/psd_end_gate_door_single", "y": 270 }
+    "side=left,facing=west": { "model": "trdm:block/psd_end_gate_door_left", "y": 180 },
+    "side=left,facing=north": { "model": "trdm:block/psd_end_gate_door_left", "y": 270 },
+    "side=left,facing=east": { "model": "trdm:block/psd_end_gate_door_left" },
+    "side=left,facing=south": { "model": "trdm:block/psd_end_gate_door_left", "y": 90 },
+    "side=middle,facing=west": { "model": "trdm:block/psd_end_gate_door_mid", "y": 180 },
+    "side=middle,facing=north": { "model": "trdm:block/psd_end_gate_door_mid", "y": 270 },
+    "side=middle,facing=east": { "model": "trdm:block/psd_end_gate_door_mid" },
+    "side=middle,facing=south": { "model": "trdm:block/psd_end_gate_door_mid", "y": 90 },
+    "side=right,facing=west": { "model": "trdm:block/psd_end_gate_door_right", "y": 180 },
+    "side=right,facing=north": { "model": "trdm:block/psd_end_gate_door_right", "y": 270 },
+    "side=right,facing=east": { "model": "trdm:block/psd_end_gate_door_right" },
+    "side=right,facing=south": { "model": "trdm:block/psd_end_gate_door_right", "y": 90 },
+    "side=single,facing=west": { "model": "trdm:block/psd_end_gate_door_single", "y": 180 },
+    "side=single,facing=north": { "model": "trdm:block/psd_end_gate_door_single", "y": 270 },
+    "side=single,facing=east": { "model": "trdm:block/psd_end_gate_door_single" },
+    "side=single,facing=south": { "model": "trdm:block/psd_end_gate_door_single", "y": 90 }
   }
 }
