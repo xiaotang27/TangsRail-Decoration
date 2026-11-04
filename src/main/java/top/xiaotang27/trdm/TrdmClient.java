@@ -22,6 +22,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmControlClient;
 import top.xiaotang27.trdm.client.TrdmEndGateDrag;
 import top.xiaotang27.trdm.client.TrdmEndGateHud;
+import top.xiaotang27.trdm.client.TrdmMtrFonts;
 import top.xiaotang27.trdm.render.RenderTrdmPSDDoor;
 import top.xiaotang27.trdm.render.RenderTrdmPSDEndGate;
 import top.xiaotang27.trdm.render.RenderTrdmPSDTop;
@@ -72,7 +73,24 @@ public class TrdmClient implements ClientModInitializer {
             }
             // 端门「按住右键拖动调开度」的状态机
             TrdmEndGateDrag.tick(client);
+            // 把 TRDM 字体灌进 MTR 的牌面缓存（MTR 初始化好 / 资源重载之后各来一次）
+            TrdmMtrFonts.tick();
         });
+
+        // 资源重载（F3+T、换资源包）之后，等下一 tick 再把字体灌回 MTR 的缓存
+        net.fabricmc.fabric.api.resource.ResourceManagerHelper
+                .get(net.minecraft.server.packs.PackType.CLIENT_RESOURCES)
+                .registerReloadListener(new net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public net.minecraft.resources.ResourceLocation getFabricId() {
+                        return Trdm.id("mtr_font_sync");
+                    }
+
+                    @Override
+                    public void onResourceManagerReload(net.minecraft.server.packs.resources.ResourceManager manager) {
+                        TrdmMtrFonts.requestSync();
+                    }
+                });
 
         // 门楣：线路图 / 站名 / 方向箭头 / 站台色带 + 玻璃上的装饰带
         BlockEntityRendererRegistry.register(Trdm.PSD_TOP_BE, context -> new RenderTrdmPSDTop(null));

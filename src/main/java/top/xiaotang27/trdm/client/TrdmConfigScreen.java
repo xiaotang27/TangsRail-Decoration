@@ -118,6 +118,8 @@ public class TrdmConfigScreen extends TrdmScreenBase {
         if (hit(mx, my, TOGGLE_X, FONT_ROW_Y - 2F, TOGGLE_W, TOGGLE_H)) {
             TrdmConfig.setUseTrdmFont(!TrdmConfig.useTrdmFont());
             TrdmHeaderTextures.resetFonts();
+            // 同时把字体灌进 MTR 的牌面缓存，并强制它把所有动态牌面重画一遍
+            TrdmMtrFonts.sync();
             return true;
         }
         if (hit(mx, my, TOGGLE_X, VIDEO_ROW_Y - 2F, TOGGLE_W, TOGGLE_H)) {

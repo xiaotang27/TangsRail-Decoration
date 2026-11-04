@@ -1424,11 +1424,15 @@ public final class TrdmHeaderTextures {
 
     // ===== 打进 jar 的思源黑体 =====
 
-    /** TRDM 字体：随 mod 打包的 MTR 字体（中文 Noto Serif CJK / 英文 Noto Sans）。 */
+    /**
+     * TRDM 字体：随 mod 打包的 Noto（中文 Noto Serif CJK / 英文 Noto Sans）。
+     * 走 <b>trdm:</b> 自己的命名空间 —— 以前放在 {@code mtr:font/} 下想顺手覆盖 MTR 的字体，
+     * 但两个模组的资源包谁赢是不确定的，读出来可能变成 MTR 自己那份，字体开关就时灵时不灵。
+     */
     private static final ResourceLocation TRDM_CJK_FONT =
-            new ResourceLocation("mtr", "font/noto-serif-cjk-tc-semibold.ttf");
+            new ResourceLocation(Trdm.MOD_ID, "font/noto-serif-cjk-tc-semibold.ttf");
     private static final ResourceLocation TRDM_LATIN_FONT =
-            new ResourceLocation("mtr", "font/noto-sans-semibold.ttf");
+            new ResourceLocation(Trdm.MOD_ID, "font/noto-sans-semibold.ttf");
     private static Font trdmCjk;
     private static Font trdmLatin;
     private static boolean trdmFontChecked;

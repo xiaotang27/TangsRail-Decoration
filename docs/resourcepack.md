@@ -72,7 +72,7 @@ your-pack/
 
 | 文件 | 作用 |
 |---|---|
-| `assets/mtr/font/*.ttf`、`mtr.json` | 换掉 MTR 的字体 |
+| `assets/trdm/font/noto-sans-semibold.ttf`、`noto-serif-cjk-tc-semibold.ttf` | 换掉「使用TRDM字体」打开时用的字体（TRDM 自己的牌子和 MTR 原版牌子都会跟着变） |
 | `assets/mtr/mtr_custom_resources.json` | 给 MTR 注册 TRDM 的指示牌（`custom_signs`） |
 | `assets/mtr/textures/block/sign/escalator.png`、`exit_1.png` | 两张标志牌贴图 |
 
