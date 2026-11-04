@@ -32,4 +32,4 @@ acc.trdm$setFontCjk(cjk);                      // @Accessor("fontCjk")
 - MTR 只在资源重载时（`CustomResources.reload` → `resetFonts()`）会清掉注入的字体，
   所以 TRDM 注册了一个客户端重载监听，**下一 tick** 再灌一次（那时 MTR 的监听已经跑完）；
 - 注入的是 `java.awt.Font` 原始对象，MTR 用 `deriveFont` 放大缩小，所以给的是基础字号的样子；
-- TRDM 自己的吊板 / 站名牌 / PIS 走的是 `TrdmHeaderTextures`，跟这条链路无关。
+- TRDM 自己的吊板 / 站名牌 / PIS 走的是 `TrdmHeaderTextures`，跟这条链路无关：\n  吊板和站名牌**始终用系统黑体 / Arial**（开关不会让它们变成 Noto），PIS 用打包的思源黑体。

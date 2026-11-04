@@ -1370,13 +1370,7 @@ public final class TrdmHeaderTextures {
         if (latinBaseFont != null) {
             return latinBaseFont;
         }
-        if (top.xiaotang27.trdm.TrdmConfig.useTrdmFont()) {
-            final Font trdm = trdmLatinFont();
-            if (trdm != null) {
-                latinBaseFont = trdm;
-                return latinBaseFont;
-            }
-        }
+        // 英文也一律用系统字体：「使用TRDM字体」那个开关只作用在 MTR 原版的牌面上
         final Set<String> available = new HashSet<>(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(Locale.ROOT)));
         for (final String candidate : LATIN_FONT_CANDIDATES) {
             if (available.contains(candidate)) {
@@ -1392,15 +1386,8 @@ public final class TrdmHeaderTextures {
         if (baseFont != null) {
             return baseFont;
         }
-        // 「使用TRDM字体」开：用随 mod 打包的 TRDM 字体；关：系统黑体 + Arial
-        if (top.xiaotang27.trdm.TrdmConfig.useTrdmFont()) {
-            final Font trdm = trdmCjkFont();
-            if (trdm != null) {
-                baseFont = trdm;
-                return baseFont;
-            }
-        }
-        // 普通黑体（SimHei）优先；思源黑体只给 PIS 用，见 pisFont(float)
+        // TRDM 自己的牌子（吊板 / 站名牌 / 门楣）一律用系统黑体；「使用TRDM字体」那个开关
+        // 只作用在 MTR 原版的牌面上（见 client/TrdmMtrFonts）。思源黑体只给 PIS 用，见 pisFont(float)
         final Set<String> available = new HashSet<>(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(Locale.ROOT)));
         for (final String candidate : FONT_CANDIDATES) {
             if (available.contains(candidate)) {
