@@ -72,3 +72,20 @@
 | `assets/trdm/textures/block/psd_lamp_on.png` | 门楣灯亮 |
 | `assets/trdm/textures/block/psd_lamp_off.png` | 门楣灯灭 |
 | `assets/trdm/textures/block/psd_door_top_left_1.png` / `_right_1.png` | 天津导视资源包的上半段滑动门贴图 |
+
+## 7. 门扇模型与贴图（用户提供的素材）
+
+端门门扇改用一套**专门的 2 格高模型 + 专用贴图**（不再是 MTR 玻璃模型）：
+
+| 位置 | 模型 | 贴图 |
+|---|---|---|
+| 单格端门 | `trdm:block/psd_end_gate_door_single` | `gate_glass_bottom_single.png` / `gate_glass_top_single.png`（两侧 6 像素边框） |
+| 门排左端 | `trdm:block/psd_end_gate_door_left` | `gate_glass_bottom_1.png` / `gate_glass_top_1.png`（一侧 8 像素边框） |
+| 门排右端 | `trdm:block/psd_end_gate_door_right` | 同上（UV 镜像） |
+| 门排中间 | `trdm:block/psd_end_gate_door_mid` | 仍用 `mtr:block/psd_glass_*`（无边框，接在中间） |
+
+- 模型本身 **2 格高（y 0~32）**、玻璃板在 **x 0~2**，所以渲染时**每格只画一次**、从下半格画；
+- 模型由**技术方块** `trdm:psd_end_gate_models`（`side` 属性 4 值）挂进模型管理器 ——
+  端门自己的 blockstate 必须全是空模型（否则关门的静态玻璃会和动画重影）；
+- **装饰条**贴着透明窗：窗在每格 z 3/16~13/16、竖直从 y=5 到 30.5 像素，
+  对应 `BAND_CENTRE_Y = 17.75/16`、`BAND_END_INSET = 3/16`。

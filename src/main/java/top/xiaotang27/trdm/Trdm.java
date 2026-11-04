@@ -26,6 +26,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.BlockTrdmPis;
 import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
+import top.xiaotang27.trdm.block.BlockTrdmEndGateModels;
 import top.xiaotang27.trdm.block.BlockTrdmPisPole;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
@@ -61,6 +62,8 @@ public class Trdm implements ModInitializer {
     public static final BlockTrdmPisPole PIS_POLE = new BlockTrdmPisPole();
     /** 屏蔽门端门：玻璃面板 + 上方不动门楣。 */
     public static final BlockTrdmPSDEndGate PSD_END_GATE = new BlockTrdmPSDEndGate();
+    /** 纯技术方块：只为把端门门扇的 4 个模型烘进模型管理器，永远不会被放置、也没有物品。 */
+    public static final BlockTrdmEndGateModels PSD_END_GATE_MODELS = new BlockTrdmEndGateModels();
     /** 屏蔽门端门：门楣 + 可旋开的门 + 固定玻璃。 */
 
     // 物品（与 MTR 一致：门楣没有独立物品，用玻璃物品放置）
@@ -99,6 +102,7 @@ public class Trdm implements ModInitializer {
         registerBlock("pis", PIS);
         registerBlock("pis_pole", PIS_POLE);
         registerBlock("psd_end_gate", PSD_END_GATE);
+        registerBlock("psd_end_gate_models", PSD_END_GATE_MODELS);
 
         registerItem("psd_door_1", PSD_DOOR_ITEM_1);
         registerItem("psd_glass_1", PSD_GLASS_ITEM_1);

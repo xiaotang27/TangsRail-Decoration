@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "side=left": { "model": "trdm:block/psd_end_gate_door_left" },
+    "side=middle": { "model": "trdm:block/psd_end_gate_door_mid" },
+    "side=right": { "model": "trdm:block/psd_end_gate_door_right" },
+    "side=single": { "model": "trdm:block/psd_end_gate_door_single" }
+  }
+}

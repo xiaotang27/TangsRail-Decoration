@@ -32,6 +32,7 @@ import org.joml.Vector3f;
 import java.util.List;
 
 import top.xiaotang27.trdm.Trdm;
+import top.xiaotang27.trdm.block.BlockTrdmEndGateModels;
 import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmEndGateAnim;
@@ -69,12 +70,20 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
     // ===== 装饰条（版面与 RenderTrdmPSDTop 里玻璃装饰带完全一致，只是画法跟着门走）=====
     private static final float BAND_HEIGHT = TrdmDecalBand.HEIGHT_BLOCKS;
     /** 装饰带竖直中心：两格玻璃的中缝（下半格往上 1 格）再抬一点。 */
-    private static final float BAND_CENTRE_Y = 1F + 2F / 16F;
+    /**
+     * 装饰带竖直中心：新端门贴图的透明窗从 y=5 像素一直到 30.5 像素（上下两格合起来），
+     * 取窗口正中 = 17.75 像素 = 1.109375 格。
+     */
+    private static final float BAND_CENTRE_Y = 17.75F / 16F;
     /** 玻璃两个面到方块中心的距离（法线朝 -facing 那面 / 朝 +facing 那面），已含端门那 2 像素偏移。 */
     private static final float GLASS_SURFACE_4 = 4F / 16F + MODEL_X_OFFSET;
     private static final float GLASS_SURFACE_6 = 6F / 16F + MODEL_X_OFFSET;
     private static final float BAND_NUDGE = 0.004F;
-    private static final float BAND_END_INSET = 1F / 16F;
+    /**
+     * 装饰带两端各往里收多少：新贴图的透明窗在每格 z 3/16 ~ 13/16（两侧各 3 像素边框），
+     * 收到 3/16 正好贴在透明部分里、不会压到边框。
+     */
+    private static final float BAND_END_INSET = 3F / 16F;
 
     // ===== 门楣灯 =====
     /** 灯底边离门楣下沿多远（门楣是下半格往上第 2 格）。灯本身尺寸固定写在 {@link #MODEL_LAMP} 里。 */
@@ -145,21 +154,17 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         final float signedAngle = Math.copySign(angleDegrees, swingAngle(intoRun, facing));
         final float pivotDx = (float) (pivotX - pos.getX());
         final float pivotDz = (float) (pivotZ - pos.getZ());
-        // 端门玻璃比普通玻璃整体往 -模型 x 挪了 2 像素，等于在世界里往 +facing 挪 2 像素；
-        // 门扇现在用「普通玻璃模型 + 这个平移」来画，所以平移必须在绕铰链旋转**之前**做。
-        final float shiftX = facing.getStepX() * MODEL_X_OFFSET;
-        final float shiftZ = facing.getStepZ() * MODEL_X_OFFSET;
 
-        // 门扇
+        // 门扇：新模型本身就是 2 格高的一整扇（玻璃板在 x 0~2，和端门的偏移一致），
+        // 所以不再需要那 2 像素平移，且每格只需画一次
         matrices.pushPose();
-        matrices.translate(shiftX, 0F, shiftZ);
         matrices.translate(pivotDx, 0F, pivotDz);
         matrices.mulPose(Axis.YP.rotationDegrees(signedAngle));
         matrices.translate(-pivotDx, 0F, -pivotDz);
         renderLeaf(world, pos, facing, back, forth, matrices, vertexConsumers, light, overlay);
         matrices.popPose();
 
-        // 装饰条：位置本来就按端门玻璃面算过（GLASS_SURFACE_*），不要再平移，只跟着转
+        // 装饰条：位置按端门玻璃面算过（GLASS_SURFACE_*），只跟着门转
         matrices.pushPose();
         matrices.translate(pivotDx, 0F, pivotDz);
         matrices.mulPose(Axis.YP.rotationDegrees(signedAngle));
@@ -171,38 +176,41 @@ public class RenderTrdmPSDEndGate<T extends BlockTrdmPSDEndGate.TileEntityTrdmPS
         renderLamp(world, pos, facing, back, forth, angleDegrees > 1F, matrices, vertexConsumers, light, overlay);
     }
 
-    /** 用普通 PSD 玻璃的方块状态来画端门玻璃（几何 / 贴图完全一致，那 2 像素偏移由外层 pose 补）。 */
-    private static BlockState glassStateLike(BlockState gateState) {
-        return Trdm.PSD_GLASS_1.defaultBlockState()
-                .setValue(HorizontalDirectionalBlock.FACING,
-                        IBlock.getStatePropertySafe(gateState, HorizontalDirectionalBlock.FACING))
-                .setValue(IBlock.HALF, IBlock.getStatePropertySafe(gateState, IBlock.HALF))
-                .setValue(IBlock.SIDE_EXTENDED, IBlock.getStatePropertySafe(gateState, IBlock.SIDE_EXTENDED));
+    /** 端门门扇模型对应的技术方块状态（只用一个 side 属性选 left / mid / right / single）。 */
+    private static BlockState leafModelState(int back, int forth) {
+        final mtr.block.IBlock.EnumSide side;
+        if (back <= 0 && forth <= 0) {
+            side = mtr.block.IBlock.EnumSide.SINGLE;
+        } else if (back > 0 && forth > 0) {
+            side = mtr.block.IBlock.EnumSide.MIDDLE;
+        } else if (back > 0) {
+            side = mtr.block.IBlock.EnumSide.RIGHT;
+        } else {
+            side = mtr.block.IBlock.EnumSide.LEFT;
+        }
+        return Trdm.PSD_END_GATE_MODELS.defaultBlockState().setValue(BlockTrdmEndGateModels.SIDE, side);
     }
 
     /**
-     * 整段门扇：逐格、上下两格各画一次玻璃模型。
-     * <p>
-     * 门扇用的是**普通 PSD 玻璃**的方块状态（贴图、几何完全一致），
-     * 端门那 2 像素的偏移由外层 pose 的平移补上 —— 这样端门 blockstate 可以全部是空模型，
-     * 开关门两个方向都能由渲染器做动画，不会和静态玻璃重影。
+     * 整段门扇：逐格画一次**整扇 2 格高**的门扇模型（模型自己就盖住上下两格），
+     * 每格再按 facing 转一下朝向。
      */
     private void renderLeaf(Level world, BlockPos pos, Direction facing, int back, int forth,
                             PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
+        final BlockState modelState = leafModelState(back, forth);
         for (int i = -back; i <= forth; i++) {
             final BlockPos cell = pos.relative(facing.getClockWise(), i);
-            for (int dy = 0; dy <= 1; dy++) {
-                final BlockPos at = cell.above(dy);
-                final BlockState cellState = world.getBlockState(at);
-                if (!(cellState.getBlock() instanceof BlockTrdmPSDEndGate)) {
-                    continue;
-                }
-                matrices.pushPose();
-                matrices.translate(at.getX() - pos.getX(), at.getY() - pos.getY(), at.getZ() - pos.getZ());
-                Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
-                        glassStateLike(cellState), matrices, vertexConsumers, light, overlay);
-                matrices.popPose();
+            final BlockState cellState = world.getBlockState(cell);
+            if (!(cellState.getBlock() instanceof BlockTrdmPSDEndGate)) {
+                continue;
             }
+            matrices.pushPose();
+            matrices.translate(cell.getX() - pos.getX(), cell.getY() - pos.getY(), cell.getZ() - pos.getZ());
+            // 模型是按 facing=west 摆的，按 facing 转一下朝向
+            matrices.mulPose(Axis.YP.rotationDegrees(-facing.toYRot()));
+            Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
+                    modelState, matrices, vertexConsumers, light, overlay);
+            matrices.popPose();
         }
     }
 

@@ -101,6 +101,8 @@ public class TrdmClient implements ClientModInitializer {
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_TOP, RenderType.cutout());
         // 端门也是玻璃：漏了这条会按 solid 画，透明像素变成白板
         BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_END_GATE, RenderType.cutout());
+        // 技术方块（端门门扇模型）也按玻璃层画，透明处才不会变成实心白块
+        BlockRenderLayerMap.INSTANCE.putBlock(Trdm.PSD_END_GATE_MODELS, RenderType.cutout());
 
         // 「蹲下 + 刷子右键屏蔽门」→ 外观设置。
         // 走 UseBlockCallback 而不是只挂在方块的 use 上：这个回调在「方块自己的 use」之前触发，
