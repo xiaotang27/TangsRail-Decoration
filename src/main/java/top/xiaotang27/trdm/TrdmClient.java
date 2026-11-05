@@ -39,6 +39,12 @@ public class TrdmClient implements ClientModInitializer {
     /** 打开 {@code -Dtrdm.debugSign=true} 会把「蹲下 + 刷子」的命中情况打进日志。 */
     private static final boolean DEBUG = Boolean.getBoolean("trdm.debugSign");
 
+    /**
+     * 「打开通用设置」的请求标记：聊天命令不能当场 {@code setScreen}，见命令注册处的注释。
+     * 标记在 {@code END_CLIENT_TICK} 里消费，那时聊天界面已经关掉，不会再被它覆盖。
+     */
+    private static boolean configScreenRequested;
+
     @Override
     public void onInitializeClient() {
         // 门扇：TRD 自己的渲染器（RenderTrdmPSDDoor）
@@ -49,16 +55,12 @@ public class TrdmClient implements ClientModInitializer {
                         net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("trdm").then(
                                 net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("config").executes(context -> {
                                     top.xiaotang27.trdm.Trdm.LOGGER.info("[config-screen] 命令触发");
-                                    final net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
-                                    // 和 MTR 一样把开界面丢到客户端线程队列里，避免在命令回调整帧中直接切屏
-                                    client.execute(() -> {
-                                        try {
-                                            client.setScreen(new top.xiaotang27.trdm.client.TrdmConfigScreen(null));
-                                            top.xiaotang27.trdm.Trdm.LOGGER.info("[config-screen] setScreen 完成，当前界面: {}", client.screen);
-                                        } catch (Throwable e) {
-                                            top.xiaotang27.trdm.Trdm.LOGGER.error("[config-screen] 打开界面失败", e);
-                                        }
-                                    });
+                                    // 这里绝对不能直接 setScreen，也不能用 client.execute：
+                                    // 客户端命令是 ChatScreen.keyPressed 里同步执行的，执行完 ChatScreen 还会
+                                    // setScreen(null) 把刚打开的界面关掉；而 Minecraft#execute 在渲染线程上
+                                    // （非任务重入时）是立即执行，所以照样会被关掉——原来的 bug 就在这里。
+                                    // 只记下请求，等本 tick 末尾聊天界面关掉后再开。
+                                    configScreenRequested = true;
                                     return 1;
                                 }))));
         BlockEntityRendererRegistry.register(Trdm.PSD_DOOR_1_BE, context -> new RenderTrdmPSDDoor<>(null, 0));
@@ -68,8 +70,13 @@ public class TrdmClient implements ClientModInitializer {
                 "key.trdm.config", -1, "key.categories.trdm");
         net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper.registerKeyBinding(configKey);
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            // 命令只负责排队，这里才是真正开界面：此时 ChatScreen 已经 setScreen(null) 过
+            if (configScreenRequested) {
+                configScreenRequested = false;
+                openConfigScreen(client);
+            }
             while (configKey.consumeClick()) {
-                client.setScreen(new top.xiaotang27.trdm.client.TrdmConfigScreen(null));
+                openConfigScreen(client);
             }
             // 端门「按住右键拖动调开度」的状态机
             TrdmEndGateDrag.tick(client);
@@ -131,6 +138,17 @@ public class TrdmClient implements ClientModInitializer {
         });
 
         UseBlockCallback.EVENT.register(TrdmClient::onUseBlock);
+    }
+
+    /** 真正把通用设置界面推到最前面（只在客户端 tick 里调用）。 */
+    private static void openConfigScreen(net.minecraft.client.Minecraft client) {
+        try {
+            client.setScreen(new top.xiaotang27.trdm.client.TrdmConfigScreen(null));
+            Trdm.LOGGER.info("[config-screen] 已打开界面，当前界面: {}，画布 {}x{}", client.screen,
+                    client.getWindow().getGuiScaledWidth(), client.getWindow().getGuiScaledHeight());
+        } catch (Throwable e) {
+            Trdm.LOGGER.error("[config-screen] 打开界面失败", e);
+        }
     }
 
     private static InteractionResult onUseBlock(Player player, Level world, InteractionHand hand, BlockHitResult hitResult) {
