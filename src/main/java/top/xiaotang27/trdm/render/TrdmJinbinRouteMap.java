@@ -92,10 +92,8 @@ public final class TrdmJinbinRouteMap {
     private static final float TRT_TEXT_CN = 32F / 675F;
     private static final float TRT_TEXT_EN = 19F / 675F;
 
-    /** bmt 图例（中英双语，字号小）。 */
-    private static final float BMT_LEGEND_ICON = 0.040F;
-    private static final float BMT_LEGEND_CN = 0.036F;
-    private static final float BMT_LEGEND_EN = 0.022F;
+    /** bmt 图例整条素材（Group 49）：宽 774 px，高度按 37/675 板高画。 */
+    private static final float BMT_LEGEND_IMAGE_W = 774F;
     private static final float BMT_LEGEND_CENTER = 0.925F;
 
     /** 改造版图例（只有中文，字号大一档）。 */
@@ -107,7 +105,6 @@ public final class TrdmJinbinRouteMap {
 
     private static final float LEGEND_ICON_GAP = 0.010F;
     private static final float LEGEND_ITEM_GAP = 0.028F;
-    private static final float LEGEND_EN_GAP = 0.004F;
 
     private TrdmJinbinRouteMap() {
     }
@@ -565,77 +562,24 @@ public final class TrdmJinbinRouteMap {
     // ===== 图例 =====
 
     private static void drawBmtLegend(Graphics2D graphics, int width, int height, float runLeft, float runRight) {
-        final float icon = height * BMT_LEGEND_ICON;
-        final float cnSize = height * BMT_LEGEND_CN;
-        final float enSize = height * BMT_LEGEND_EN;
+        // 整条图例直接用 Group 49 素材（774×37，透明底），和参考图一字不差：
+        // 高度 37/675 板高、右对齐、垂直中心 0.925 板高
+        final TrdmSignAssets.Sprite legend = TrdmSignAssets.sprite(TrdmSignAssets.BMT_LEGEND);
+        if (legend == null) {
+            return;
+        }
+        final float scale = height / 675F;
+        float legendWidth = BMT_LEGEND_IMAGE_W * scale;
         final float available = Math.max(1F, runRight - runLeft - width * 0.02F);
-        float scale = 1F;
-        float total = 0F;
-        for (int iteration = 0; iteration < 4; iteration++) {
-            total = bmtLegendWidth(graphics, height, scale);
-            if (total <= available || total <= 0F) {
-                break;
-            }
-            scale *= Math.max(0.35F, available / total * 0.98F);
+        if (legendWidth > available) {
+            legendWidth = available;
         }
-        final float iconGap = height * LEGEND_ICON_GAP * scale;
-        final float itemGap = height * LEGEND_ITEM_GAP * scale;
-        final Font cnFont = TrdmHeaderTextures.font(cnSize * scale);
-        final Font enFont = TrdmHeaderTextures.latinFont(enSize * scale);
-        final FontMetrics cnMetrics = graphics.getFontMetrics(cnFont);
-        final FontMetrics enMetrics = graphics.getFontMetrics(enFont);
+        if (legendWidth <= 0F) {
+            return;
+        }
+        final float centerX = runRight - width * 0.01F - legendWidth / 2F;
         final float centerY = height * BMT_LEGEND_CENTER;
-        final float startX = Math.max(runLeft, runRight - width * 0.015F - total);
-        final float cnBaseline = centerY + cnMetrics.getAscent() * 0.45F;
-        final float enBaseline = cnBaseline + cnMetrics.getDescent() + enMetrics.getAscent() + height * LEGEND_EN_GAP;
-
-        final String[] cn = {"当前站", "下一站", "上一站", "换乘站", "始发站、终点站"};
-        final String[] en = {"This Station", "Next Station", "Previous Station", "Transfer Station",
-                "Starting Station, Terminal Station"};
-        final String[] icons = {TrdmSignAssets.BMT_THIS_STATION, TrdmSignAssets.BMT_NEXT_STATION,
-                TrdmSignAssets.BMT_PASS_STATION, TrdmSignAssets.BMT_TRANSFER_STATION,
-                TrdmSignAssets.BMT_HEAD_STATION};
-
-        float x = startX;
-        graphics.setColor(new Color(TEXT_COLOR, true));
-        graphics.setFont(cnFont);
-        graphics.drawString("图例", x, cnBaseline);
-        graphics.drawString("图例", x + cnFont.getSize2D() * 0.03F, cnBaseline);
-        graphics.setFont(enFont);
-        graphics.drawString("Legend", x, enBaseline);
-        x += Math.max(textWidth(graphics, "图例", cnFont), textWidth(graphics, "Legend", enFont)) + iconGap;
-
-        for (int i = 0; i < cn.length; i++) {
-            final BufferedImage image = imageOf(icons[i], false);
-            TrdmSignAssets.drawSprite(graphics, image, x + icon / 2F, centerY, icon);
-            graphics.setColor(new Color(TEXT_COLOR, true));
-            graphics.setFont(cnFont);
-            graphics.drawString(cn[i], x + icon + iconGap, cnBaseline);
-            graphics.drawString(cn[i], x + icon + iconGap + cnFont.getSize2D() * 0.03F, cnBaseline);
-            graphics.setFont(enFont);
-            graphics.drawString(en[i], x + icon + iconGap, enBaseline);
-            x += icon + iconGap + Math.max(textWidth(graphics, cn[i], cnFont), textWidth(graphics, en[i], enFont))
-                    + itemGap;
-        }
-    }
-
-    private static float bmtLegendWidth(Graphics2D graphics, float height, float scale) {
-        final float icon = height * BMT_LEGEND_ICON * scale;
-        final float cnSize = height * BMT_LEGEND_CN * scale;
-        final float enSize = height * BMT_LEGEND_EN * scale;
-        final float iconGap = height * LEGEND_ICON_GAP * scale;
-        final float itemGap = height * LEGEND_ITEM_GAP * scale;
-        final Font cnFont = TrdmHeaderTextures.font(cnSize);
-        final Font enFont = TrdmHeaderTextures.latinFont(enSize);
-        final String[] cn = {"当前站", "下一站", "上一站", "换乘站", "始发站、终点站"};
-        final String[] en = {"This Station", "Next Station", "Previous Station", "Transfer Station",
-                "Starting Station, Terminal Station"};
-        float total = textWidth(graphics, "图例", cnFont) + iconGap;
-        for (int i = 0; i < cn.length; i++) {
-            total += Math.max(textWidth(graphics, cn[i], cnFont), textWidth(graphics, en[i], enFont))
-                    + icon + iconGap + itemGap;
-        }
-        return total;
+        TrdmSignAssets.drawSprite(graphics, legend.image(), centerX, centerY, legendWidth);
     }
 
     private static void drawTrtLegend(Graphics2D graphics, int width, int height,

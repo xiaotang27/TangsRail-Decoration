@@ -54,6 +54,8 @@ public final class TrdmSignAssets {
     public static final String BMT_PASS_STATION = "bmt_passstn";
     /** 线路图换乘站（十字圈）。 */
     public static final String BMT_TRANSFER_STATION = "bmt_transferstn";
+    /** bmt 线路图右下角的整条图例（Group 49 素材，含图标、中英文；透明底）。 */
+    public static final String BMT_LEGEND = "bmt_legend";
 
     // ===== 津滨轻轨风格（改造，trt_bmt）=====
     /** 改造版线路图当前站：蓝底 + 白色左箭头，绘制时按线路色重上色。 */
@@ -154,7 +156,7 @@ public final class TrdmSignAssets {
         for (final String name : new String[]{STATION_CIRCLE, CURRENT_STATION, TRANSFER_2, TRANSFER_3, HEAD_TAIL,
                 TRANSFER_LABEL, COLOR_LINE, ROUTE_LINE_ARROW, STATION_LOGO, ACCESSIBLE_ELEVATOR,
                 BMT_ARROW, BMT_LINEHEAD, BMT_HEAD_STATION, BMT_THIS_STATION, BMT_NEXT_STATION, BMT_PASS_STATION,
-                BMT_TRANSFER_STATION, TRT_BMT_THIS_STATION, TRT_BMT_NEXT_STATION}) {
+                BMT_TRANSFER_STATION, BMT_LEGEND, TRT_BMT_THIS_STATION, TRT_BMT_NEXT_STATION}) {
             loadSprite(name);
         }
     }
@@ -411,7 +413,7 @@ public final class TrdmSignAssets {
                 STATION_CIRCLE, CURRENT_STATION, TRANSFER_2, TRANSFER_3, HEAD_TAIL,
                 TRANSFER_LABEL, COLOR_LINE, ROUTE_LINE_ARROW, STATION_LOGO, ACCESSIBLE_ELEVATOR,
                 BMT_ARROW, BMT_LINEHEAD, BMT_HEAD_STATION, BMT_THIS_STATION, BMT_NEXT_STATION, BMT_PASS_STATION,
-                BMT_TRANSFER_STATION, TRT_BMT_THIS_STATION, TRT_BMT_NEXT_STATION
+                BMT_TRANSFER_STATION, BMT_LEGEND, TRT_BMT_THIS_STATION, TRT_BMT_NEXT_STATION
         };
         for (final String name : names) {
             try {
