@@ -173,7 +173,8 @@ public final class TrdmJinbinRouteMap {
         final float groupWidth = pitch * (count - 1);
         // 整组（含箭头那一侧的伸出、末端半个站点图标）水平居中，和参考图一样
         final float leading = height * ARROW_LEAD;
-        final float trailing = marker * 0.55F;
+        // 端头站那一侧的内容边界就是圆形图标的右/左沿
+        final float trailing = marker * 0.5F;
         final float originX = (width - (leading + groupWidth + trailing)) / 2F;
         final float groupLeft = arrowLeft ? originX + leading : originX + trailing;
         final float[] xs = new float[count];
@@ -188,8 +189,9 @@ public final class TrdmJinbinRouteMap {
         final float lastX = xs[count - 1];
         final float leftMost = Math.min(firstX, lastX);
         final float rightMost = Math.max(firstX, lastX);
-        final float lineLeft = arrowLeft ? leftMost - height * ARROW_LEAD : leftMost - marker * 0.55F;
-        final float lineRight = arrowLeft ? rightMost + marker * 0.55F : rightMost + height * ARROW_LEAD;
+        // 没有箭头的那一端是始发/终点站：线路收到站点圆心就停，端头被圆形图标整个盖住
+        final float lineLeft = arrowLeft ? leftMost - height * ARROW_LEAD : leftMost;
+        final float lineRight = arrowLeft ? rightMost : rightMost + height * ARROW_LEAD;
         // 箭头那一侧的线头往里收一点，让斜切边露出线路轮廓（参考图的「斜切」就是这样来的）
         final float drawLeft = arrowLeft ? lineLeft + height * ARROW_LINE_INSET : lineLeft;
         final float drawRight = arrowLeft ? lineRight : lineRight - height * ARROW_LINE_INSET;
