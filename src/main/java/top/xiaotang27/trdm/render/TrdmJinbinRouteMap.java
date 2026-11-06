@@ -470,7 +470,8 @@ public final class TrdmJinbinRouteMap {
             if (interchange.isEmpty()) {
                 continue;
             }
-            final float flagW = interchange.size() * height * TRT_FLAG_UNIT_W;
+            // 换乘旗宽度一律按单线换乘算（多线只在同一宽度里分色条），不管换乘几条线都一样宽
+            final float flagW = height * TRT_FLAG_UNIT_W;
             final float left = xs[i] - flagW / 2F;
             final float band = flagW / interchange.size();
             final Shape oldClip = graphics.getClip();
