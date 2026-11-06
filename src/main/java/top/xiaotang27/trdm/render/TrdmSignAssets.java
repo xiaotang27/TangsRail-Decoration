@@ -39,6 +39,28 @@ public final class TrdmSignAssets {
     /** 无障碍电梯牌左侧线路标签后面那个图标（用户自己放进来的图，缺了就不画）。 */
     public static final String ACCESSIBLE_ELEVATOR = "accessible_elevator";
 
+    // ===== 津滨轻轨风格（bmt）=====
+    /** 站名板左下角的黑色左箭头（已把原图的白底抠掉）。 */
+    public static final String BMT_ARROW = "bmt_arrow";
+    /** 线路图左端的斜向箭头。 */
+    public static final String BMT_LINEHEAD = "bmt_linehead";
+    /** 线路图始发 / 终点站图标。 */
+    public static final String BMT_HEAD_STATION = "bmt_headstn";
+    /** 线路图当前站（红点）。 */
+    public static final String BMT_THIS_STATION = "bmt_thisstn";
+    /** 线路图下一站 / 前方站（黑点）。 */
+    public static final String BMT_NEXT_STATION = "bmt_nextstn";
+    /** 线路图驶过车站（灰点）。 */
+    public static final String BMT_PASS_STATION = "bmt_passstn";
+    /** 线路图换乘站（十字圈）。 */
+    public static final String BMT_TRANSFER_STATION = "bmt_transferstn";
+
+    // ===== 津滨轻轨风格（改造，trt_bmt）=====
+    /** 改造版线路图当前站：蓝底 + 白色左箭头，绘制时按线路色重上色。 */
+    public static final String TRT_BMT_THIS_STATION = "trt_bmt_thisstn";
+    /** 改造版线路图下一站 / 前方站：蓝点，绘制时按线路色重上色。 */
+    public static final String TRT_BMT_NEXT_STATION = "trt_bmt_nextstn";
+
     private static final Map<String, Sprite> SPRITES = new HashMap<>();
     private static final Map<String, BufferedImage> TINTED = new HashMap<>();
     private static final Map<String, BufferedImage> RECOLORED = new HashMap<>();
@@ -130,7 +152,9 @@ public final class TrdmSignAssets {
      */
     public static synchronized void primeAll() {
         for (final String name : new String[]{STATION_CIRCLE, CURRENT_STATION, TRANSFER_2, TRANSFER_3, HEAD_TAIL,
-                TRANSFER_LABEL, COLOR_LINE, ROUTE_LINE_ARROW, STATION_LOGO, ACCESSIBLE_ELEVATOR}) {
+                TRANSFER_LABEL, COLOR_LINE, ROUTE_LINE_ARROW, STATION_LOGO, ACCESSIBLE_ELEVATOR,
+                BMT_ARROW, BMT_LINEHEAD, BMT_HEAD_STATION, BMT_THIS_STATION, BMT_NEXT_STATION, BMT_PASS_STATION,
+                BMT_TRANSFER_STATION, TRT_BMT_THIS_STATION, TRT_BMT_NEXT_STATION}) {
             loadSprite(name);
         }
     }
@@ -193,8 +217,84 @@ public final class TrdmSignAssets {
         return result;
     }
 
-    private static List<Integer> detectArcs(BufferedImage image) {
-        // 每桶累计：x 和、y 和、像素数、r 和、g 和、b 和
+    /**
+     * 把素材里「有颜色的主体」换成 {@code color}，白色部分（比如当前站圆圈里的白箭头、
+     * 圆圈外的白色留白）原样保留。用于改造版的当前站 / 下一站图标：素材本身是 9 号线的蓝色，
+     * 但实际线路可能是别的颜色。
+     */
+    public static synchronized BufferedImage recoloredBody(String name, int color) {
+        return recoloredBody(name, color, false);
+    }
+
+    /** 同上，但可以先左右翻转素材（箭头方向反过来时用）。 */
+    public static synchronized BufferedImage recoloredBody(String name, int color, boolean mirror) {
+        final Sprite sprite = sprite(name, mirror);
+        if (sprite == null) {
+            return null;
+        }
+        final int rgb = color & 0xFFFFFF;
+        final String key = name + (mirror ? "|m" : "") + "|body|" + Integer.toHexString(rgb);
+        final BufferedImage cached = RECOLORED.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        final BufferedImage source = sprite.image();
+        final int width = source.getWidth();
+        final int height = source.getHeight();
+        final int bodyLuminance = dominantBodyLuminance(source);
+        final int red = (rgb >> 16) & 0xFF;
+        final int green = (rgb >> 8) & 0xFF;
+        final int blue = rgb & 0xFF;
+        final BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                final int argb = source.getRGB(x, y);
+                final int alpha = (argb >>> 24) & 0xFF;
+                if (alpha < 8) {
+                    result.setRGB(x, y, argb);
+                    continue;
+                }
+                final int luminance = luminance(argb);
+                final float coverage = bodyLuminance >= 250
+                        ? 0F
+                        : Math.max(0F, Math.min(1F, (255F - luminance) / (255F - bodyLuminance)));
+                final int outRed = Math.round(255F * (1F - coverage) + red * coverage);
+                final int outGreen = Math.round(255F * (1F - coverage) + green * coverage);
+                final int outBlue = Math.round(255F * (1F - coverage) + blue * coverage);
+                result.setRGB(x, y, (alpha << 24) | (outRed << 16) | (outGreen << 8) | outBlue);
+            }
+        }
+        RECOLORED.put(key, result);
+        return result;
+    }
+
+    /** 素材里除白色以外的主体平均亮度（用来判断「蓝底」有多亮，重上色时当作 coverage=1 的基准）。 */
+    private static int dominantBodyLuminance(BufferedImage image) {
+        long sum = 0;
+        long count = 0;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                final int argb = image.getRGB(x, y);
+                if (((argb >>> 24) & 0xFF) < 200) {
+                    continue;
+                }
+                final int luminance = luminance(argb);
+                if (luminance < 235) {
+                    sum += luminance;
+                    count++;
+                }
+            }
+        }
+        return count == 0 ? 60 : (int) (sum / count);
+    }
+
+    private static int luminance(int rgb) {
+        return Math.round(0.299F * ((rgb >> 16) & 0xFF)
+                + 0.587F * ((rgb >> 8) & 0xFF)
+                + 0.114F * (rgb & 0xFF));
+    }
+
+    private static List<Integer> detectArcs(BufferedImage image) {        // 每桶累计：x 和、y 和、像素数、r 和、g 和、b 和
         final Map<Integer, long[]> buckets = new HashMap<>();
         final int width = image.getWidth();
         final int height = image.getHeight();
@@ -309,7 +409,9 @@ public final class TrdmSignAssets {
     public static synchronized void primeFromDirectory(Path directory) {
         final String[] names = {
                 STATION_CIRCLE, CURRENT_STATION, TRANSFER_2, TRANSFER_3, HEAD_TAIL,
-                TRANSFER_LABEL, COLOR_LINE, ROUTE_LINE_ARROW, STATION_LOGO, ACCESSIBLE_ELEVATOR
+                TRANSFER_LABEL, COLOR_LINE, ROUTE_LINE_ARROW, STATION_LOGO, ACCESSIBLE_ELEVATOR,
+                BMT_ARROW, BMT_LINEHEAD, BMT_HEAD_STATION, BMT_THIS_STATION, BMT_NEXT_STATION, BMT_PASS_STATION,
+                BMT_TRANSFER_STATION, TRT_BMT_THIS_STATION, TRT_BMT_NEXT_STATION
         };
         for (final String name : names) {
             try {

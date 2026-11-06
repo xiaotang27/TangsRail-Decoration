@@ -188,7 +188,11 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             renderRouteMap(storedMatrixTransformations, world, pos, platformId, state, facing, leftBlocks, rightBlocks, quadFacing, color, light);
         }
 
-        renderColorStrip(storedMatrixTransformations, platformId, state, quadFacing, color, light);
+        // 从 MTR 原版移植来的那条「色带延伸」只留给天津地铁样式：
+        // 津滨两种样式的动态贴图自己一直铺到模型下沿，色带直接画在模型最底层，不再叠这条带子。
+        if (BlockTrdmPSDTop.headerStyle(state) == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN) {
+            renderColorStrip(storedMatrixTransformations, platformId, state, quadFacing, color, light);
+        }
 
         // 玻璃上的装饰带：按「合并后的整块玻璃」分段 —— 一段 = 刷子连起来的一组玻璃，
         // 由这一组的左端那一格画完整一条；整段都没合并过的玻璃视同合并的一整块。
@@ -319,6 +323,13 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             return;
         }
 
+        final int headerStyle = BlockTrdmPSDTop.headerStyle(state);
+        if (headerStyle != top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN) {
+            renderJinbinStationName(storedMatrixTransformations, platformId, state, stationName, leftBlocks,
+                    rightBlocks, facing, color, light, headerStyle);
+            return;
+        }
+
         final float width = leftBlocks + rightBlocks + 1 - SIDE_PADDING * 2;
         final float height = 1 - TOP_PADDING - BOTTOM_PADDING;
         final List<TrdmHeaderTextures.Badge> badges = getBadges(platformId);
@@ -326,7 +337,59 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         if (texture == null) {
             return;
         }
-        scheduleRunQuad(storedMatrixTransformations, texture, leftBlocks, rightBlocks, facing, color, light);
+        scheduleRunQuad(storedMatrixTransformations, texture, leftBlocks, rightBlocks, facing, color, light,
+                1 - BOTTOM_PADDING);
+    }
+
+    /**
+     * 津滨轻轨风格（bmt / 改造）的站名板：站名 + 左下线路牌 + 开往 / 下一站 / 上一站。
+     * 只有换乘站才画顶部的方形线路标志；线路色全部跟随本站台的主线路。
+     */
+    private void renderJinbinStationName(StoredMatrixTransformations storedMatrixTransformations, long platformId,
+                                         BlockState state, String stationName, int leftBlocks, int rightBlocks,
+                                         Direction facing, int color, int light, int headerStyle) {
+        final float width = leftBlocks + rightBlocks + 1 - SIDE_PADDING * 2;
+        // 津滨样式：贴图一直铺到门楣模型下沿，底部色带就画在模型最底层（不再和 MTR 色带叠在一起）
+        final float height = 1 - TOP_PADDING;
+        final int arrowDirection = IBlock.getStatePropertySafe(state, BlockTrdmPSDTop.ARROW_DIRECTION);
+        final boolean arrowLeft = (arrowDirection & 0b01) == 0;
+
+        final ClientCache.PlatformRouteDetails routeDetails = getPrimaryRoute(platformId);
+        final TrdmHeaderTextures.Badge routeBadge = primaryBadge(platformId, routeDetails);
+        final boolean interchange = !getBadges(platformId).isEmpty();
+
+        String destination = "";
+        String nextStation = "";
+        String previousStation = "";
+        boolean terminal = false;
+        if (routeDetails != null && !routeDetails.stationDetails.isEmpty()) {
+            final List<ClientCache.PlatformRouteDetails.StationDetails> stations = routeDetails.stationDetails;
+            final int lastIndex = stations.size() - 1;
+            final int currentIndex = Mth.clamp(routeDetails.currentStationIndex, 0, lastIndex);
+            destination = stations.get(lastIndex).stationName;
+            nextStation = stations.get(Math.min(lastIndex, currentIndex + 1)).stationName;
+            if (currentIndex > 0) {
+                previousStation = stations.get(currentIndex - 1).stationName;
+            }
+            terminal = currentIndex == lastIndex;
+        }
+
+        final ResourceLocation texture = TrdmHeaderTextures.getJinbinStation(platformId, headerStyle, stationName,
+                routeBadge, interchange, destination, nextStation, previousStation, terminal, arrowLeft,
+                width / height);
+        if (texture != null) {
+            scheduleRunQuad(storedMatrixTransformations, texture, leftBlocks, rightBlocks, facing, color, light, 1F);
+        }
+    }
+
+    /** 本站台主线路的标志（左下线路牌、顶部方形标志都用它）。 */
+    private static TrdmHeaderTextures.Badge primaryBadge(long platformId,
+                                                         ClientCache.PlatformRouteDetails routeDetails) {
+        if (routeDetails == null) {
+            return null;
+        }
+        final String[] parts = splitRouteName(routeDetails.routeName);
+        return new TrdmHeaderTextures.Badge(routeDetails.routeColor, parts[0], parts[1]);
     }
 
     /**
@@ -398,8 +461,11 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     private static final float SPAN_Z_NUDGE = 0.002F;
 
     private void renderRouteMap(StoredMatrixTransformations storedMatrixTransformations, Level world, BlockPos pos, long platformId, BlockState state, Direction blockFacing, int leftBlocks, int rightBlocks, Direction facing, int color, int light) {
-        // 玻璃门楣按分组奇偶交替：站点信息吊板 - 滑动门 - 线路图 - 滑动门 - 站点信息 …
-        if (BlockTrdmPSDTop.isStationInfoPanel(world, pos, blockFacing)) {
+        final int headerStyle = BlockTrdmPSDTop.headerStyle(state);
+        // 天津样式：玻璃门楣按分组奇偶交替「站点信息吊板 - 线路图」。
+        // 津滨样式：玻璃上只画线路图，不再交替站点信息。
+        if (headerStyle == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN
+                && BlockTrdmPSDTop.isStationInfoPanel(world, pos, blockFacing)) {
             renderStationInfo(storedMatrixTransformations, platformId, state, leftBlocks, rightBlocks, facing, color, light);
             return;
         }
@@ -416,8 +482,14 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         final boolean arrowLeft = (arrowDirection & 0b01) == 0;
         final int stationCount = Math.max(1, routeDetails.stationDetails.size());
 
-        final float height = 1 - TOP_PADDING - BOTTOM_PADDING;
-        final float minimumWidth = TrdmRouteMap.minimumAspect(stationCount, arrowLeft) * height;
+        // 天津样式给 MTR 的那条色带留 1.5/16；津滨样式一直铺到模型下沿，色带画在模型最底层
+        final float height = headerStyle == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN
+                ? 1 - TOP_PADDING - BOTTOM_PADDING : 1 - TOP_PADDING;
+        final float panelBottom = headerStyle == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN
+                ? 1 - BOTTOM_PADDING : 1F;
+        final float minimumWidth = headerStyle == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN
+                ? TrdmRouteMap.minimumAspect(stationCount, arrowLeft) * height
+                : TrdmJinbinRouteMap.minimumAspect(stationCount, arrowLeft, headerStyle) * height;
         final float runWidth = leftBlocks + rightBlocks + 1;
         final float runLeftX = -leftBlocks;
         final float runRightX = 1 + rightBlocks;
@@ -432,7 +504,9 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         final float areaWidth = areaRightX - areaLeftX;
         // 无论吊板朝哪边、多宽，线路图都用同一个比例画：
         // 面积不够就把四边形画出可用范围（盖到旁边去），绝不缩图、绝不裁剪 —— 信息永远完整且一模一样
-        final float minimumAspect = TrdmRouteMap.minimumAspect(stationCount, arrowLeft);
+        final float minimumAspect = headerStyle == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN
+                ? TrdmRouteMap.minimumAspect(stationCount, arrowLeft)
+                : TrdmJinbinRouteMap.minimumAspect(stationCount, arrowLeft, headerStyle);
         final float requestedAspect = Math.max(areaWidth / height, minimumAspect);
         final TrdmHeaderTextures.TextureSize size = TrdmHeaderTextures.routeMapTextureSize(requestedAspect);
         final float usedWidth = size.aspect() * height;
@@ -445,10 +519,14 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
 
         // 素材在渲染线程先读一次，后台烘焙线程只读缓存
         TrdmSignAssets.primeAll();
-        final ResourceLocation texture = TrdmHeaderTextures.getRouteMapPanel(
-                platformId, requestedAspect, arrowLeft, runLeftFraction, runRightFraction, routeDataSignature(routeDetails));
+        final ResourceLocation texture = headerStyle == top.xiaotang27.trdm.control.PsdStyles.HEADER_TIANJIN
+                ? TrdmHeaderTextures.getRouteMapPanel(platformId, requestedAspect, arrowLeft, runLeftFraction,
+                runRightFraction, routeDataSignature(routeDetails))
+                : TrdmHeaderTextures.getJinbinRouteMap(platformId, headerStyle, requestedAspect, arrowLeft,
+                runLeftFraction, runRightFraction, routeDataSignature(routeDetails));
         if (texture != null) {
-            scheduleSpanQuad(storedMatrixTransformations, texture, quadLeftX, quadLeftX + usedWidth, facing, color, light);
+            scheduleSpanQuad(storedMatrixTransformations, texture, quadLeftX, quadLeftX + usedWidth, panelBottom,
+                    facing, color, light);
         }
     }
 
@@ -457,12 +535,12 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
      * 稍微往前挪一点点（{@link #SPAN_Z_NUDGE}），免得和借来的那块吊板自己的贴图共面打架。
      */
     private static void scheduleSpanQuad(StoredMatrixTransformations storedMatrixTransformations, ResourceLocation texture,
-                                         float x0, float x1, Direction facing, int color, int light) {
+                                         float x0, float x1, float bottom, Direction facing, int color, int light) {
         RenderTrains.scheduleRender(texture, false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matrices, vertexConsumer) -> {
             storedMatrixTransformations.transform(matrices);
             IDrawing.drawTexture(matrices, vertexConsumer,
                     x0, TOP_PADDING, SPAN_Z_NUDGE,
-                    x1, 1 - BOTTOM_PADDING, SPAN_Z_NUDGE,
+                    x1, bottom, SPAN_Z_NUDGE,
                     0, 0, 1, 1,
                     facing, color, light);
             matrices.popPose();
@@ -502,7 +580,8 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         if (currentIndex == lastIndex) {
             final ResourceLocation terminal = TrdmHeaderTextures.getTerminal(platformId, width / height);
             if (terminal != null) {
-                scheduleRunQuad(storedMatrixTransformations, terminal, leftBlocks, rightBlocks, facing, color, light);
+                scheduleRunQuad(storedMatrixTransformations, terminal, leftBlocks, rightBlocks, facing, color, light,
+                        1 - BOTTOM_PADDING);
             }
             return;
         }
@@ -512,7 +591,8 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
         final String nextStation = stations.get(nextIndex).stationName;
         final ResourceLocation texture = TrdmHeaderTextures.getStationInfo(platformId, destination, nextStation, arrowLeft, blocks, width / height);
         if (texture != null) {
-            scheduleRunQuad(storedMatrixTransformations, texture, leftBlocks, rightBlocks, facing, color, light);
+            scheduleRunQuad(storedMatrixTransformations, texture, leftBlocks, rightBlocks, facing, color, light,
+                    1 - BOTTOM_PADDING);
         }
     }
 
@@ -547,7 +627,7 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     private void renderDirectionArrow(StoredMatrixTransformations storedMatrixTransformations, long platformId, BlockState state, int leftBlocks, int rightBlocks, Direction facing, int color, int light) {
         final float width = leftBlocks + rightBlocks + 1 - SIDE_PADDING * 2;
         final float height = 1 - TOP_PADDING - BOTTOM_PADDING;
-        scheduleRunQuad(storedMatrixTransformations, getDirectionArrowResource(platformId, state, width / height), leftBlocks, rightBlocks, facing, color, light);
+        scheduleRunQuad(storedMatrixTransformations, getDirectionArrowResource(platformId, state, width / height), leftBlocks, rightBlocks, facing, color, light, 1 - BOTTOM_PADDING);
     }
 
     private static ResourceLocation getDirectionArrowResource(long platformId, BlockState state, float aspectRatio) {
@@ -563,13 +643,13 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
     /**
      * MTR 的绘制方式：整段一张贴图，每格裁自己那一条 UV。
      */
-    private static void scheduleRunQuad(StoredMatrixTransformations storedMatrixTransformations, ResourceLocation texture, int leftBlocks, int rightBlocks, Direction facing, int color, int light) {
+    private static void scheduleRunQuad(StoredMatrixTransformations storedMatrixTransformations, ResourceLocation texture, int leftBlocks, int rightBlocks, Direction facing, int color, int light, float bottom) {
         final float width = leftBlocks + rightBlocks + 1 - SIDE_PADDING * 2;
         RenderTrains.scheduleRender(texture, false, RenderTrains.QueuedRenderLayer.EXTERIOR, (matrices, vertexConsumer) -> {
             storedMatrixTransformations.transform(matrices);
             IDrawing.drawTexture(matrices, vertexConsumer,
                     leftBlocks == 0 ? SIDE_PADDING : 0, TOP_PADDING, 0,
-                    1 - (rightBlocks == 0 ? SIDE_PADDING : 0), 1 - BOTTOM_PADDING, 0,
+                    1 - (rightBlocks == 0 ? SIDE_PADDING : 0), bottom, 0,
                     (leftBlocks - (leftBlocks == 0 ? 0 : SIDE_PADDING)) / width, 0,
                     (width - rightBlocks + (rightBlocks == 0 ? 0 : SIDE_PADDING)) / width, 1,
                     facing, color, light);

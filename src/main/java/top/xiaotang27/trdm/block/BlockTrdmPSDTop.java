@@ -59,10 +59,10 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
      * arrow_direction(4)×persistent(4)，所以这两个属性每多一个值，状态数就翻一倍。
      * 之前写成 0..15 时门楣一共 262,144 个状态（加 end_gate 后 524,288），
      * 每个状态都要在加载期建成对象再烘焙模型 —— 直接表现就是「加载本 mod 很久不动」。
-     * 现在按 {@link top.xiaotang27.trdm.control.PsdStyles#HEADER_STYLES} 的实际长度收到 0..1，
-     * 门楣状态数降到 8,192。
+     * 现在按 {@link top.xiaotang27.trdm.control.PsdStyles#HEADER_STYLES} 的实际长度收到 0..2
+     * （天津 / 津滨 / 津滨改造），门楣状态数约 12,288。
      */
-    public static final IntegerProperty HEADER_STYLE = IntegerProperty.create("header_style", 0, 1);
+    public static final IntegerProperty HEADER_STYLE = IntegerProperty.create("header_style", 0, 2);
     /**
      * 玻璃装饰线样式（方块状态）。范围说明同上：见 {@link top.xiaotang27.trdm.control.PsdStyles#BAND_STYLES}，
      * 目前只有 0（天津装饰线）和 1（只画人字），所以取 0..1。
@@ -346,9 +346,9 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         if (!(state.getBlock() instanceof BlockTrdmPSDTop)) {
             return;
         }
-        // 属性范围只有 0..1（见 HEADER_STYLE 的注释），网络包送来的值先夹一下，
+        // 属性范围只有 0..2（见 HEADER_STYLE 的注释），网络包送来的值先夹一下，
         // 免得手滑或旧版客户端给出越界值直接抛 IllegalArgumentException。
-        final int header = Mth.clamp(headerStyle, 0, 1);
+        final int header = Mth.clamp(headerStyle, 0, 2);
         final int band = Mth.clamp(bandStyle, 0, 1);
         if (headerStyle(state) == header && bandStyle(state) == band) {
             return;

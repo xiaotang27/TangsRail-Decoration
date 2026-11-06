@@ -147,6 +147,27 @@ public final class TrdmHeaderTextures {
     }
 
     /**
+     * 津滨轻轨风格站名板（门扇上方那几块）：站名 + 线路牌 + 开往 / 下一站 / 上一站。
+     * 样式 1/2 的排版在 {@link TrdmJinbinHeaderPanel}。
+     */
+    public static ResourceLocation getJinbinStation(long platformId, int style, String stationName,
+                                                    Badge routeBadge, boolean interchange, String destination,
+                                                    String nextStation, String previousStation, boolean terminal,
+                                                    boolean arrowLeft, float aspect) {
+        final String key = "jinbin-station|" + style + "|" + platformId + "|" + stationName + "|" + badgeKey(
+                routeBadge == null ? List.of() : List.of(routeBadge))
+                + "|" + interchange + "|" + destination + "|" + nextStation + "|" + previousStation + "|" + terminal
+                + "|" + arrowLeft + "|" + formatAspect(aspect);
+        // 箭头素材在渲染线程先读一次，后台烘焙线程只读缓存
+        TrdmSignAssets.primeAll();
+        return resolve(key, () -> {
+            final TextureSize size = panelTextureSize(aspect);
+            return toNativeImage(TrdmJinbinHeaderPanel.render(size.width(), size.height(), style, stationName,
+                    routeBadge, interchange, destination, nextStation, previousStation, terminal, arrowLeft));
+        });
+    }
+
+    /**
      * 线路图吊板：一条粗横线（后方灰、前方线路色）+ 方向箭头 + 站点图标 + 斜排站名
      * + 换乘尖旗与文字 + 右下角图例。版面实现在 {@link TrdmRouteMap}。
      */
@@ -155,6 +176,26 @@ public final class TrdmHeaderTextures {
         final String key = "rmap|" + platformId + "|" + arrowLeft + "|" + formatAspect(aspect)
                 + "|" + formatAspect(runLeftFraction) + "|" + formatAspect(runRightFraction) + "|" + signature;
         return resolve(key, () -> generateRouteMapPanel(platformId, aspect, arrowLeft, runLeftFraction, runRightFraction));
+    }
+
+    /**
+     * 津滨轻轨风格线路图（bmt / 改造）：竖排站名 + 线路色横线 + 站点图标 / 换乘信息 / 图例。
+     * 版面实现在 {@link TrdmJinbinRouteMap}。
+     */
+    public static ResourceLocation getJinbinRouteMap(long platformId, int style, float aspect, boolean arrowLeft,
+                                                    float runLeftFraction, float runRightFraction, String signature) {
+        final String key = "jinbin-rmap|" + style + "|" + platformId + "|" + arrowLeft + "|" + formatAspect(aspect)
+                + "|" + formatAspect(runLeftFraction) + "|" + formatAspect(runRightFraction) + "|" + signature;
+        TrdmSignAssets.primeAll();
+        return resolve(key, () -> {
+            final TrdmRouteMap.Model model = buildRouteMapModel(platformId, arrowLeft);
+            if (model == null) {
+                return null;
+            }
+            final TextureSize size = routeMapTextureSize(aspect);
+            return toNativeImage(TrdmJinbinRouteMap.render(size.width(), size.height(), style, model,
+                    runLeftFraction, runRightFraction));
+        });
     }
 
     /**
@@ -330,7 +371,7 @@ public final class TrdmHeaderTextures {
     /**
      * 把 MTR 的线路数据翻成线路图要用的结构（站名、本站序号、换乘线路、线路色/名）。
      */
-    private static TrdmRouteMap.Model buildRouteMapModel(long platformId, boolean arrowLeft) {
+    static TrdmRouteMap.Model buildRouteMapModel(long platformId, boolean arrowLeft) {
         final List<ClientCache.PlatformRouteDetails> routes = ClientData.DATA_CACHE.requestPlatformIdToRoutes(platformId);
         if (routes.isEmpty()) {
             return null;

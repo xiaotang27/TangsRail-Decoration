@@ -43,6 +43,8 @@
   "gui.trdm.psd_style.header_label": "吊版",
   "gui.trdm.psd_style.band_label": "玻璃装饰线",
   "gui.trdm.psd_style.header.0": "天津地铁站台门吊板",
+  "gui.trdm.psd_style.header.1": "津滨轻轨风格站台门吊板",
+  "gui.trdm.psd_style.header.2": "津滨轻轨风格站台门吊板（改造）",
   "gui.trdm.psd_style.band.0": "天津地铁站台装饰线（样式1）",
   "gui.trdm.psd_style.band.1": "天津地铁站台装饰线（样式2）",
   "gui.trdm.psd_style.in_use": "使用中",

@@ -43,6 +43,8 @@
   "gui.trdm.psd_style.header_label": "Header panel",
   "gui.trdm.psd_style.band_label": "Glass decal stripe",
   "gui.trdm.psd_style.header.0": "Tianjin Metro platform door header panel",
+  "gui.trdm.psd_style.header.1": "Jinbin Light Rail platform door header panel",
+  "gui.trdm.psd_style.header.2": "Jinbin Light Rail platform door header panel (retrofit)",
   "gui.trdm.psd_style.band.0": "Tianjin Metro platform decal stripe (style 1)",
   "gui.trdm.psd_style.band.1": "Tianjin Metro platform decal stripe (style 2)",
   "gui.trdm.psd_style.in_use": "in use",

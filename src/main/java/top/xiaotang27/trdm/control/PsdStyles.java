@@ -8,6 +8,10 @@ public final class PsdStyles {
 
     /** 吊版：0 = 天津地铁站台门吊板。 */
     public static final int HEADER_TIANJIN = 0;
+    /** 吊版：1 = 津滨轻轨风格站台门吊板（参考 Frame 88–91，素材前缀 bmt）。 */
+    public static final int HEADER_JINBIN = 1;
+    /** 吊版：2 = 津滨轻轨风格站台门吊板（改造，参考 Frame 92–94，素材前缀 trt_bmt）。 */
+    public static final int HEADER_JINBIN_RETROFIT = 2;
     /** 玻璃装饰线：0 = 天津地铁站台装饰线（样式1）。 */
     public static final int BAND_TIANJIN_1 = 0;
     /**
@@ -20,7 +24,7 @@ public final class PsdStyles {
     public static final int DEFAULT_BAND = BAND_TIANJIN_1;
 
     /** 界面上可选的全部吊版样式（顺序就是列表顺序）。 */
-    public static final int[] HEADER_STYLES = {HEADER_TIANJIN};
+    public static final int[] HEADER_STYLES = {HEADER_TIANJIN, HEADER_JINBIN, HEADER_JINBIN_RETROFIT};
     /** 界面上可选的全部玻璃装饰线样式。 */
     public static final int[] BAND_STYLES = {BAND_TIANJIN_1, BAND_CHEVRON_ONLY};
 
