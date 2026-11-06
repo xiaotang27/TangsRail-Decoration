@@ -96,11 +96,11 @@ public final class TrdmJinbinRouteMap {
     private static final float BMT_LEGEND_IMAGE_W = 774F;
     private static final float BMT_LEGEND_CENTER = 0.925F;
 
-    /** 改造版图例（只有中文，字号大一档）。 */
-    private static final float TRT_LEGEND_ICON = 0.075F;
-    private static final float TRT_LEGEND_CN = 0.072F;
-    private static final float TRT_LEGEND_SWATCH_W = 0.182F;
-    private static final float TRT_LEGEND_SWATCH_H = 0.070F;
+    /** 改造版图例（只有中文；比 bmt 那套大一点，但整体收小一档）。 */
+    private static final float TRT_LEGEND_ICON = 0.060F;
+    private static final float TRT_LEGEND_CN = 0.058F;
+    private static final float TRT_LEGEND_SWATCH_W = 0.146F;
+    private static final float TRT_LEGEND_SWATCH_H = 0.056F;
     private static final float TRT_LEGEND_CENTER = 0.906F;
 
     private static final float LEGEND_ICON_GAP = 0.010F;
