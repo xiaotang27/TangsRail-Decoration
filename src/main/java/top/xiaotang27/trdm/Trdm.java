@@ -1,8 +1,10 @@
 package top.xiaotang27.trdm;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -14,7 +16,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.xiaotang27.trdm.block.BlockTrdmBigStationSign;
@@ -154,6 +158,8 @@ public class Trdm implements ModInitializer {
         TrdmControlNetwork.registerServer();
         // 服务端全局 tick：手动开门保持着的时候，每 tick 把门压回开启（列车逻辑改不动它）
         PsdManualHold.registerServerTick();
+        // 旧存档的门楣 SIDE_EXTENDED 还是「整排连起来」的旧值；区块加载时按门/玻璃分组重算一次
+        registerHeaderSideMigration();
 
         CREATIVE_TAB = Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, id(MOD_ID),
                 FabricItemGroup.builder()
@@ -182,6 +188,28 @@ public class Trdm implements ModInitializer {
 
     public static ResourceLocation id(String path) {
         return new ResourceLocation(MOD_ID, path);
+    }
+
+    /**
+     * 旧存档迁移：以前门楣的 {@code SIDE_EXTENDED} 是「左右有门楣就连起来」算的，
+     * 所以一整排门/玻璃的门楣 side 都是 left/middle/right，门楣贴图会按整排走。
+     * 现在改成 MTR 原版的门/玻璃分组（一扇门用门的 SIDE，一组玻璃用 SIDE_EXTENDED），
+     * 旧存档里的已放置门楣不会自己重算，因此区块加载时按下方方块重算一次。
+     */
+    private static void registerHeaderSideMigration() {
+        ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
+            for (final BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+                if (!(blockEntity instanceof BlockTrdmPSDTop.TileEntityTrdmPSDTop)) {
+                    continue;
+                }
+                final BlockPos pos = blockEntity.getBlockPos();
+                final BlockState current = world.getBlockState(pos);
+                final BlockState actual = BlockTrdmPSDTop.getActualState(world, pos);
+                if (actual != current) {
+                    world.setBlock(pos, actual, Block.UPDATE_CLIENTS);
+                }
+            }
+        });
     }
 
     private static void registerBlock(String path, Block block) {
