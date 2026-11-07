@@ -18,6 +18,7 @@
 | PIS 乘客信息屏 | `trdm:pis` | 见 [PIS](pis.md) |
 | 显示屏柱 | `trdm:pis_pole` | 把 PIS 架高的立杆 |
 | 盲道 | `trdm:tactile_paving` | 贴地盲道砖，按四邻自动切换「线 / 点」 |
+| 盲道台阶 | `trdm:tactile_paving_step` | 半格高（8px）盲道台阶，四邻逻辑与盲道一致 |
 | 高站台门延伸板 | `trdm:psd_extension` | 在门楣高度延伸高站台门门楣，转角 / 拐弯后自动换模型 |
 
 ## 放置规则
@@ -89,6 +90,14 @@
   - **转角 / 丁字 / 十字 / 单独一格** → 点（交点用点）。
 - 贴图来自素材 `paving_1.png`（线）和 `paving_2.png`（点），复制为
   `assets/trdm/textures/block/paving_line.png` 与 `paving_dot.png`。
+
+## 盲道台阶（`trdm:tactile_paving_step`）
+
+- 半格高（8px）的盲道台阶：顶面复用 `paving_1`（线）/ `paving_2`（点），侧面和底面用
+  `gray_paving`（1×1 纯色贴图）。
+- 连接逻辑与贴地盲道完全一致：四个布尔量 `north / east / south / west`；端点 / 转角 /
+  丁字 / 十字 / 单独一格 → 点，直线中段 → 线，东西向 `y=90`。
+- 台阶只和台阶连接；贴地盲道和台阶各自成段。
 
 ## 高站台门延伸板（`trdm:psd_extension`）
 

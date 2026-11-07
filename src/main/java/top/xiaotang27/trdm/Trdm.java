@@ -31,6 +31,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDExtension;
 import top.xiaotang27.trdm.block.BlockTrdmPisPole;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePaving;
+import top.xiaotang27.trdm.block.BlockTrdmTactilePavingStep;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
 import top.xiaotang27.trdm.item.ItemTrdmBigSign;
 import top.xiaotang27.trdm.control.PsdManualHold;
@@ -64,6 +65,8 @@ public class Trdm implements ModInitializer {
     public static final BlockTrdmPisPole PIS_POLE = new BlockTrdmPisPole();
     /** 盲道砖：贴在地面的薄贴片，按四邻自动在「线」和「点」之间切换。 */
     public static final BlockTrdmTactilePaving TACTILE_PAVING = new BlockTrdmTactilePaving();
+    /** 盲道台阶：半格高（8px）的盲道砖，连接逻辑与贴地盲道一致。 */
+    public static final BlockTrdmTactilePavingStep TACTILE_PAVING_STEP = new BlockTrdmTactilePavingStep();
     /** 屏蔽门端门：玻璃面板 + 上方不动门楣。 */
     public static final BlockTrdmPSDEndGate PSD_END_GATE = new BlockTrdmPSDEndGate();
     /** 纯技术方块：只为把端门门扇的 4 个模型烘进模型管理器，永远不会被放置、也没有物品。 */
@@ -83,6 +86,7 @@ public class Trdm implements ModInitializer {
     public static final Item PIS_ITEM = new BlockItem(PIS, new Item.Properties());
     public static final Item PIS_POLE_ITEM = new BlockItem(PIS_POLE, new Item.Properties());
     public static final Item TACTILE_PAVING_ITEM = new BlockItem(TACTILE_PAVING, new Item.Properties());
+    public static final Item TACTILE_PAVING_STEP_ITEM = new BlockItem(TACTILE_PAVING_STEP, new Item.Properties());
     public static final ItemTrdmPSD PSD_END_GATE_ITEM = new ItemTrdmPSD(ItemTrdmPSD.Kind.END_GATE);
     public static final Item PSD_EXTENSION_ITEM = new BlockItem(PSD_EXTENSION, new Item.Properties());
 
@@ -110,6 +114,7 @@ public class Trdm implements ModInitializer {
         registerBlock("pis", PIS);
         registerBlock("pis_pole", PIS_POLE);
         registerBlock("tactile_paving", TACTILE_PAVING);
+        registerBlock("tactile_paving_step", TACTILE_PAVING_STEP);
         registerBlock("psd_end_gate", PSD_END_GATE);
         registerBlock("psd_end_gate_models", PSD_END_GATE_MODELS);
         registerBlock("psd_extension", PSD_EXTENSION);
@@ -124,6 +129,7 @@ public class Trdm implements ModInitializer {
         registerItem("pis", PIS_ITEM);
         registerItem("pis_pole", PIS_POLE_ITEM);
         registerItem("tactile_paving", TACTILE_PAVING_ITEM);
+        registerItem("tactile_paving_step", TACTILE_PAVING_STEP_ITEM);
         registerItem("psd_end_gate", PSD_END_GATE_ITEM);
         registerItem("psd_extension", PSD_EXTENSION_ITEM);
 
@@ -166,6 +172,7 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(PIS_ITEM));
                     entries.accept(new ItemStack(PIS_POLE_ITEM));
                     entries.accept(new ItemStack(TACTILE_PAVING_ITEM));
+                    entries.accept(new ItemStack(TACTILE_PAVING_STEP_ITEM));
                     entries.accept(new ItemStack(PSD_END_GATE_ITEM));
                     entries.accept(new ItemStack(PSD_EXTENSION_ITEM));
                 });

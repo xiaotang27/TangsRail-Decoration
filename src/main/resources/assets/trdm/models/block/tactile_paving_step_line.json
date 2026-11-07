@@ -1,0 +1,23 @@
+{
+  "credit": "盲道台阶·线：半格高（8px）的盲道台阶，顶面复用 paving_1，侧面/底面用 gray_paving。",
+  "parent": "block/block",
+  "textures": {
+    "top": "trdm:block/paving_line",
+    "side": "trdm:block/gray_paving",
+    "particle": "trdm:block/paving_line"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 8, 16],
+      "faces": {
+        "down": {"uv": [0, 0, 16, 16], "texture": "#side"},
+        "up": {"uv": [0, 0, 16, 16], "texture": "#top"},
+        "north": {"uv": [0, 0, 16, 8], "texture": "#side"},
+        "south": {"uv": [0, 0, 16, 8], "texture": "#side"},
+        "west": {"uv": [0, 0, 16, 8], "texture": "#side"},
+        "east": {"uv": [0, 0, 16, 8], "texture": "#side"}
+      }
+    }
+  ]
+}
