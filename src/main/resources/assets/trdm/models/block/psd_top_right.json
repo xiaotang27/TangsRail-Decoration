@@ -3,7 +3,7 @@
 	"credit": "Made with Blockbench",
 	"parent": "block/block",
 	"textures": {
-		"particle": "mtr:block/psd_top_edge"
+		"particle": "mtr:block/psd_top"
 	},
 	"elements": [
 		{

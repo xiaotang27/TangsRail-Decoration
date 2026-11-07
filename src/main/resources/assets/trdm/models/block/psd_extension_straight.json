@@ -3,7 +3,7 @@
   "credit": "高站台门无倒角门楣：psd_top_left + psd_top_right 左右两半合并成一整格，供延伸板直线段和物品模型使用。",
   "parent": "block/block",
   "textures": {
-    "particle": "mtr:block/psd_top_edge"
+    "particle": "mtr:block/psd_top"
   },
   "elements": [
     {

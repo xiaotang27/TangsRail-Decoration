@@ -113,18 +113,6 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
     }
 
     /**
-     * 放下一格门楣就把整段门楣连起来（以前是「蹲下 + 刷子」干的活，现在自动做，
-     * 蹲下 + 刷子腾出来开外观设置）。
-     */
-    @Override
-    public void onPlace(BlockState state, Level world, BlockPos pos, BlockState oldState, boolean movedByPiston) {
-        super.onPlace(state, world, pos, oldState, movedByPiston);
-        if (!world.isClientSide) {
-            connectHeaders(world, pos, state);
-        }
-    }
-
-    /**
      * 「蹲下 + 刷子右键」屏蔽门 / 玻璃 / 端头玻璃：打开这一段的「屏蔽门外观设置」
      * （吊版样式 + 玻璃装饰线样式）。
      */
@@ -229,28 +217,6 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         }
         final Block below = world.getBlockState(pos.below()).getBlock();
         return below instanceof BlockPSDAPGGlassBase && !(below instanceof BlockPSDAPGGlassEndBase);
-    }
-
-    /**
-     * 把这一格和左右连续的同类门楣按「左右还有没有门楣」重算侧别，从而合并成一整排。
-     */
-    private void connectHeaders(Level world, BlockPos pos, BlockState state) {
-        connectHeader(world, pos);
-        final Direction facing = IBlock.getStatePropertySafe(state, FACING);
-        propagate(world, pos, facing.getClockWise(), offsetPos -> connectHeader(world, offsetPos), 1);
-        propagate(world, pos, facing.getCounterClockWise(), offsetPos -> connectHeader(world, offsetPos), 1);
-    }
-
-    private static void connectHeader(Level world, BlockPos pos) {
-        final BlockState state = world.getBlockState(pos);
-        if (!(state.getBlock() instanceof BlockTrdmPSDTop)) {
-            return;
-        }
-        final Direction facing = IBlock.getStatePropertySafe(state, FACING);
-        final EnumSide side = TrdmPSDSide.compute(isHeader(world, pos.relative(facing.getCounterClockWise())), isHeader(world, pos.relative(facing.getClockWise())));
-        if (state.getValue(SIDE_EXTENDED) != side) {
-            world.setBlockAndUpdate(pos, state.setValue(SIDE_EXTENDED, side));
-        }
     }
 
     private static boolean isHeader(BlockGetter world, BlockPos pos) {
@@ -376,9 +342,16 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         final BlockState oldState = world.getBlockState(pos);
         if (blockBelow instanceof BlockPSDAPGBase) {
             facing = IBlock.getStatePropertySafe(stateBelow, FACING);
+            // side 跟下方的门 / 玻璃自己走（MTR 原版行为）：
+            // 一扇门 2 格，用门的 SIDE（左/右）；一组合并玻璃用玻璃的 SIDE_EXTENDED（左/中/右）。
+            // 这样门楣的 edge 模型只出现在一扇门 / 一组玻璃的两端，段内用无缝贴图。
+            if (blockBelow instanceof BlockPSDAPGDoorBase) {
+                side = IBlock.getStatePropertySafe(stateBelow, BlockPSDAPGDoorBase.SIDE);
+            } else {
+                side = IBlock.getStatePropertySafe(stateBelow, SIDE_EXTENDED);
+            }
             final boolean leftConnected = isHeader(world, pos.relative(facing.getCounterClockWise()));
             final boolean rightConnected = isHeader(world, pos.relative(facing.getClockWise()));
-            side = TrdmPSDSide.compute(leftConnected, rightConnected);
             final boolean persistent = IBlock.getStatePropertySafe(oldState, PERSISTENT) != EnumPersistent.NONE;
             if (blockBelow instanceof BlockPSDAPGGlassEndBase && !persistent) {
                 // 端头玻璃：空着的那一侧弯成端头
