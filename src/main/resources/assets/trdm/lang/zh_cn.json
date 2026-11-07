@@ -125,5 +125,7 @@
   "block.trdm.psd_end_gate": "屏蔽门端门",
   "item.trdm.psd_end_gate": "屏蔽门端门",
   "block.trdm.tactile_paving": "盲道",
-  "item.trdm.tactile_paving": "盲道"
+  "item.trdm.tactile_paving": "盲道",
+  "block.trdm.psd_extension": "高站台门延伸板",
+  "item.trdm.psd_extension": "高站台门延伸板"
 }

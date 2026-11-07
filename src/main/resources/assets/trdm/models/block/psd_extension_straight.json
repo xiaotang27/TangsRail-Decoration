@@ -1,0 +1,56 @@
+{
+  "format_version": "1.21.11",
+  "credit": "高站台门无倒角门楣：psd_top_left + psd_top_right 左右两半合并成一整格，供延伸板直线段和物品模型使用。",
+  "parent": "block/block",
+  "textures": {
+    "particle": "mtr:block/psd_top_edge"
+  },
+  "elements": [
+    {
+      "name": "Left main",
+      "from": [0, 0, 8],
+      "to": [6, 16, 16],
+      "faces": {
+        "north": {"uv": [10, 0, 16, 16], "texture": "#particle"},
+        "east": {"uv": [0, 0, 8, 16], "texture": "#particle"},
+        "south": {"uv": [0, 0, 6, 16], "texture": "#particle", "cullface": "south"},
+        "west": {"uv": [8, 0, 16, 16], "texture": "#particle", "cullface": "west"},
+        "up": {"uv": [0, 8, 6, 16], "texture": "#particle", "cullface": "up"}
+      }
+    },
+    {
+      "name": "Left bottom",
+      "from": [0, 0, 8],
+      "to": [6, 1, 16],
+      "faces": {
+        "north": {"uv": [10, 15, 16, 16], "texture": "#particle"},
+        "south": {"uv": [0, 15, 6, 16], "texture": "#particle", "cullface": "south"},
+        "west": {"uv": [8, 15, 16, 16], "texture": "#particle", "cullface": "west"},
+        "down": {"uv": [0, 0, 6, 8], "texture": "#particle"}
+      }
+    },
+    {
+      "name": "Right main",
+      "from": [0, 0, 0],
+      "to": [6, 16, 8],
+      "faces": {
+        "north": {"uv": [10, 0, 16, 16], "texture": "#particle", "cullface": "north"},
+        "east": {"uv": [8, 0, 16, 16], "texture": "#particle"},
+        "south": {"uv": [0, 0, 6, 16], "texture": "#particle"},
+        "west": {"uv": [0, 0, 8, 16], "texture": "#particle", "cullface": "west"},
+        "up": {"uv": [0, 0, 6, 8], "texture": "#particle", "cullface": "up"}
+      }
+    },
+    {
+      "name": "Right bottom",
+      "from": [0, 0, 0],
+      "to": [6, 1, 8],
+      "faces": {
+        "north": {"uv": [10, 15, 16, 16], "texture": "#particle", "cullface": "north"},
+        "south": {"uv": [0, 15, 6, 16], "texture": "#particle"},
+        "west": {"uv": [0, 15, 8, 16], "texture": "#particle", "cullface": "west"},
+        "down": {"uv": [0, 8, 6, 16], "texture": "#particle"}
+      }
+    }
+  ]
+}

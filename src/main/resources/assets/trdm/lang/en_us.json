@@ -125,5 +125,7 @@
   "block.trdm.psd_end_gate": "PSD End Gate",
   "item.trdm.psd_end_gate": "PSD End Gate",
   "block.trdm.tactile_paving": "Tactile Paving",
-  "item.trdm.tactile_paving": "Tactile Paving"
+  "item.trdm.tactile_paving": "Tactile Paving",
+  "block.trdm.psd_extension": "High Platform Door Extension Panel",
+  "item.trdm.psd_extension": "High Platform Door Extension Panel"
 }

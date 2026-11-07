@@ -18,6 +18,7 @@
 | PIS 乘客信息屏 | `trdm:pis` | 见 [PIS](pis.md) |
 | 显示屏柱 | `trdm:pis_pole` | 把 PIS 架高的立杆 |
 | 盲道 | `trdm:tactile_paving` | 贴地盲道砖，按四邻自动切换「线 / 点」 |
+| 高站台门延伸板 | `trdm:psd_extension` | 在门楣高度延伸高站台门门楣，转角 / 拐弯后自动换模型 |
 
 ## 放置规则
 
@@ -88,3 +89,17 @@
   - **转角 / 丁字 / 十字 / 单独一格** → 点（交点用点）。
 - 贴图来自素材 `paving_1.png`（线）和 `paving_2.png`（点），复制为
   `assets/trdm/textures/block/paving_line.png` 与 `paving_dot.png`。
+
+## 高站台门延伸板（`trdm:psd_extension`）
+
+- **用途**：放在高站台门门楣的同一高度（门上方第 3 格），把门楣继续往两侧或拐角延伸；
+  和原版楼梯一样，`facing` 取玩家朝向，形状按四邻自动推。
+- **三套现成模型**：
+  - 直线段 → 普通高站台门「无倒角」门楣（`psd_top_left` + `psd_top_right` 拼成整格）；
+  - 转角 → 直角转弯的 L 形门楣（`psd_top_end_square_left/right`）；
+  - 拐弯后的那一段 → 端门门楣（`psd_end_gate_top`，4px 厚、和端门齐平），
+    并会沿着这一段继续传播。
+- **判定**：本格内侧（`facing` 的反方向）接了一块朝向另一条边的延伸板，且左右至少有一块
+  同朝向的直线段 → 转角；左右紧贴着转角板、或已经判成端门门楣的同朝向延伸板 → 端门门楣段；
+  其余 → 直线段。L 形回折边跟在转角内侧那块板的朝向上。
+- 物品模型与直线段共用 `psd_extension_straight`（左右两半合并的整格门楣）。
