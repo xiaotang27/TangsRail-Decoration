@@ -2,6 +2,8 @@ package top.xiaotang27.trdm;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.core.BlockPos;
@@ -11,6 +13,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -49,6 +52,9 @@ public class Trdm implements ModInitializer {
 
     public static final String MOD_ID = "trdm";
     public static final Logger LOGGER = LoggerFactory.getLogger("TangsRail Decoration");
+
+    /** 旧存档门楣 side 迁移队列：区块加载时只入队，服务器 tick 再写方块。 */
+    private static final java.util.Queue<HeaderKey> PENDING_HEADER_FIXES = new java.util.ArrayDeque<>();
 
     // 方块：一套门扇、玻璃、端头玻璃，外加一格门楣
     public static final BlockTrdmPSDDoor PSD_DOOR_1 = new BlockTrdmPSDDoor();
@@ -194,22 +200,42 @@ public class Trdm implements ModInitializer {
      * 旧存档迁移：以前门楣的 {@code SIDE_EXTENDED} 是「左右有门楣就连起来」算的，
      * 所以一整排门/玻璃的门楣 side 都是 left/middle/right，门楣贴图会按整排走。
      * 现在改成 MTR 原版的门/玻璃分组（一扇门用门的 SIDE，一组玻璃用 SIDE_EXTENDED），
-     * 旧存档里的已放置门楣不会自己重算，因此区块加载时按下方方块重算一次。
+     * 旧存档里的已放置门楣不会自己重算，因此区块加载时只把门楣位置入队，
+     * 等服务器 tick（区块完全加载后）再重算 —— 不在 CHUNK_LOAD 里直接写方块，避免加载卡死。
      */
     private static void registerHeaderSideMigration() {
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
             for (final BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-                if (!(blockEntity instanceof BlockTrdmPSDTop.TileEntityTrdmPSDTop)) {
-                    continue;
-                }
-                final BlockPos pos = blockEntity.getBlockPos();
-                final BlockState current = world.getBlockState(pos);
-                final BlockState actual = BlockTrdmPSDTop.getActualState(world, pos);
-                if (actual != current) {
-                    world.setBlock(pos, actual, Block.UPDATE_CLIENTS);
+                if (blockEntity instanceof BlockTrdmPSDTop.TileEntityTrdmPSDTop) {
+                    PENDING_HEADER_FIXES.add(new HeaderKey(world, blockEntity.getBlockPos()));
                 }
             }
         });
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            // 一 tick 最多处理一批，避免进服第一 tick 一次改太多方块。
+            for (int i = 0; i < 256; i++) {
+                final HeaderKey key = PENDING_HEADER_FIXES.poll();
+                if (key == null) {
+                    return;
+                }
+                final ServerLevel level = key.level();
+                if (!level.isLoaded(key.pos())) {
+                    continue;
+                }
+                final BlockState current = level.getBlockState(key.pos());
+                if (!(current.getBlock() instanceof BlockTrdmPSDTop)) {
+                    continue;
+                }
+                final BlockState actual = BlockTrdmPSDTop.getActualState(level, key.pos());
+                if (actual != current) {
+                    level.setBlock(key.pos(), actual, Block.UPDATE_CLIENTS);
+                }
+            }
+        });
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> PENDING_HEADER_FIXES.clear());
+    }
+
+    private record HeaderKey(ServerLevel level, BlockPos pos) {
     }
 
     private static void registerBlock(String path, Block block) {
