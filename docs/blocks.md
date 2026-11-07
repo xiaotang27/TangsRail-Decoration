@@ -17,6 +17,7 @@
 | 悬挂式站外站名牌 | `trdm:hung_big_station_sign` | 同上 |
 | PIS 乘客信息屏 | `trdm:pis` | 见 [PIS](pis.md) |
 | 显示屏柱 | `trdm:pis_pole` | 把 PIS 架高的立杆 |
+| 盲道 | `trdm:tactile_paving` | 贴地盲道砖，按四邻自动切换「线 / 点」 |
 
 ## 放置规则
 
@@ -74,3 +75,16 @@
 - 端门的玻璃和门楣模型比普通玻璃**沿 -x 方向多挪了 2 像素**，用来和端头玻璃的玻璃面接上。
 
 端门的需求与实现约定记在开发文档 `docs_fordev/end-gate-spec.md`。
+
+## 盲道（`trdm:tactile_paving`）
+
+- **贴地贴片**：只有一张贴地的平面（上下两面都画，物品栏里从哪面看都不空），无碰撞、不挡人；
+  要放在完整方块的上表面（顶台阶也行），下面被拆掉时贴片跟着消失。平面比脚下方块顶面高
+  0.25 模型单位（约 1/64 格），避免和 MTR 站台顶面贴花深度打架。
+- **自动连接**：四个正方向各有一个 blockstate 布尔量 `north / east / south / west`，
+  放置或邻格变化时只判断「紧贴着的邻格是不是盲道砖」，再交给 blockstate 选模型：
+  - 一段连续盲道的**两端** → 点（`paving_2`）；
+  - 直线的**中段** → 线（`paving_1`），南北向用原模型，东西向 `y=90`；
+  - **转角 / 丁字 / 十字 / 单独一格** → 点（交点用点）。
+- 贴图来自素材 `paving_1.png`（线）和 `paving_2.png`（点），复制为
+  `assets/trdm/textures/block/paving_line.png` 与 `paving_dot.png`。

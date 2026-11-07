@@ -1,0 +1,18 @@
+{
+  "credit": "盲道·线：贴地平面（上下两面都画），贴图来自素材 paving_1.png。条纹沿 Z 轴；东西向由 blockstate 的 y=90 旋转。抬 0.25 模型单位避免和下方方块顶面/贴花打架。",
+  "ambientocclusion": false,
+  "textures": {
+    "0": "trdm:block/paving_line",
+    "particle": "trdm:block/paving_line"
+  },
+  "elements": [
+    {
+      "from": [0, 0.25, 0],
+      "to": [16, 0.25, 16],
+      "faces": {
+        "up": { "uv": [0, 0, 16, 16], "texture": "#0" },
+        "down": { "uv": [0, 0, 16, 16], "texture": "#0" }
+      }
+    }
+  ]
+}

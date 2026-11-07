@@ -1,0 +1,18 @@
+{
+  "credit": "盲道·点：贴地平面（上下两面都画），贴图来自素材 paving_2.png。抬 0.25 模型单位（约 1/64 格）避免和下方方块顶面/贴花打架。",
+  "ambientocclusion": false,
+  "textures": {
+    "0": "trdm:block/paving_dot",
+    "particle": "trdm:block/paving_dot"
+  },
+  "elements": [
+    {
+      "from": [0, 0.25, 0],
+      "to": [16, 0.25, 16],
+      "faces": {
+        "up": { "uv": [0, 0, 16, 16], "texture": "#0" },
+        "down": { "uv": [0, 0, 16, 16], "texture": "#0" }
+      }
+    }
+  ]
+}

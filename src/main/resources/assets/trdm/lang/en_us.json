@@ -123,5 +123,7 @@
   "gui.trdm.psd_style.on": "On",
   "gui.trdm.psd_style.off": "Off",
   "block.trdm.psd_end_gate": "PSD End Gate",
-  "item.trdm.psd_end_gate": "PSD End Gate"
+  "item.trdm.psd_end_gate": "PSD End Gate",
+  "block.trdm.tactile_paving": "Tactile Paving",
+  "item.trdm.tactile_paving": "Tactile Paving"
 }

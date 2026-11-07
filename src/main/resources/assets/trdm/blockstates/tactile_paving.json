@@ -1,0 +1,53 @@
+{
+  "variants": {
+    "north=false,east=false,south=false,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=false,south=false,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=false,east=true,south=false,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=true,south=false,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=false,east=false,south=true,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=false,south=true,west=false": {
+      "model": "trdm:block/tactile_paving_line"
+    },
+    "north=false,east=true,south=true,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=true,south=true,west=false": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=false,east=false,south=false,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=false,south=false,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=false,east=true,south=false,west=true": {
+      "model": "trdm:block/tactile_paving_line",
+      "y": 90
+    },
+    "north=true,east=true,south=false,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=false,east=false,south=true,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=false,south=true,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=false,east=true,south=true,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    },
+    "north=true,east=true,south=true,west=true": {
+      "model": "trdm:block/tactile_paving_dot"
+    }
+  }
+}

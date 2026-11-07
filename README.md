@@ -27,6 +27,12 @@ Extend the railway facilities for [Minecraft Transit Railway 3.x](https://github
    gradlew.bat build     # Windows
    ./gradlew build       # Linux / macOS
    ```
+## Contributing
+### Adding features
+1. Fork this project
+2. On your fork, create a new branch based on the development version branch
+3. Commit your changes to the new branch
+4. Make a Pull Request to merge your branch into the development version of this repository
 
 ## License
 
