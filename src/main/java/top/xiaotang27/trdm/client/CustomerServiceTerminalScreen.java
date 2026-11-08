@@ -69,8 +69,9 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private void renderHeader(GuiGraphics guiGraphics, float mx, float my) {
+        TicketUi.logo(this, guiGraphics, TicketUi.PANEL_X + 10F, TicketUi.PANEL_Y + 5F, 24F);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.station", stationName),
-                TicketUi.PANEL_X + 12F, TicketUi.PANEL_Y + 10F, FONT_ROW, TicketUi.TEXT_LIGHT);
+                TicketUi.PANEL_X + 74F, TicketUi.PANEL_Y + 10F, FONT_ROW, TicketUi.TEXT_LIGHT);
         if (view != VIEW_HOME) {
             final float x = TicketUi.PANEL_X + TicketUi.PANEL_W - BACK_W - 10F;
             TicketUi.button(this, guiGraphics, x, TicketUi.PANEL_Y + 5F, BACK_W, BACK_H,

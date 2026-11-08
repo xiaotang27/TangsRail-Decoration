@@ -35,6 +35,7 @@ final class TicketUi {
     static final int ROW_HEADER = 0xFFC6C6C6;
 
     static final ResourceLocation EMERALD = new ResourceLocation("minecraft", "textures/item/emerald.png");
+    static final ResourceLocation LOGO = new ResourceLocation("trdm", "textures/gui/logo_wide.png");
 
     private static final String[] KEYS = {
             "1", "2", "3",
@@ -56,10 +57,14 @@ final class TicketUi {
         host.rect(guiGraphics, PANEL_X + 2F, PANEL_Y + 2F, PANEL_W - 4F, PANEL_H - 4F, BG_LIGHT);
         host.rect(guiGraphics, PANEL_X, PANEL_Y, PANEL_W, HEADER_H, HEADER);
         if (brand) {
-            host.textRight(guiGraphics, Component.literal("TangsRail Decoration"),
-                    PANEL_X + PANEL_W - 12F, PANEL_Y + 11F,
-                    TrdmScreenBase.FONT_SUB, TEXT_LIGHT);
+            logo(host, guiGraphics, PANEL_X + PANEL_W - 80F, PANEL_Y + 2F, 30F);
         }
+    }
+
+    /** 设计稿里的 tangsrail Decoration 横版 logo。 */
+    static void logo(TrdmScreenBase host, GuiGraphics guiGraphics, float x, float y, float height) {
+        final float width = height * 610F / 270F;
+        host.image(guiGraphics, LOGO, x, y, width, height);
     }
 
     static void tab(TrdmScreenBase host, GuiGraphics guiGraphics, float x, float y, float w, float h,
