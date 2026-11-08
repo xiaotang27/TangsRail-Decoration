@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.fare.FareMoney;
+import top.xiaotang27.trdm.ticket.PassCatalog;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,13 +40,6 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
 
     private static final Object FIELD_SEARCH = new Object();
 
-    private static final PassRow[] PASSES = {
-            new PassRow("一日票", 10),
-            new PassRow("三日票", 25),
-            new PassRow("青春18券", 50),
-            new PassRow("未命名车票", 2)
-    };
-
     private final String stationName;
     private final long stationId;
     private final BlockPos pos;
@@ -63,6 +57,7 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
     private String transactionTitle = "";
     private long transactionStationId = -1L;
     private boolean transactionByPrice;
+    private String transactionPassId = "";
     private long unitPriceCents = 200L;
     private int quantity = 1;
     private String dialog;
@@ -274,17 +269,17 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
     private void renderPasses(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_passes"),
                 LIST_X, 64F, FONT_ROW, TicketUi.TEXT_DARK);
-        for (int index = 0; index < PASSES.length; index++) {
-            final PassRow pass = PASSES[index];
+        for (int index = 0; index < PassCatalog.ALL.size(); index++) {
+            final PassCatalog.Definition pass = PassCatalog.ALL.get(index);
             final float top = 92F + index * 34F;
             rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, 32F,
                     hit(mx, my, LIST_X, top, LIST_W, 32F) ? TicketUi.ROW_HOVER : TicketUi.ROW);
-            text(guiGraphics, Component.literal(pass.name()), LIST_X + 4F, top + 10F,
+            text(guiGraphics, Component.translatable(pass.nameKey()), LIST_X + 4F, top + 10F,
                     FONT_ROW, TicketUi.TEXT_DARK);
-            textRight(guiGraphics, Component.literal("—"), LIST_X + LIST_W - 4F,
-                    top + 10F, FONT_ROW, TicketUi.TEXT_MUTED);
+            textRight(guiGraphics, Component.literal(FareMoney.yuan(pass.priceEmeralds() * 100L)),
+                    LIST_X + LIST_W - 4F, top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
         }
-        hintDark(guiGraphics, "gui.trdm.ticket.pass.todo", LIST_X, 244F);
+        hintDark(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, 244F);
     }
 
     // ===== 交通卡 =====
@@ -481,7 +476,10 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
                 return true;
             }
             if (hit(mx, my, LIST_X, 400F, 150F, 28F)) {
-                dialog = "ok";
+                if (!purchasePending && !transactionPassId.isEmpty()) {
+                    purchasePending = true;
+                    TicketClientNetwork.buyPass(pos, transactionPassId, quantity);
+                }
                 return true;
             }
             if (hit(mx, my, LIST_X + 164F, 400F, 100F, 28F)) {
@@ -490,11 +488,14 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
             }
             return false;
         }
-        for (int index = 0; index < PASSES.length; index++) {
+        for (int index = 0; index < PassCatalog.ALL.size(); index++) {
             if (hit(mx, my, LIST_X, 92F + index * 34F, LIST_W, 32F)) {
-                dialogMessage = Component.translatable("gui.trdm.ticket.pass.todo");
-                dialog = "ok";
-                transactionOpen = false;
+                final PassCatalog.Definition pass = PassCatalog.ALL.get(index);
+                transactionPassId = pass.id();
+                transactionTitle = Component.translatable(pass.nameKey()).getString();
+                unitPriceCents = pass.priceEmeralds() * 100L;
+                quantity = 1;
+                transactionOpen = true;
                 return true;
             }
         }
@@ -612,8 +613,5 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
     }
 
     private record StationRow(long id, String name, long fareCents) {
-    }
-
-    private record PassRow(String name, int price) {
     }
 }

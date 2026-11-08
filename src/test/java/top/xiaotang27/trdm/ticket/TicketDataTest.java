@@ -103,6 +103,28 @@ class TicketDataTest {
     }
 
     @Test
+    void passLifecycle() {
+        final ItemStack pass = new ItemStack(Items.PAPER);
+        TicketData.issuePass(pass, "day3", 3, station, "minecraft:overworld");
+        assertTrue(TicketData.isPass(pass));
+        assertEquals("day3", TicketData.passDefinition(pass));
+        assertEquals(3, TicketData.passDays(pass));
+        assertFalse(TicketData.passActive(pass));
+        assertEquals(TicketData.State.EMPTY, TicketData.state(pass));
+
+        TicketData.activatePass(pass, java.util.UUID.randomUUID(), "Alice", 1000L, 2000L);
+        assertTrue(TicketData.passActive(pass));
+        assertEquals(1000L, TicketData.passFrom(pass));
+        assertEquals(2000L, TicketData.passUntil(pass));
+        assertEquals("Alice", TicketData.passOwnerName(pass));
+
+        TicketData.enter(pass, station, "minecraft:overworld");
+        assertEquals(TicketData.State.ENTERED, TicketData.state(pass));
+        TicketData.setPassExited(pass);
+        assertEquals(TicketData.State.EXITED, TicketData.state(pass));
+    }
+
+    @Test
     void blankStackHasNoData() {
         assertFalse(TicketData.hasData(new ItemStack(Items.PAPER)));
         assertFalse(TicketData.hasEntry(new ItemStack(Items.PAPER)));

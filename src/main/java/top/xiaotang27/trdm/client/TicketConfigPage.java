@@ -1028,6 +1028,11 @@ final class TicketConfigPage {
         if (host.hit(mx, my, toggleX, ENABLE_TOGGLE_Y, TrdmScreenBase.TOGGLE_W, TrdmScreenBase.TOGGLE_H)) {
             config.enabled = !config.enabled;
             FareRuntime.get().save();
+            final Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(Component.translatable(config.enabled
+                        ? "gui.trdm.ticket.toggle.on" : "gui.trdm.ticket.toggle.off"), false);
+            }
             return true;
         }
 

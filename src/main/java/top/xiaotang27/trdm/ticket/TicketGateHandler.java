@@ -48,8 +48,7 @@ public final class TicketGateHandler {
         } else if (held.is(Trdm.EXIT_TICKET_ITEM)) {
             result = exitTicket(level, player, station, held, entrance);
         } else if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
-            message(player, "gui.trdm.ticket.gate.invalid_ticket");
-            result = TicketSystem.EnumTicketBarrierOpen.CLOSED;
+            result = pass(level, player, station, held, entrance);
         } else {
             message(player, "gui.trdm.ticket.gate.no_ticket");
             result = TicketSystem.EnumTicketBarrierOpen.CLOSED;
@@ -174,6 +173,62 @@ public final class TicketGateHandler {
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
         ticket.shrink(1);
+        message(player, "gui.trdm.ticket.gate.exit_ticket", stationName(station));
+        return TicketSystem.EnumTicketBarrierOpen.OPEN;
+    }
+
+    /** 通票：首次入闸激活并快照有效期；有效期内免费、不限次，仅限本人。 */
+    private static TicketSystem.EnumTicketBarrierOpen pass(ServerLevel level, Player player,
+                                                           Station station, ItemStack pass,
+                                                           boolean entrance) {
+        if (!TicketData.isPass(pass)) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        final long now = System.currentTimeMillis();
+        if (!TicketData.passActive(pass)) {
+            if (!entrance) {
+                message(player, "gui.trdm.ticket.gate.invalid_ticket");
+                return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+            }
+            final PassCatalog.Definition definition = PassCatalog.byId(TicketData.passDefinition(pass));
+            if (definition == null) {
+                message(player, "gui.trdm.ticket.gate.invalid_ticket");
+                return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+            }
+            final long[] window = PassValidity.window(definition.days(), now);
+            TicketData.activatePass(pass, player.getUUID(), player.getGameProfile().getName(),
+                    window[0], window[1]);
+            TicketData.enter(pass, station, ServerFareRuntime.dimensionId(level));
+            message(player, "gui.trdm.ticket.gate.pass_activated",
+                    Component.translatable(definition.nameKey()), PassValidity.format(window[1]));
+            return TicketSystem.EnumTicketBarrierOpen.OPEN;
+        }
+        if (PassValidity.expired(TicketData.passUntil(pass), now)) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        final String owner = TicketData.passOwner(pass);
+        if (owner.isEmpty()) {
+            TicketData.bindPassOwner(pass, player.getUUID(), player.getGameProfile().getName());
+        } else if (!owner.equals(player.getUUID().toString())) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        if (entrance) {
+            if (TicketData.state(pass) == TicketData.State.ENTERED) {
+                message(player, "gui.trdm.ticket.gate.invalid_ticket");
+                return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+            }
+            TicketData.enter(pass, station, ServerFareRuntime.dimensionId(level));
+            message(player, "gui.trdm.ticket.gate.entry_ticket", stationName(station));
+            return TicketSystem.EnumTicketBarrierOpen.OPEN;
+        }
+        if (TicketData.state(pass) != TicketData.State.ENTERED) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        TicketData.setPassExited(pass);
         message(player, "gui.trdm.ticket.gate.exit_ticket", stationName(station));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }

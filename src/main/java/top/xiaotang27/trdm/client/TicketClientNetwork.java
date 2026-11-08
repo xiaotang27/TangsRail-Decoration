@@ -47,6 +47,14 @@ public final class TicketClientNetwork {
         ClientPlayNetworking.send(TicketNetwork.BUY_CARD, buf);
     }
 
+    public static void buyPass(BlockPos pos, String definitionId, int quantity) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        buf.writeUtf(definitionId, 64);
+        buf.writeVarInt(quantity);
+        ClientPlayNetworking.send(TicketNetwork.BUY_PASS, buf);
+    }
+
     public static void topUp(BlockPos pos, int amountEmeralds) {
         final FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBlockPos(pos);

@@ -21,6 +21,9 @@ public final class TicketNetwork {
     /** C2S：BlockPos + 充值金额（绿宝石），要求主手持交通卡。 */
     public static final ResourceLocation TOPUP = Trdm.id("ticket_topup");
 
+    /** C2S：BlockPos + 通票定义 ID + 数量。 */
+    public static final ResourceLocation BUY_PASS = Trdm.id("ticket_buy_pass");
+
     /** C2S：BlockPos（客服终端），按主手车票/交通卡补车费。 */
     public static final ResourceLocation PAY_FARE = Trdm.id("ticket_pay_fare");
 
@@ -58,6 +61,12 @@ public final class TicketNetwork {
             final BlockPos pos = buf.readBlockPos();
             final int amount = buf.readVarInt();
             server.execute(() -> send(player, TicketPurchase.topUpCard(player, pos, amount)));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(BUY_PASS, (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final String definitionId = buf.readUtf(64);
+            final int quantity = buf.readVarInt();
+            server.execute(() -> send(player, TicketPurchase.buyPass(player, pos, definitionId, quantity)));
         });
         ServerPlayNetworking.registerGlobalReceiver(PAY_FARE, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();

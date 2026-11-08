@@ -60,6 +60,29 @@ public final class TicketTooltips {
         tooltip.add(Component.translatable("item.trdm.exit_ticket.tooltip.usage"));
     }
 
+    public static void pass(ItemStack stack, List<Component> tooltip) {
+        if (!TicketData.isPass(stack)) {
+            tooltip.add(Component.translatable("item.trdm.pass.tooltip.invalid"));
+            return;
+        }
+        if (!TicketData.passActive(stack)) {
+            tooltip.add(Component.translatable("item.trdm.pass.tooltip.inactive"));
+        } else {
+            if (PassValidity.expired(TicketData.passUntil(stack), System.currentTimeMillis())) {
+                tooltip.add(Component.translatable("item.trdm.pass.tooltip.expired"));
+            } else {
+                tooltip.add(Component.translatable("item.trdm.pass.tooltip.valid_until",
+                        PassValidity.format(TicketData.passUntil(stack))));
+            }
+            final String owner = TicketData.passOwnerName(stack);
+            if (!owner.isEmpty()) {
+                tooltip.add(Component.translatable("item.trdm.pass.tooltip.owner", owner));
+            }
+            tooltip.add(stateLine(stack));
+        }
+        tooltip.add(Component.translatable("item.trdm.pass.tooltip.usage"));
+    }
+
     private static String formatTime(long epochMillis) {
         return java.time.Instant.ofEpochMilli(epochMillis)
                 .atZone(java.time.ZoneId.systemDefault())

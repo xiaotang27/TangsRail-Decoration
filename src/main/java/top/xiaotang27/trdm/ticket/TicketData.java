@@ -22,6 +22,8 @@ public final class TicketData {
     public static final String TYPE_CARD = "card";
     /** 无票补票后发的“出站票”：只能在一个指定车站出站一次。 */
     public static final String TYPE_EXIT = "exit";
+    /** 通票（可变车票）：由 {@link PassCatalog} 的定义决定有效期和售价。 */
+    public static final String TYPE_PASS = "pass";
 
     public enum State {
         /** 未使用。 */
@@ -61,6 +63,13 @@ public final class TicketData {
     private static final String KEY_EXIT_NAME = "exit_name";
     private static final String KEY_EXIT_DIM = "exit_dim";
     private static final String KEY_EXIT_EXPIRES = "exit_expires";
+    private static final String KEY_PASS_DEF = "pass_def";
+    private static final String KEY_PASS_DAYS = "pass_days";
+    private static final String KEY_PASS_OWNER = "pass_owner";
+    private static final String KEY_PASS_OWNER_NAME = "pass_owner_name";
+    private static final String KEY_PASS_ACTIVE = "pass_active";
+    private static final String KEY_PASS_FROM = "pass_from";
+    private static final String KEY_PASS_UNTIL = "pass_until";
 
     private TicketData() {
     }
@@ -102,6 +111,21 @@ public final class TicketData {
         root.putString(KEY_EXIT_DIM, dimension == null ? "" : dimension);
         root.putLong(KEY_EXIT_EXPIRES, expiresAt);
         root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
+        commit(stack, root);
+    }
+
+    /** 发售一张未激活通票。 */
+    public static void issuePass(ItemStack stack, String definitionId, int days,
+                                 Station sold, String soldDimension) {
+        final CompoundTag root = new CompoundTag();
+        root.putString(KEY_SERIAL, UUID.randomUUID().toString());
+        root.putString(KEY_TYPE, TYPE_PASS);
+        root.putString(KEY_PASS_DEF, definitionId == null ? "" : definitionId);
+        root.putInt(KEY_PASS_DAYS, Math.max(1, days));
+        root.putBoolean(KEY_PASS_ACTIVE, false);
+        root.putString(KEY_STATE, State.EMPTY.name());
+        root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
+        putSold(root, sold, soldDimension);
         commit(stack, root);
     }
 
@@ -246,6 +270,70 @@ public final class TicketData {
     public static long exitExpires(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? 0L : root.getLong(KEY_EXIT_EXPIRES);
+    }
+
+    public static boolean isPass(ItemStack stack) {
+        return hasData(stack) && TYPE_PASS.equals(type(stack));
+    }
+
+    public static String passDefinition(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_PASS_DEF);
+    }
+
+    public static int passDays(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0 : root.getInt(KEY_PASS_DAYS);
+    }
+
+    public static boolean passActive(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root != null && root.getBoolean(KEY_PASS_ACTIVE);
+    }
+
+    public static String passOwner(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_PASS_OWNER);
+    }
+
+    public static String passOwnerName(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_PASS_OWNER_NAME);
+    }
+
+    public static long passFrom(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_PASS_FROM);
+    }
+
+    public static long passUntil(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_PASS_UNTIL);
+    }
+
+    /** 首次入闸：写入绑定玩家和有效期。 */
+    public static void activatePass(ItemStack stack, UUID owner, String ownerName, long from, long until) {
+        final CompoundTag root = copyRoot(stack);
+        root.putBoolean(KEY_PASS_ACTIVE, true);
+        root.putString(KEY_PASS_OWNER, owner == null ? "" : owner.toString());
+        root.putString(KEY_PASS_OWNER_NAME, ownerName == null ? "" : ownerName);
+        root.putLong(KEY_PASS_FROM, from);
+        root.putLong(KEY_PASS_UNTIL, until);
+        commit(stack, root);
+    }
+
+    /** 已激活但缺绑定玩家的旧数据：补写绑定。 */
+    public static void bindPassOwner(ItemStack stack, UUID owner, String ownerName) {
+        final CompoundTag root = copyRoot(stack);
+        root.putString(KEY_PASS_OWNER, owner == null ? "" : owner.toString());
+        root.putString(KEY_PASS_OWNER_NAME, ownerName == null ? "" : ownerName);
+        commit(stack, root);
+    }
+
+    public static void setPassExited(ItemStack stack) {
+        final CompoundTag root = copyRoot(stack);
+        root.putString(KEY_STATE, State.EXITED.name());
+        commit(stack, root);
     }
 
     // ===== 改 =====

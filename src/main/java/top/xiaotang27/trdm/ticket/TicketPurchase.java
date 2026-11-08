@@ -196,6 +196,37 @@ public final class TicketPurchase {
         return new Result(true, "gui.trdm.ticket.fare.paid", emeralds);
     }
 
+    // ===== 通票 =====
+
+    public static Result buyPass(ServerPlayer player, BlockPos pos, String definitionId, int quantity) {
+        final ServerLevel level = player.serverLevel();
+        final Result invalid = validate(player, pos, Trdm.TICKET_VENDING_MACHINE, Trdm.CUSTOMER_SERVICE_TERMINAL);
+        if (invalid != null) {
+            return invalid;
+        }
+        final Station station = ServerFareRuntime.stationAt(level, pos);
+        if (station == null) {
+            return error("gui.trdm.ticket.error.no_station");
+        }
+        final PassCatalog.Definition definition = PassCatalog.byId(definitionId);
+        if (definition == null) {
+            return error("gui.trdm.ticket.error.unknown_pass");
+        }
+        final int count = Math.max(1, Math.min(64, quantity));
+        final long cost = (long) definition.priceEmeralds() * count;
+        if (!takeEmeralds(player, cost)) {
+            return new Result(false, "gui.trdm.ticket.error.no_emerald", cost);
+        }
+        final String dimension = ServerFareRuntime.dimensionId(level);
+        for (int index = 0; index < count; index++) {
+            final ItemStack pass = new ItemStack(Trdm.VARIABLE_TICKET_ITEM);
+            TicketData.issuePass(pass, definition.id(), definition.days(), station, dimension);
+            give(player, pass);
+        }
+        TicketSync.sync(player);
+        return new Result(true, "gui.trdm.ticket.buy.pass_success", count);
+    }
+
     // ===== 补出入记录 / 无票出站票 =====
 
     public static Result recordEntry(ServerPlayer player, BlockPos pos, long entryStationId) {
