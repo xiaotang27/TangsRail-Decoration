@@ -95,6 +95,15 @@ java {
     }
 }
 
+// Loom 的 runClient / runServer 默认跟随 Gradle 守护进程的 JVM。Gradle 还跑在 17 上时，
+// 开发实例会拿 17 启动、被 fabric.mod.json 的 java >=21 拒绝；这里显式钉到 21。
+def java21Launcher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+tasks.matching { it.name == "runClient" || it.name == "runServer" }.configureEach {
+    it.javaLauncher = java21Launcher
+}
+
 // 一次性工具：重新生成站点信息吊板的箭头素材（assets/trdm/textures/block/sign/arrow.png）。
 // 生成后可以直接用同尺寸 PNG 覆盖，渲染端把它当黑色剪影蒙版用。
 tasks.register('generateArrowAsset', JavaExec) {
