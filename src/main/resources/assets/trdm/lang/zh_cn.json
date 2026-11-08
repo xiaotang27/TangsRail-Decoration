@@ -116,6 +116,7 @@
   "gui.trdm.ticket.no_permission2": "只有服务器管理员才能编辑票务系统设置。",
   "gui.trdm.ticket.no_permission3": "请联系服务器管理员修改或授予您操作员权限。",
   "gui.trdm.ticket.need_world": "进入世界后可用",
+  "gui.trdm.ticket.no_line_data": "无线路数据。",
   "block.trdm.ticket_vending_machine": "售票机",
   "block.trdm.customer_service_terminal": "客服终端",
   "item.trdm.single_ticket": "单程票",

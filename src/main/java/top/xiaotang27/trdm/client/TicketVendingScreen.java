@@ -37,13 +37,6 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private static final Object FIELD_SEARCH = new Object();
 
-    private static final String[][] SAMPLE_GROUPS = {
-            {"1号线|Line 1", "刘园|LIUYUAN", "名字|MINGZI", "车站|CHEZHAN", "双桥河|SHUANGQIAOHE"},
-            {"2号线|Line 2", "梅江会展中心|MEIJIANG", "文化中心|WENHUA", "天塔|TIANTA", "天泰路|TIANTAILU"},
-            {"3号线|Line 3", "西站|XIZHAN", "红旗南路|HONGQINANLU", "解放南路|JIEFANGNANLU", "迎风道|YINGFENGDAO"},
-            {"6号线|Line 6", "金钟河大街|JINZHONGHE", "金钟街|JINZHONGJIE", "民权门|MINQUANMEN", "北宁公园|BEINING"}
-    };
-
     private static final PassRow[] PASSES = {
             new PassRow("一日票", 10),
             new PassRow("三日票", 25),
@@ -99,15 +92,6 @@ public class TicketVendingScreen extends TrdmScreenBase {
             if (!names.isEmpty()) {
                 groups.add(new LineGroup(route.name == null ? "?" : route.name,
                         rowsOf(names, groupIndex)));
-            }
-        }
-        if (groups.isEmpty()) {
-            for (int groupIndex = 0; groupIndex < SAMPLE_GROUPS.length; groupIndex++) {
-                final LinkedHashSet<String> names = new LinkedHashSet<>();
-                for (int index = 1; index < SAMPLE_GROUPS[groupIndex].length; index++) {
-                    names.add(SAMPLE_GROUPS[groupIndex][index]);
-                }
-                groups.add(new LineGroup(SAMPLE_GROUPS[groupIndex][0], rowsOf(names, groupIndex)));
             }
         }
     }
@@ -176,6 +160,12 @@ public class TicketVendingScreen extends TrdmScreenBase {
         }
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_stations"),
                 LIST_X, 96F, FONT_ROW, TicketUi.TEXT_DARK);
+
+        if (groups.isEmpty()) {
+            text(guiGraphics, Component.translatable("gui.trdm.ticket.no_line_data"),
+                    LIST_X, LIST_TOP + 4F, FONT_ROW, TicketUi.TEXT_MUTED);
+            return;
+        }
 
         final List<LineGroup> visible = visibleGroups();
         final float total = totalHeight(visible);

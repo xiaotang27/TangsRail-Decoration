@@ -64,14 +64,6 @@ final class TicketConfigPage {
     private static final int SELECT_RULE = 1;
     private static final int SELECT_TEMPLATE = 2;
 
-    private static final String[] SAMPLE_LINES = {
-            "1号线|Line 1",
-            "2号线|Line 2",
-            "3号线|Line 3",
-            "九广东铁|Kowloon Canton Railway",
-            "现代有轨电车|Modern Tram"
-    };
-
     private final TrdmScreenBase host;
 
     private final List<String> lines = new ArrayList<>();
@@ -112,13 +104,7 @@ final class TicketConfigPage {
             }
         }
         real.sort(String.CASE_INSENSITIVE_ORDER);
-
-        final boolean sample = real.isEmpty();
-        if (sample) {
-            lines.addAll(List.of(SAMPLE_LINES));
-        } else {
-            lines.addAll(real);
-        }
+        lines.addAll(real);
 
         rules.add(new RuleRow("按里程分段计费"));
         rules.add(new RuleRow("按区间分段计费"));
@@ -128,13 +114,6 @@ final class TicketConfigPage {
         templates.add(new TemplateRow("三日票"));
         templates.add(new TemplateRow("青春18券"));
         templates.add(new TemplateRow("未命名车票"));
-
-        if (sample) {
-            lineOwner.put(lines.get(0), 0);
-            lineOwner.put(lines.get(1), 0);
-            lineOwner.put(lines.get(2), 1);
-            lineOwner.put(lines.get(3), 2);
-        }
 
         templates.get(1).rules.add(0);
         templates.get(1).rules.add(1);
@@ -200,9 +179,15 @@ final class TicketConfigPage {
         host.toggle(guiGraphics, toggleX, ENABLE_TOGGLE_Y, enabled);
 
         host.section(guiGraphics, "gui.trdm.ticket.rules", RULES_SECTION_Y);
-        host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
-                TrdmScreenBase.CONTENT_RIGHT, RULES_SECTION_Y + 5F,
-                TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        if (lines.isEmpty()) {
+            host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.no_line_data"),
+                    TrdmScreenBase.CONTENT_RIGHT, RULES_SECTION_Y + 5F,
+                    TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_WARN);
+        } else {
+            host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
+                    TrdmScreenBase.CONTENT_RIGHT, RULES_SECTION_Y + 5F,
+                    TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        }
 
         renderRuleRow(guiGraphics, -1, 0, mx, my);
         for (int index = 0; index < rules.size(); index++) {

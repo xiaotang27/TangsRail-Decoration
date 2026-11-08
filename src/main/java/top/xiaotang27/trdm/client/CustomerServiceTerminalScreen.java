@@ -45,12 +45,6 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private static final Object FIELD_STATION = new Object();
 
-    private static final String[][] SAMPLE_STATION_GROUPS = {
-            {"1号线|Line 1", "刘园|LIUYUAN", "名字|MINGZI", "车站|CHEZHAN", "双桥河|SHUANGQIAOHE"},
-            {"2号线|Line 2", "梅江会展中心|MEIJIANG", "文化中心|WENHUA", "天塔|TIANTA", "天泰路|TIANTAILU"},
-            {"3号线|Line 3", "西站|XIZHAN", "红旗南路|HONGQINANLU", "解放南路|JIEFANGNANLU", "迎风道|YINGFENGDAO"}
-    };
-
     private final String stationName;
     private final BlockPos pos;
 
@@ -96,16 +90,6 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             }
             if (!names.isEmpty()) {
                 stationGroups.add(new LineGroup(route.name == null ? "?" : route.name,
-                        rowsOf(names, groupIndex)));
-            }
-        }
-        if (stationGroups.isEmpty()) {
-            for (int groupIndex = 0; groupIndex < SAMPLE_STATION_GROUPS.length; groupIndex++) {
-                final LinkedHashSet<String> names = new LinkedHashSet<>();
-                for (int index = 1; index < SAMPLE_STATION_GROUPS[groupIndex].length; index++) {
-                    names.add(SAMPLE_STATION_GROUPS[groupIndex][index]);
-                }
-                stationGroups.add(new LineGroup(SAMPLE_STATION_GROUPS[groupIndex][0],
                         rowsOf(names, groupIndex)));
             }
         }
@@ -219,6 +203,12 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         }
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_stations"),
                 TicketUi.PANEL_X + 20F, 130F, FONT_ROW, TicketUi.TEXT_DARK);
+
+        if (stationGroups.isEmpty()) {
+            text(guiGraphics, Component.translatable("gui.trdm.ticket.no_line_data"),
+                    TicketUi.PANEL_X + 20F, 154F + 4F, FONT_ROW, TicketUi.TEXT_MUTED);
+            return;
+        }
 
         final List<LineGroup> visible = visibleStationGroups();
         final float total = stationTotalHeight(visible);

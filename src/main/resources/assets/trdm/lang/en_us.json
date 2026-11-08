@@ -148,6 +148,7 @@
   "gui.trdm.ticket.no_permission2": "Only server administrators can edit ticketing settings.",
   "gui.trdm.ticket.no_permission3": "Ask an administrator to change it or grant you operator permissions.",
   "gui.trdm.ticket.need_world": "Available after entering a world",
+  "gui.trdm.ticket.no_line_data": "No line data.",
   "block.trdm.ticket_vending_machine": "Ticket vending machine",
   "block.trdm.customer_service_terminal": "Customer service terminal",
   "item.trdm.single_ticket": "Single ticket",
