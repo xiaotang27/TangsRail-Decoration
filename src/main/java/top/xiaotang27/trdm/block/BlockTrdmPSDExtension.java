@@ -1,5 +1,8 @@
 package top.xiaotang27.trdm.block;
 
+import mtr.block.BlockPSDAPGBase;
+import mtr.block.BlockPSDAPGDoorBase;
+import mtr.block.BlockPSDTop;
 import mtr.block.IBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -25,6 +28,10 @@ import top.xiaotang27.trdm.Trdm;
  * <ul>
  *     <li>{@link EnumShape#STRAIGHT}：直线段，用普通高站台门「无倒角」门楣
  *         （{@code psd_top_left} + {@code psd_top_right} 左右两半拼成整格）；</li>
+ * </ul>
+ * 直线段的竖向接缝跟下方门 / 合并玻璃 / 门楣自己走：一扇门、一组用刷子合并的玻璃内部无缝，
+ * 只在一组玻璃的两端、玻璃和滑动门之间用带边线的半模型（和普通门楣的 MTR 原版规则一致）。
+ * <ul>
  *     <li>{@link EnumShape#CORNER_LEFT} / {@link EnumShape#CORNER_RIGHT}：转角，用直角转弯的 L 形门楣
  *         （{@code psd_top_end_square_left/right}）；</li>
  *     <li>{@link EnumShape#END_WALL}：转过弯后的那一段，用端门门楣（{@code psd_end_gate_top}，
@@ -48,6 +55,12 @@ public class BlockTrdmPSDExtension extends Block {
     /** 这一段用哪套门楣模型，见类注释。 */
     public static final EnumProperty<EnumShape> SHAPE = EnumProperty.create("shape", EnumShape.class);
 
+    /**
+     * 直线段的竖向接缝侧别，跟下方门 / 合并玻璃 / 门楣分组走（MTR 原版门楣同一套规则）：
+     * {@code left}/{@code right} 只在一侧压边，{@code middle} 两侧无缝，{@code single} 两侧压边。
+     */
+    public static final EnumProperty<IBlock.EnumSide> SIDE = IBlock.SIDE_EXTENDED;
+
     /** 普通门楣 / 转角门楣按 6px 厚做选中框；端门门楣 4px。 */
     private static final int STRAIGHT_THICKNESS = 6;
     private static final int END_WALL_THICKNESS = 4;
@@ -56,26 +69,28 @@ public class BlockTrdmPSDExtension extends Block {
         super(Properties.of().requiresCorrectToolForDrops().strength(2).noOcclusion());
         registerDefaultState(defaultBlockState()
                 .setValue(FACING, Direction.NORTH)
-                .setValue(SHAPE, EnumShape.STRAIGHT));
+                .setValue(SHAPE, EnumShape.STRAIGHT)
+                .setValue(SIDE, IBlock.EnumSide.MIDDLE));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, SHAPE);
+        builder.add(FACING, SHAPE, SIDE);
     }
 
-    /** 和楼梯一样：朝向取玩家水平朝向，形状按放置时四周的延伸板自动推。 */
+    /** 和楼梯一样：朝向取玩家水平朝向，形状按放置时四周的延伸板自动推；接缝侧别看下方门/玻璃分组。 */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        final BlockState state = defaultBlockState().setValue(FACING, context.getHorizontalDirection());
+        BlockState state = defaultBlockState().setValue(FACING, context.getHorizontalDirection());
+        state = withSide(state, context.getLevel(), context.getClickedPos());
         return withShape(state, context.getLevel(), context.getClickedPos());
     }
 
-    /** 任意邻格变化都重推形状；端门门楣段会顺着同朝向的段继续传播。 */
+    /** 任意邻格变化都重推形状；接缝侧别跟着下方门/玻璃/门楣的分组一起更新。 */
     @Override
     public BlockState updateShape(BlockState state, Direction direction, BlockState neighborState,
                                   LevelAccessor level, BlockPos pos, BlockPos neighborPos) {
-        return withShape(state, level, pos);
+        return withShape(withSide(state, level, pos), level, pos);
     }
 
     @Override
@@ -91,6 +106,38 @@ public class BlockTrdmPSDExtension extends Block {
 
     private static BlockState withShape(BlockState state, BlockGetter level, BlockPos pos) {
         return state.setValue(SHAPE, computeShape(level, pos, state.getValue(FACING)));
+    }
+
+    private static BlockState withSide(BlockState state, BlockGetter level, BlockPos pos) {
+        return state.setValue(SIDE, computeSide(level, pos));
+    }
+
+    /**
+     * 接缝侧别只看下方那格：
+     * 门 → 门的 SIDE（一扇门 2 格，左右各一条外缘）；
+     * 玻璃 / 端头玻璃 / 端门 → 玻璃的 SIDE_EXTENDED（一组用刷子合并的玻璃，左右/中间）；
+     * 普通门楣 / 延伸板 → 它们自己的 side（延伸板叠在门楣上时可继承同一组接缝）；
+     * 其它（空气、站台地面）→ middle，整格无缝。
+     */
+    private static IBlock.EnumSide computeSide(BlockGetter level, BlockPos pos) {
+        final BlockState below = level.getBlockState(pos.below());
+        final Block block = below.getBlock();
+        if (block instanceof BlockPSDAPGDoorBase) {
+            return IBlock.getStatePropertySafe(below, BlockPSDAPGDoorBase.SIDE);
+        }
+        if (block instanceof BlockPSDAPGBase) {
+            return IBlock.getStatePropertySafe(below, IBlock.SIDE_EXTENDED);
+        }
+        if (block instanceof BlockTrdmPSDTop) {
+            return IBlock.getStatePropertySafe(below, IBlock.SIDE_EXTENDED);
+        }
+        if (block instanceof BlockPSDTop) {
+            return IBlock.getStatePropertySafe(below, IBlock.SIDE_EXTENDED);
+        }
+        if (block instanceof BlockTrdmPSDExtension) {
+            return IBlock.getStatePropertySafe(below, SIDE);
+        }
+        return IBlock.EnumSide.MIDDLE;
     }
 
     /**
