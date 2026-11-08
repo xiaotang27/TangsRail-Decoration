@@ -58,6 +58,13 @@ public final class TicketData {
     private static final String KEY_LAST_EXIT_NAME = "last_exit_name";
     private static final String KEY_LAST_EXIT_DIM = "last_exit_dim";
     private static final String KEY_LAST_EXIT_TIME = "last_exit_time";
+    private static final String KEY_LAST_EXIT_ZONE = "last_exit_zone";
+    private static final String KEY_LAST_EXIT_PAID = "last_exit_paid";
+    private static final String KEY_JOURNEY_ENTRY_STATION = "journey_entry_station";
+    private static final String KEY_JOURNEY_ENTRY_NAME = "journey_entry_name";
+    private static final String KEY_JOURNEY_ENTRY_DIM = "journey_entry_dim";
+    private static final String KEY_JOURNEY_PAID = "journey_paid";
+    private static final String KEY_JOURNEY_CONTINUING = "journey_continuing";
     private static final String KEY_TX = "tx";
     private static final String KEY_EXIT_STATION = "exit_station";
     private static final String KEY_EXIT_NAME = "exit_name";
@@ -139,15 +146,38 @@ public final class TicketData {
     }
 
     /** 交通卡出站：写 lastExit、扣费记录、切到 {@link State#EXITED}。 */
-    public static void markExit(ItemStack stack, Station exit, String dimension, long fareCents) {
+    public static void markExit(ItemStack stack, Station exit, String dimension, long fareCents,
+                                long chargedCents, long gameTime) {
         final CompoundTag root = copyRoot(stack);
         final long now = System.currentTimeMillis();
         root.putString(KEY_STATE, State.EXITED.name());
         root.putLong(KEY_LAST_EXIT_STATION, exit.id);
         root.putString(KEY_LAST_EXIT_NAME, stationName(exit));
         root.putString(KEY_LAST_EXIT_DIM, dimension);
-        root.putLong(KEY_LAST_EXIT_TIME, now);
-        addTx(root, now, "fare", -Math.abs(fareCents), root.getLong(KEY_BALANCE));
+        root.putLong(KEY_LAST_EXIT_TIME, gameTime);
+        root.putInt(KEY_LAST_EXIT_ZONE, exit.zone);
+        root.putLong(KEY_LAST_EXIT_PAID, Math.max(0L, fareCents));
+        addTx(root, now, "fare", -chargedCents, root.getLong(KEY_BALANCE));
+        commit(stack, root);
+    }
+
+    /** 开始一段普通行程：journey 指向本次入站，已付 0，非连续。 */
+    public static void startJourney(ItemStack stack, Station station, String dimension) {
+        final CompoundTag root = copyRoot(stack);
+        root.putLong(KEY_JOURNEY_ENTRY_STATION, station.id);
+        root.putString(KEY_JOURNEY_ENTRY_NAME, stationName(station));
+        root.putString(KEY_JOURNEY_ENTRY_DIM, dimension == null ? "" : dimension);
+        root.putLong(KEY_JOURNEY_PAID, 0L);
+        root.putBoolean(KEY_JOURNEY_CONTINUING, false);
+        applyEntry(root, station, dimension, System.currentTimeMillis());
+        commit(stack, root);
+    }
+
+    /** 连续行程：保留原始入站和已付金额，只切回 ENTERED。 */
+    public static void continueJourney(ItemStack stack) {
+        final CompoundTag root = copyRoot(stack);
+        root.putBoolean(KEY_JOURNEY_CONTINUING, true);
+        root.putString(KEY_STATE, State.ENTERED.name());
         commit(stack, root);
     }
 
@@ -246,6 +276,63 @@ public final class TicketData {
     public static String lastExitName(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? "" : root.getString(KEY_LAST_EXIT_NAME);
+    }
+
+    public static long lastExitStation(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_LAST_EXIT_STATION);
+    }
+
+    public static String lastExitDimension(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_LAST_EXIT_DIM);
+    }
+
+    /** 上次出站时的游戏时间（tick），用于 10 分钟连续计费窗口。 */
+    public static long lastExitTime(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_LAST_EXIT_TIME);
+    }
+
+    public static int lastExitZone(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0 : root.getInt(KEY_LAST_EXIT_ZONE);
+    }
+
+    public static long lastExitPaid(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_LAST_EXIT_PAID);
+    }
+
+    public static long journeyEntryStation(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_JOURNEY_ENTRY_STATION);
+    }
+
+    public static String journeyEntryName(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_JOURNEY_ENTRY_NAME);
+    }
+
+    public static String journeyEntryDimension(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_JOURNEY_ENTRY_DIM);
+    }
+
+    public static long journeyPaid(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : Math.max(0L, root.getLong(KEY_JOURNEY_PAID));
+    }
+
+    public static boolean journeyContinuing(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root != null && root.getBoolean(KEY_JOURNEY_CONTINUING);
+    }
+
+    public static void setJourneyPaid(ItemStack stack, long cents) {
+        final CompoundTag root = copyRoot(stack);
+        root.putLong(KEY_JOURNEY_PAID, Math.max(0L, cents));
+        commit(stack, root);
     }
 
     public static boolean isExitTicket(ItemStack stack) {

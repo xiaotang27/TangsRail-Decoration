@@ -1361,13 +1361,9 @@ final class TicketConfigPage {
         return Minecraft.getInstance().player != null;
     }
 
-    /** 服务端快照接入前先用客户端可见信息做 UX 判断；真正的权限以服务端为准。 */
+    /** 权限以服务端下发的快照为准（未同步时退回客户端近似判断）。 */
     private boolean canEdit() {
-        final Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.getSingleplayerServer() != null) {
-            return true;
-        }
-        return minecraft.player != null && minecraft.player.hasPermissions(2);
+        return FareRuntime.get().canEdit();
     }
 
     private String ellipsize(String text, float maxWidth, float fontPx) {

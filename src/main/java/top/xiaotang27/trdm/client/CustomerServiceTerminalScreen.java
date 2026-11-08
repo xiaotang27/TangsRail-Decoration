@@ -520,16 +520,22 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
             showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
             return;
         }
-        if (!TicketData.entryDimension(held).equals(FareRuntime.dimensionId())) {
+        final boolean card = held.is(Trdm.TRANSIT_CARD_ITEM);
+        final boolean continuous = card && TicketData.journeyContinuing(held);
+        final String entryDimension = continuous
+                ? TicketData.journeyEntryDimension(held) : TicketData.entryDimension(held);
+        if (!entryDimension.equals(FareRuntime.dimensionId())) {
             showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
             return;
         }
-        final boolean card = held.is(Trdm.TRANSIT_CARD_ITEM);
-        final long fare = FareRuntime.get().quote(TicketData.entryStation(held), stationId).totalCents();
+        final long origin = continuous
+                ? TicketData.journeyEntryStation(held) : TicketData.entryStation(held);
+        final long paid = continuous ? TicketData.journeyPaid(held) : 0L;
+        final long fare = FareRuntime.get().quote(origin, stationId).totalCents();
         final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
-        final long due = Math.max(0L, fare - value);
+        final long due = Math.max(0L, fare - paid - value);
         infoAction = ACTION_PAY_FARE;
-        infoStationId = TicketData.entryStation(held);
+        infoStationId = origin;
         infoTitle = Component.translatable("gui.trdm.terminal.fare").getString();
         infoLines.clear();
         final String soldName = TicketData.soldName(held);
@@ -541,6 +547,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         infoLines.add(card
                 ? Component.translatable("gui.trdm.terminal.card_balance", FareMoney.yuan(value)).getString()
                 : Component.translatable("gui.trdm.terminal.ticket_amount", FareMoney.text(value)).getString());
+        if (paid > 0L) {
+            infoLines.add(Component.translatable("gui.trdm.terminal.paid_line",
+                    FareMoney.text(paid)).getString());
+        }
         infoLines.add(Component.translatable("gui.trdm.terminal.fare_due",
                 FareMoney.text(fare)).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.extra",
@@ -592,7 +602,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                 showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
                 return true;
             }
-            if (!TicketData.entryDimension(held).equals(FareRuntime.dimensionId())) {
+            final boolean continuous = held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.journeyContinuing(held);
+            final String entryDimension = continuous
+                    ? TicketData.journeyEntryDimension(held) : TicketData.entryDimension(held);
+            if (!entryDimension.equals(FareRuntime.dimensionId())) {
                 showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
                 return true;
             }
@@ -608,7 +621,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         stationQuery = "";
         stationScroll = 0F;
         final ItemStack held = heldItem();
-        repriceStationGroups(mode == RECORD_EXIT ? TicketData.entryStation(held) : 0L, mode == RECORD_EXIT);
+        repriceStationGroups(mode == RECORD_EXIT ? recordOrigin(held) : 0L, mode == RECORD_EXIT);
+    }
+
+    /** 连续计费时从原始入闸站算票价，否则从本次入闸站算。 */
+    private static long recordOrigin(ItemStack held) {
+        if (held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.journeyContinuing(held)) {
+            return TicketData.journeyEntryStation(held);
+        }
+        return TicketData.entryStation(held);
     }
 
     /** 按“入闸站 → 该站”的票价重算列表；补入站记录不需要票价。 */
@@ -687,9 +708,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
             return;
         }
         final boolean card = held.is(Trdm.TRANSIT_CARD_ITEM);
+        final boolean continuous = card && TicketData.journeyContinuing(held);
+        final long paid = continuous ? TicketData.journeyPaid(held) : 0L;
         final long fare = row.fareCents();
         final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
-        final long due = Math.max(0L, fare - value);
+        final long due = Math.max(0L, fare - paid - value);
         infoAction = ACTION_RECORD_EXIT;
         infoStationId = row.id();
         infoTitle = Component.translatable("gui.trdm.terminal.exit_record").getString();
@@ -702,6 +725,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         infoLines.add(card
                 ? Component.translatable("gui.trdm.terminal.card_balance", FareMoney.yuan(value)).getString()
                 : Component.translatable("gui.trdm.terminal.ticket_amount", FareMoney.text(value)).getString());
+        if (paid > 0L) {
+            infoLines.add(Component.translatable("gui.trdm.terminal.paid_line",
+                    FareMoney.text(paid)).getString());
+        }
         infoLines.add(Component.translatable("gui.trdm.terminal.extra",
                 FareMoney.text(due)).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.total_line",

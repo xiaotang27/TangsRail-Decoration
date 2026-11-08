@@ -269,6 +269,7 @@
   "gui.trdm.terminal.choose_entry_station": "请选择入闸站",
   "gui.trdm.terminal.choose_exit_station": "请选择出闸站",
   "gui.trdm.terminal.fare_line": "车费：¥%s",
+  "gui.trdm.terminal.paid_line": "已付车费：¥%s",
   "gui.trdm.terminal.record_entry_success": "补入站记录成功",
   "gui.trdm.terminal.record_exit_success": "补出站记录成功",
   "gui.trdm.terminal.search_station": "搜索车站……",

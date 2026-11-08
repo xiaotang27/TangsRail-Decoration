@@ -2,7 +2,11 @@ package top.xiaotang27.trdm.fare;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /** 最低票价（入闸余额门槛）的计算。 */
 class FareConfigTest {
@@ -41,5 +45,25 @@ class FareConfigTest {
         config.rules.add(cheap);
         config.rules.add(normal);
         assertEquals(400L, config.minimumFareCents());
+    }
+
+    @Test
+    void copyFromKeepsRuleListIdentity() {
+        final FareConfig target = FareDefaults.config();
+        final List<FareRule> rules = target.rules;
+
+        final FareConfig source = new FareConfig();
+        source.enabled = false;
+        final FareRule flat = new FareRule("x", "X", FareRule.Kind.FLAT);
+        flat.flatFareCents = 123L;
+        source.rules.add(flat);
+        source.routeRules.put("minecraft:overworld|7", "x");
+
+        target.copyFrom(source);
+        assertFalse(target.enabled);
+        assertSame(rules, target.rules);
+        assertEquals(1, target.rules.size());
+        assertEquals("x", target.rules.get(0).id);
+        assertEquals("x", target.routeRules.get("minecraft:overworld|7"));
     }
 }

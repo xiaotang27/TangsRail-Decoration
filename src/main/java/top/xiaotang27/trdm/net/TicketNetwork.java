@@ -1,15 +1,20 @@
 package top.xiaotang27.trdm.net;
 
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import top.xiaotang27.trdm.Trdm;
+import top.xiaotang27.trdm.fare.FareConfig;
+import top.xiaotang27.trdm.fare.FareJson;
+import top.xiaotang27.trdm.server.ServerFareConfig;
 import top.xiaotang27.trdm.ticket.TicketPurchase;
 
-/** 票务交易网络包：C2S 四个请求 + S2C 一个结果。 */
+/** 票务交易网络包：C2S 请求 + S2C 结果 + 服务端配置同步。 */
 public final class TicketNetwork {
 
     /** C2S：BlockPos + 目的站 id + 票面额 + 数量 + 是否按价格购买。 */
@@ -38,6 +43,12 @@ public final class TicketNetwork {
 
     /** S2C：成功标志 + 翻译键 + 数值。 */
     public static final ResourceLocation RESULT = Trdm.id("ticket_result");
+
+    /** S2C：配置 JSON + 该玩家能否编辑。 */
+    public static final ResourceLocation CONFIG_SYNC = Trdm.id("ticket_config_sync");
+
+    /** C2S：设置页保存的完整配置 JSON。 */
+    public static final ResourceLocation CONFIG_UPDATE = Trdm.id("ticket_config_update");
 
     private TicketNetwork() {
     }
@@ -86,6 +97,49 @@ public final class TicketNetwork {
             final BlockPos pos = buf.readBlockPos();
             server.execute(() -> send(player, TicketPurchase.buyExitTicket(player, pos)));
         });
+        ServerPlayNetworking.registerGlobalReceiver(CONFIG_UPDATE, (server, player, handler, buf, responseSender) -> {
+            final String json = buf.readUtf(1_000_000);
+            server.execute(() -> handleConfigUpdate(server, player, json));
+        });
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> sendConfig(handler.player));
+    }
+
+    /** 把服务端权威配置发给某个玩家。 */
+    public static void sendConfig(ServerPlayer player) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(FareJson.write(ServerFareConfig.config()), 1_000_000);
+        buf.writeBoolean(canEdit(player));
+        ServerPlayNetworking.send(player, CONFIG_SYNC, buf);
+    }
+
+    private static boolean canEdit(ServerPlayer player) {
+        if (player.hasPermissions(2)) {
+            return true;
+        }
+        final MinecraftServer server = player.getServer();
+        return server != null && server.getSingleplayerProfile() != null
+                && server.getSingleplayerProfile().getId().equals(player.getUUID());
+    }
+
+    private static void broadcastConfig(MinecraftServer server) {
+        for (final ServerPlayer player : server.getPlayerList().getPlayers()) {
+            sendConfig(player);
+        }
+    }
+
+    private static void handleConfigUpdate(MinecraftServer server, ServerPlayer player, String json) {
+        if (!canEdit(player)) {
+            sendConfig(player);
+            return;
+        }
+        try {
+            final FareConfig parsed = FareJson.parse(json);
+            ServerFareConfig.replace(parsed);
+            broadcastConfig(server);
+        } catch (Exception exception) {
+            Trdm.LOGGER.error("应用客户端票务配置失败: {}", player.getGameProfile().getName(), exception);
+            sendConfig(player);
+        }
     }
 
     public static void send(ServerPlayer player, TicketPurchase.Result result) {

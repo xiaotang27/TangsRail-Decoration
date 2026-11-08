@@ -301,6 +301,7 @@
   "gui.trdm.terminal.choose_entry_station": "Choose the entry station",
   "gui.trdm.terminal.choose_exit_station": "Choose the exit station",
   "gui.trdm.terminal.fare_line": "Fare: ¥%s",
+  "gui.trdm.terminal.paid_line": "Paid: ¥%s",
   "gui.trdm.terminal.record_entry_success": "Entry record corrected",
   "gui.trdm.terminal.record_exit_success": "Exit record corrected",
   "gui.trdm.terminal.search_station": "Search stations…",

@@ -16,10 +16,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 /**
- * 客户端计费运行时：配置加载/保存、站点图缓存、统一报价入口。
+ * 客户端计费运行时：服务端配置快照、站点图缓存、统一报价入口。
  * <p>
- * 当前阶段配置落在 {@code config/trdm-fares.json}，便于先把手感和算价跑通；
- * 服务端权威版本会复用同一份 {@link FareConfig}/{@link FareJson}，只把加载来源换成世界存档。
+ * 进入世界后由服务端下发权威配置（{@link #applySnapshot}）；设置页保存时发回服务端落盘并广播。
+ * 本地 {@code config/trdm-fares.json} 只在未收到快照时作为回退（以及服务端首次迁移的来源）。
  */
 public final class FareRuntime {
 
@@ -31,6 +31,8 @@ public final class FareRuntime {
     private final FareConfig config;
     private FareGraph graph = FareGraph.empty();
     private long networkSignature = Long.MIN_VALUE;
+    private boolean synced;
+    private boolean serverCanEdit;
 
     private FareRuntime(Path path, FareConfig config) {
         this.path = path;
@@ -62,6 +64,35 @@ public final class FareRuntime {
         return config;
     }
 
+    /** 服务端下发的权威配置：原地覆盖，界面上缓存的 rules 列表引用仍然有效。 */
+    public synchronized void applySnapshot(String json, boolean canEdit) {
+        try {
+            final FareConfig parsed = FareJson.parse(json);
+            config.copyFrom(parsed);
+            serverCanEdit = canEdit;
+            synced = true;
+        } catch (Exception exception) {
+            Trdm.LOGGER.error("应用服务端票务配置失败", exception);
+        }
+    }
+
+    /** 当前是否已经收到服务端快照。 */
+    public synchronized boolean synced() {
+        return synced;
+    }
+
+    /** 是否允许编辑票务设置；已同步时以服务端权限为准。 */
+    public boolean canEdit() {
+        if (synced) {
+            return serverCanEdit;
+        }
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.getSingleplayerServer() != null) {
+            return true;
+        }
+        return minecraft.player != null && minecraft.player.hasPermissions(2);
+    }
+
     /** MTR 站点/线路数据变化后重建站点图；没变化时直接复用。 */
     public synchronized void sync() {
         final ClientFareNetwork snapshot = ClientFareNetwork.snapshot();
@@ -82,8 +113,12 @@ public final class FareRuntime {
         return FareEngine.quote(config, graph, fromStationId, toStationId, dimensionId());
     }
 
-    /** 保存配置；失败只记日志，不打断界面。 */
+    /** 保存配置：已联网时交给服务端；否则写本地文件（回退）。 */
     public synchronized void save() {
+        if (synced && Minecraft.getInstance().getConnection() != null) {
+            TicketClientNetwork.sendConfigUpdate(FareJson.write(config));
+            return;
+        }
         config.touch();
         try {
             FareJson.save(path, config);

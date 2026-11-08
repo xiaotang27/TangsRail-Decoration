@@ -171,17 +171,23 @@ public final class TicketPurchase {
     }
 
     private static Result payFareCard(ServerLevel level, ServerPlayer player, Station station, ItemStack card) {
-        TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
+        final String dimension = ServerFareRuntime.dimensionId(level);
+        TicketData.ensureCard(card, station, dimension);
         if (TicketData.state(card) != TicketData.State.ENTERED || !TicketData.hasEntry(card)) {
             return error("gui.trdm.ticket.error.no_entry");
         }
-        if (!TicketData.entryDimension(card).equals(ServerFareRuntime.dimensionId(level))) {
+        final boolean continuous = TicketData.journeyContinuing(card);
+        final String entryDimension = continuous
+                ? TicketData.journeyEntryDimension(card) : TicketData.entryDimension(card);
+        if (!entryDimension.equals(dimension)) {
             return error("gui.trdm.ticket.error.cross_dimension");
         }
-        final long fare = ServerFareRuntime.quote(level, TicketData.entryStation(card), station.id)
-                .totalCents();
+        final long origin = continuous
+                ? TicketData.journeyEntryStation(card) : TicketData.entryStation(card);
+        final long paid = continuous ? TicketData.journeyPaid(card) : 0L;
+        final long fare = ServerFareRuntime.quote(level, origin, station.id).totalCents();
         final long balance = TicketData.balance(card);
-        final long due = Math.max(0L, fare - balance);
+        final long due = Math.max(0L, fare - paid - balance);
         if (due <= 0L) {
             return new Result(true, "gui.trdm.ticket.fare.nothing_due", 0L);
         }
@@ -257,7 +263,7 @@ public final class TicketPurchase {
             if (TicketData.state(held) == TicketData.State.ENTERED) {
                 return error("gui.trdm.ticket.error.already_entry");
             }
-            TicketData.setEntry(held, station, dimension, System.currentTimeMillis());
+            TicketData.startJourney(held, station, dimension);
             TicketSync.sync(player);
             return new Result(true, "gui.trdm.terminal.record_entry_success", 0L);
         }
@@ -311,17 +317,24 @@ public final class TicketPurchase {
 
     private static Result recordExitCard(ServerLevel level, ServerPlayer player, Station station,
                                          ItemStack card) {
-        TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
+        final String dimension = ServerFareRuntime.dimensionId(level);
+        TicketData.ensureCard(card, station, dimension);
         if (TicketData.state(card) != TicketData.State.ENTERED || !TicketData.hasEntry(card)) {
             return error("gui.trdm.ticket.error.no_entry");
         }
-        if (!TicketData.entryDimension(card).equals(ServerFareRuntime.dimensionId(level))) {
+        final boolean continuous = TicketData.journeyContinuing(card);
+        final String entryDimension = continuous
+                ? TicketData.journeyEntryDimension(card) : TicketData.entryDimension(card);
+        if (!entryDimension.equals(dimension)) {
             return error("gui.trdm.ticket.error.cross_dimension");
         }
-        final long fare = ServerFareRuntime.quote(level, TicketData.entryStation(card), station.id)
-                .totalCents();
+        final long origin = continuous
+                ? TicketData.journeyEntryStation(card) : TicketData.entryStation(card);
+        final long paid = continuous ? TicketData.journeyPaid(card) : 0L;
+        final long fare = ServerFareRuntime.quote(level, origin, station.id).totalCents();
         long balance = TicketData.balance(card);
-        final long due = Math.max(0L, fare - balance);
+        final long remainingFare = fare - paid;
+        final long due = Math.max(0L, remainingFare - balance);
         if (due > 0L) {
             final long emeralds = FareMoney.emeralds(due);
             if (!takeEmeralds(player, emeralds)) {
@@ -329,9 +342,10 @@ public final class TicketPurchase {
             }
             balance += due;
         }
-        final long remaining = balance - fare;
-        TicketData.setBalance(card, remaining);
-        TicketData.markExit(card, station, ServerFareRuntime.dimensionId(level), fare);
+        final long newBalance = balance - remainingFare;
+        TicketData.setBalance(card, newBalance);
+        TicketData.markExit(card, station, dimension, fare, remainingFare, level.getGameTime());
+        TicketData.setJourneyPaid(card, fare);
         TicketSync.sync(player);
         return new Result(true, "gui.trdm.terminal.record_exit_success", 0L);
     }

@@ -125,6 +125,30 @@ class TicketDataTest {
     }
 
     @Test
+    void journeyTracksPaidTotal() {
+        final ItemStack card = new ItemStack(Items.PAPER);
+        TicketData.issueCard(card, 5000L, 18, station, "minecraft:overworld");
+        TicketData.startJourney(card, station, "minecraft:overworld");
+        assertEquals(TicketData.State.ENTERED, TicketData.state(card));
+        assertEquals(7L, TicketData.journeyEntryStation(card));
+        assertEquals(0L, TicketData.journeyPaid(card));
+        assertFalse(TicketData.journeyContinuing(card));
+
+        TicketData.setBalance(card, 4500L);
+        TicketData.markExit(card, station, "minecraft:overworld", 500L, 500L, 1000L);
+        assertEquals(TicketData.State.EXITED, TicketData.state(card));
+        assertEquals(1000L, TicketData.lastExitTime(card));
+        assertEquals(500L, TicketData.lastExitPaid(card));
+        TicketData.setJourneyPaid(card, 500L);
+
+        TicketData.continueJourney(card);
+        assertTrue(TicketData.journeyContinuing(card));
+        assertEquals(TicketData.State.ENTERED, TicketData.state(card));
+        assertEquals(7L, TicketData.journeyEntryStation(card));
+        assertEquals(500L, TicketData.journeyPaid(card));
+    }
+
+    @Test
     void blankStackHasNoData() {
         assertFalse(TicketData.hasData(new ItemStack(Items.PAPER)));
         assertFalse(TicketData.hasEntry(new ItemStack(Items.PAPER)));

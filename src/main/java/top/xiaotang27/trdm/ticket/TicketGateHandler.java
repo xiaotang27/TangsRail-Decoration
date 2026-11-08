@@ -112,7 +112,8 @@ public final class TicketGateHandler {
                                                                   Station station, ItemStack card,
                                                                   boolean entrance) {
         // 空白交通卡（例如从创造模式物品栏拿的）也能用：先按 0 余额初始化。
-        TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
+        final String dimension = ServerFareRuntime.dimensionId(level);
+        TicketData.ensureCard(card, station, dimension);
         final long minimumFare = ServerFareRuntime.config().minimumFareCents();
         if (entrance) {
             if (TicketData.state(card) == TicketData.State.ENTERED) {
@@ -124,7 +125,17 @@ public final class TicketGateHandler {
                 message(player, "gui.trdm.ticket.gate.entry_no_balance");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
-            TicketData.enter(card, station, ServerFareRuntime.dimensionId(level));
+            final long now = level.getGameTime();
+            final boolean continuous = JourneyRules.canContinue(
+                    TicketData.lastExitStation(card), TicketData.lastExitName(card),
+                    TicketData.lastExitZone(card), TicketData.lastExitTime(card),
+                    TicketData.lastExitDimension(card),
+                    station.id, station.name, station.zone, dimension, now);
+            if (continuous) {
+                TicketData.continueJourney(card);
+            } else {
+                TicketData.startJourney(card, station, dimension);
+            }
             message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.entry_card",
                     stationName(station), FareMoney.yuan(balance)), balance));
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
@@ -133,25 +144,33 @@ public final class TicketGateHandler {
             message(player, "gui.trdm.ticket.gate.no_entry");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
-        if (!TicketData.entryDimension(card).equals(ServerFareRuntime.dimensionId(level))) {
+        final boolean continuous = TicketData.journeyContinuing(card);
+        final String entryDimension = continuous
+                ? TicketData.journeyEntryDimension(card) : TicketData.entryDimension(card);
+        if (!entryDimension.equals(dimension)) {
             message(player, "gui.trdm.ticket.gate.cross_dimension");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
-        final long fare = fareTo(level, TicketData.entryStation(card), station.id);
+        final long origin = continuous
+                ? TicketData.journeyEntryStation(card) : TicketData.entryStation(card);
+        final long paid = continuous ? TicketData.journeyPaid(card) : 0L;
+        final long fare = fareTo(level, origin, station.id);
         if (fare < 0L) {
             message(player, "gui.trdm.ticket.gate.no_fare");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
+        final long remainingFare = fare - paid;
         final long balance = TicketData.balance(card);
-        if (balance < fare) {
+        if (balance < remainingFare) {
             message(player, "gui.trdm.ticket.gate.exit_no_balance");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
-        final long remaining = balance - fare;
-        TicketData.setBalance(card, remaining);
-        TicketData.markExit(card, station, ServerFareRuntime.dimensionId(level), fare);
+        final long newBalance = balance - remainingFare;
+        TicketData.setBalance(card, newBalance);
+        TicketData.markExit(card, station, dimension, fare, remainingFare, level.getGameTime());
+        TicketData.setJourneyPaid(card, fare);
         message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.exit_card",
-                stationName(station), FareMoney.yuan(fare), FareMoney.yuan(remaining)), remaining));
+                stationName(station), FareMoney.yuan(fare), FareMoney.yuan(newBalance)), newBalance));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }
 

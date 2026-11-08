@@ -49,6 +49,7 @@ import top.xiaotang27.trdm.item.ItemTransitCard;
 import top.xiaotang27.trdm.item.ItemVariableTicket;
 import top.xiaotang27.trdm.item.ItemExitTicket;
 import top.xiaotang27.trdm.net.TicketNetwork;
+import top.xiaotang27.trdm.server.ServerFareConfig;
 import top.xiaotang27.trdm.server.ServerFareRuntime;
 import top.xiaotang27.trdm.control.PsdManualHold;
 import top.xiaotang27.trdm.net.TrdmControlNetwork;
@@ -272,9 +273,12 @@ public class Trdm implements ModInitializer {
                 }
             }
         });
+        ServerLifecycleEvents.SERVER_STARTED.register(ServerFareConfig::load);
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> ServerFareConfig.save());
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             PENDING_HEADER_FIXES.clear();
             ServerFareRuntime.reset();
+            ServerFareConfig.reset();
         });
     }
 

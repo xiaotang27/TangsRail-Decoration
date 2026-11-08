@@ -112,4 +112,27 @@ public final class FareConfig {
     public void touch() {
         revision++;
     }
+
+    /**
+     * 用一个新配置覆盖当前对象（保留对象引用，界面上缓存的 {@code rules} 列表仍然有效）。
+     * 用于服务端同步快照。
+     */
+    public void copyFrom(FareConfig other) {
+        if (other == null || other == this) {
+            return;
+        }
+        schemaVersion = other.schemaVersion;
+        revision = other.revision;
+        enabled = other.enabled;
+        mode = other.mode;
+        metric = other.metric;
+        transferDiscountCents = other.transferDiscountCents;
+        mergeSameRule = other.mergeSameRule;
+        rules.clear();
+        for (final FareRule rule : other.rules) {
+            rules.add(rule.copy());
+        }
+        routeRules.clear();
+        routeRules.putAll(other.routeRules);
+    }
 }

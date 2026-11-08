@@ -28,6 +28,19 @@ public final class TicketClientNetwork {
                         }
                     });
                 });
+        ClientPlayNetworking.registerGlobalReceiver(TicketNetwork.CONFIG_SYNC,
+                (client, handler, buf, responseSender) -> {
+                    final String json = buf.readUtf(1_000_000);
+                    final boolean canEdit = buf.readBoolean();
+                    client.execute(() -> FareRuntime.get().applySnapshot(json, canEdit));
+                });
+    }
+
+    /** 设置页保存：把完整配置发给服务端，服务端校验后落盘并广播。 */
+    public static void sendConfigUpdate(String json) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeUtf(json, 1_000_000);
+        ClientPlayNetworking.send(TicketNetwork.CONFIG_UPDATE, buf);
     }
 
     public static void buySingle(BlockPos pos, long destination, long faceCents, int quantity, boolean byPrice) {
