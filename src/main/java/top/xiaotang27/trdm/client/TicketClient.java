@@ -17,7 +17,7 @@ public final class TicketClient {
             message("gui.trdm.ticket_machine.no_station");
             return;
         }
-        Minecraft.getInstance().setScreen(new TicketVendingScreen(station.name, pos));
+        Minecraft.getInstance().setScreen(new TicketVendingScreen(station.name, station.id, pos));
     }
 
     public static void openTerminal(BlockPos pos) {
@@ -26,7 +26,7 @@ public final class TicketClient {
             message("gui.trdm.ticket_machine.no_station");
             return;
         }
-        Minecraft.getInstance().setScreen(new CustomerServiceTerminalScreen(station.name, pos));
+        Minecraft.getInstance().setScreen(new CustomerServiceTerminalScreen(station.name, station.id, pos));
     }
 
     private static void message(String key) {

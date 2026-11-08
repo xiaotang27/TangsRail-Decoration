@@ -71,6 +71,16 @@ dependencies {
 
 }
 
+// 计费引擎（fare 包）是纯 Java，不碰 Minecraft 类，单元测试直接跑 JUnit。
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
 processResources {
     // 把 Gradle version 展开进 fabric.mod.json 的 ${version}。
     filesMatching('fabric.mod.json') {

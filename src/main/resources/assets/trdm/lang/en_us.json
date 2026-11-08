@@ -226,6 +226,7 @@
   "gui.trdm.terminal.total_line": "Total: ¥%s",
   "gui.trdm.terminal.entry": "Entered at: %s",
   "gui.trdm.terminal.no_ticket_amount": "Additional fare: ¥%s",
+  "gui.trdm.terminal.no_fare_rule": "No fare rule is configured; cannot charge a fare.",
   "gui.trdm.psd_style.on": "On",
   "gui.trdm.psd_style.off": "Off",
   "block.trdm.psd_end_gate": "PSD End Gate",

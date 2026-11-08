@@ -194,6 +194,7 @@
   "gui.trdm.terminal.total_line": "总计：¥%s",
   "gui.trdm.terminal.entry": "入闸站：%s",
   "gui.trdm.terminal.no_ticket_amount": "补票金额：¥%s",
+  "gui.trdm.terminal.no_fare_rule": "尚未配置任何票价规则，无法补票。",
   "gui.trdm.station_sign.select_title": "选择本站站台",
   "gui.trdm.station_sign.next": "下一站",
   "gui.trdm.station_sign.next_en": "Next Station",

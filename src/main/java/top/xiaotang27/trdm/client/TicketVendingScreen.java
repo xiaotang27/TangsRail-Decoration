@@ -7,14 +7,16 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import top.xiaotang27.trdm.fare.FareMoney;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
-/** 售票机界面：单程票 / 通用票 / 交通卡三个页签，浅色主题，演示数据。 */
+/** 售票机界面：单程票 / 通用票 / 交通卡三个页签，浅色主题；单程票价格来自计费引擎。 */
 public class TicketVendingScreen extends TrdmScreenBase {
 
     private static final int TAB_SINGLE = 0;
@@ -45,6 +47,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
     };
 
     private final String stationName;
+    private final long stationId;
     private final BlockPos pos;
     private final List<LineGroup> groups = new ArrayList<>();
 
@@ -52,22 +55,24 @@ public class TicketVendingScreen extends TrdmScreenBase {
     private String query = "";
     private float listScroll;
     private int selectedLine = -1;
+    private long selectedStationId = -1L;
     private String selectedStationName = "";
 
     private String priceInput = "";
     private boolean transactionOpen;
     private String transactionTitle = "";
-    private int unitPrice = 2;
+    private long unitPriceCents = 200L;
     private int quantity = 1;
     private String dialog;
 
-    public TicketVendingScreen(String stationName, BlockPos pos) {
-        this(null, stationName, pos);
+    public TicketVendingScreen(String stationName, long stationId, BlockPos pos) {
+        this(null, stationName, stationId, pos);
     }
 
-    public TicketVendingScreen(Screen parent, String stationName, BlockPos pos) {
+    public TicketVendingScreen(Screen parent, String stationName, long stationId, BlockPos pos) {
         super(parent, Component.translatable("block.trdm.ticket_vending_machine"));
         this.stationName = stationName == null ? "" : stationName;
+        this.stationId = stationId;
         this.pos = pos;
         themeFieldBg = 0xFFFFFFFF;
         themeFieldBorder = TicketUi.BORDER;
@@ -77,31 +82,31 @@ public class TicketVendingScreen extends TrdmScreenBase {
     }
 
     private void loadStations() {
+        final FareRuntime fares = FareRuntime.get();
+        fares.sync();
         final List<Route> routes = new ArrayList<>(ClientData.ROUTES);
         routes.sort(Comparator.comparing((Route route) -> route.name == null ? "" : route.name,
                 String.CASE_INSENSITIVE_ORDER));
-        for (int groupIndex = 0; groupIndex < routes.size(); groupIndex++) {
-            final Route route = routes.get(groupIndex);
-            final LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (final Route route : routes) {
+            final Map<Long, String> stations = new LinkedHashMap<>();
             for (final Route.RoutePlatform platform : route.platformIds) {
                 final Station station = ClientData.DATA_CACHE.platformIdToStation.get(platform.platformId);
                 if (station != null && station.name != null && !station.name.isBlank()) {
-                    names.add(station.name);
+                    stations.putIfAbsent(station.id, station.name);
                 }
             }
-            if (!names.isEmpty()) {
+            if (!stations.isEmpty()) {
                 groups.add(new LineGroup(route.name == null ? "?" : route.name,
-                        rowsOf(names, groupIndex)));
+                        rowsOf(stations, fares)));
             }
         }
     }
 
-    private List<StationRow> rowsOf(LinkedHashSet<String> names, int groupIndex) {
+    private List<StationRow> rowsOf(Map<Long, String> stations, FareRuntime fares) {
         final List<StationRow> rows = new ArrayList<>();
-        int index = 0;
-        for (final String name : names) {
-            rows.add(new StationRow(name, 2 + (groupIndex + index) % 3));
-            index++;
+        for (final Map.Entry<Long, String> entry : stations.entrySet()) {
+            final long fare = fares.quote(stationId, entry.getKey()).totalCents();
+            rows.add(new StationRow(entry.getKey(), entry.getValue(), fare));
         }
         return rows;
     }
@@ -184,14 +189,14 @@ public class TicketVendingScreen extends TrdmScreenBase {
             top += GROUP_H;
             for (final StationRow row : group.stations()) {
                 if (top + ROW_H >= LIST_TOP && top <= LIST_BOTTOM) {
-                    final boolean selected = row.name().equals(selectedStationName);
+                    final boolean selected = row.id() == selectedStationId;
                     final boolean hovered = mx >= LIST_X && mx < LIST_X + LIST_W
                             && my >= top && my < top + ROW_H;
                     rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, ROW_H - 1F,
                             selected ? TicketUi.GREEN : (hovered ? TicketUi.ROW_HOVER : TicketUi.ROW));
                     text(guiGraphics, Component.literal(row.name()), LIST_X + 4F, top + 7F,
                             FONT_ROW, selected ? TicketUi.TEXT_LIGHT : TicketUi.TEXT_DARK);
-                    textRight(guiGraphics, Component.literal("¥" + row.price()),
+                    textRight(guiGraphics, Component.literal(FareMoney.yuan(row.fareCents())),
                             LIST_X + LIST_W - 4F, top + 7F, FONT_ROW,
                             selected ? TicketUi.TEXT_LIGHT : TicketUi.TEXT_DARK);
                 }
@@ -323,15 +328,15 @@ public class TicketVendingScreen extends TrdmScreenBase {
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.transaction"),
                 LIST_X, 64F, FONT_SECTION, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.literal(transactionTitle), LIST_X, 108F, FONT_ROW, TicketUi.TEXT_DARK);
-        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.fare_amount", unitPrice),
-                LIST_X, 132F, FONT_ROW, TicketUi.TEXT_DARK);
-        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.total", unitPrice * quantity),
-                LIST_X, 160F, FONT_ROW, TicketUi.TEXT_DARK);
-        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.pay_emerald", unitPrice * quantity),
-                LIST_X, 184F, FONT_ROW, TicketUi.TEXT_DARK);
-        TicketUi.emerald(this, guiGraphics,
-                LIST_X + textWidth(Component.translatable("gui.trdm.ticket_machine.pay_emerald",
-                        unitPrice * quantity), FONT_ROW) + 6F, 183F, 14F);
+        final long totalCents = unitPriceCents * quantity;
+        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.fare_amount",
+                FareMoney.text(unitPriceCents)), LIST_X, 132F, FONT_ROW, TicketUi.TEXT_DARK);
+        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.total",
+                FareMoney.text(totalCents)), LIST_X, 160F, FONT_ROW, TicketUi.TEXT_DARK);
+        final Component pay = Component.translatable("gui.trdm.ticket_machine.pay_emerald",
+                FareMoney.emeralds(totalCents));
+        text(guiGraphics, pay, LIST_X, 184F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.emerald(this, guiGraphics, LIST_X + textWidth(pay, FONT_ROW) + 6F, 183F, 14F);
 
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.quantity"),
                 LIST_X, 226F, FONT_ROW, TicketUi.TEXT_DARK);
@@ -419,11 +424,12 @@ public class TicketVendingScreen extends TrdmScreenBase {
                 top += GROUP_H;
                 for (final StationRow row : group.stations()) {
                     if (my >= top && my < top + ROW_H) {
+                        selectedStationId = row.id();
                         selectedStationName = row.name();
-                        priceInput = String.valueOf(row.price());
+                        priceInput = FareMoney.input(row.fareCents());
                         transactionTitle = Component.translatable("gui.trdm.ticket_machine.single_title",
                                 row.name()).getString();
-                        unitPrice = row.price();
+                        unitPriceCents = row.fareCents();
                         quantity = 1;
                         transactionOpen = true;
                         return true;
@@ -438,6 +444,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
             final float y = 154F + index * 28F;
             if (hit(mx, my, RIGHT_X, y, 220F, 24F)) {
                 selectedLine = selectedLine == index ? -1 : index;
+                selectedStationId = -1L;
                 selectedStationName = "";
                 priceInput = "";
                 listScroll = 0F;
@@ -476,7 +483,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
         for (int index = 0; index < PASSES.length; index++) {
             if (hit(mx, my, LIST_X, 92F + index * 34F, LIST_W, 32F)) {
                 transactionTitle = PASSES[index].name();
-                unitPrice = PASSES[index].price();
+                unitPriceCents = PASSES[index].price() * 100L;
                 quantity = 1;
                 transactionOpen = true;
                 return true;
@@ -511,7 +518,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
                             ? Component.translatable("gui.trdm.ticket_machine.by_price").getString()
                             : Component.translatable("gui.trdm.ticket_machine.single_title",
                             selectedStationName).getString();
-                    unitPrice = parsePrice();
+                    unitPriceCents = parsePrice() * 100L;
                     quantity = 1;
                     transactionOpen = true;
                 }
@@ -581,7 +588,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
     private record LineGroup(String name, List<StationRow> stations) {
     }
 
-    private record StationRow(String name, int price) {
+    private record StationRow(long id, String name, long fareCents) {
     }
 
     private record PassRow(String name, int price) {

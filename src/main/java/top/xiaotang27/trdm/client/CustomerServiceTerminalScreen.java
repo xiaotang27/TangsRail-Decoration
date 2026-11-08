@@ -8,14 +8,16 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import top.xiaotang27.trdm.fare.FareMoney;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
-/** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。浅色主题，演示数据。 */
+/** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。浅色主题；补票按计费引擎报价。 */
 public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private static final int VIEW_HOME = 0;
@@ -45,7 +47,13 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private static final Object FIELD_STATION = new Object();
 
+    /** 补票/补记录时，选择的车站代表“入闸站”；出闸站固定为终端所在站。 */
+    private static final int RECORD_ENTRY = 0;
+    private static final int RECORD_EXIT = 1;
+    private static final int RECORD_FARE = 2;
+
     private final String stationName;
+    private final long stationId;
     private final BlockPos pos;
 
     private int view = VIEW_HOME;
@@ -53,20 +61,21 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private String dialog;
     private String infoTitle = "";
     private final List<String> infoLines = new ArrayList<>();
-    private int infoAmount;
+    private long infoAmountCents;
     private boolean infoNeedsPayment;
     private boolean infoFromRecord;
 
     private final List<LineGroup> stationGroups = new ArrayList<>();
     private String stationQuery = "";
     private float stationScroll;
-    private boolean recordIsEntry;
+    private int recordMode = RECORD_ENTRY;
     private String recordStation = "";
-    private int recordPrice;
+    private long recordFareCents;
 
-    public CustomerServiceTerminalScreen(String stationName, BlockPos pos) {
+    public CustomerServiceTerminalScreen(String stationName, long stationId, BlockPos pos) {
         super(null, Component.translatable("block.trdm.customer_service_terminal"));
         this.stationName = stationName == null ? "" : stationName;
+        this.stationId = stationId;
         this.pos = pos;
         themeFieldBg = 0xFFFFFFFF;
         themeFieldBorder = TicketUi.BORDER;
@@ -76,31 +85,31 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private void loadStationGroups() {
+        final FareRuntime fares = FareRuntime.get();
+        fares.sync();
         final List<Route> routes = new ArrayList<>(ClientData.ROUTES);
         routes.sort(Comparator.comparing((Route route) -> route.name == null ? "" : route.name,
                 String.CASE_INSENSITIVE_ORDER));
-        for (int groupIndex = 0; groupIndex < routes.size(); groupIndex++) {
-            final Route route = routes.get(groupIndex);
-            final LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (final Route route : routes) {
+            final Map<Long, String> stations = new LinkedHashMap<>();
             for (final Route.RoutePlatform platform : route.platformIds) {
                 final Station station = ClientData.DATA_CACHE.platformIdToStation.get(platform.platformId);
                 if (station != null && station.name != null && !station.name.isBlank()) {
-                    names.add(station.name);
+                    stations.putIfAbsent(station.id, station.name);
                 }
             }
-            if (!names.isEmpty()) {
+            if (!stations.isEmpty()) {
                 stationGroups.add(new LineGroup(route.name == null ? "?" : route.name,
-                        rowsOf(names, groupIndex)));
+                        rowsOf(stations, fares)));
             }
         }
     }
 
-    private List<StationRow> rowsOf(LinkedHashSet<String> names, int groupIndex) {
+    private List<StationRow> rowsOf(Map<Long, String> stations, FareRuntime fares) {
         final List<StationRow> rows = new ArrayList<>();
-        int index = 0;
-        for (final String name : names) {
-            rows.add(new StationRow(name, 2 + (groupIndex + index) % 3));
-            index++;
+        for (final Map.Entry<Long, String> entry : stations.entrySet()) {
+            final long fare = fares.quote(entry.getKey(), stationId).totalCents();
+            rows.add(new StationRow(entry.getKey(), entry.getValue(), fare));
         }
         return rows;
     }
@@ -169,7 +178,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         }
         final float payY = 120F + infoLines.size() * 24F + 6F;
         if (infoNeedsPayment) {
-            final Component pay = Component.translatable("gui.trdm.terminal.pay_emerald", infoAmount);
+            final Component pay = Component.translatable("gui.trdm.terminal.pay_emerald",
+                    FareMoney.emeralds(infoAmountCents));
             text(guiGraphics, pay, TicketUi.PANEL_X + 20F, payY, FONT_ROW, TicketUi.TEXT_DARK);
             TicketUi.emerald(this, guiGraphics,
                     TicketUi.PANEL_X + 20F + textWidth(pay, FONT_ROW) + 6F, payY - 1F, 14F);
@@ -239,7 +249,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
                             hovered ? TicketUi.ROW_HOVER : TicketUi.ROW);
                     text(guiGraphics, Component.literal(row.name()), TicketUi.PANEL_X + 22F, top + 6F,
                             FONT_ROW, TicketUi.TEXT_DARK);
-                    textRight(guiGraphics, Component.literal("¥" + row.price()),
+                    textRight(guiGraphics, Component.literal(FareMoney.yuan(row.fareCents())),
                             TicketUi.PANEL_X + TicketUi.PANEL_W - 22F, top + 6F,
                             FONT_ROW, TicketUi.TEXT_DARK);
                 }
@@ -398,7 +408,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             return true;
         }
         if (hit(mx, my, 620F, 150F, 200F, 180F)) {
-            Minecraft.getInstance().setScreen(new TicketVendingScreen(this, stationName, pos));
+            Minecraft.getInstance().setScreen(new TicketVendingScreen(this, stationName, stationId, pos));
             return true;
         }
         return false;
@@ -406,7 +416,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private boolean clickRepair(float mx, float my) {
         if (hit(mx, my, 160F, 160F, 190F, 160F)) {
-            showFareInfo();
+            openStationPicker(RECORD_FARE);
             return true;
         }
         if (hit(mx, my, 385F, 160F, 190F, 160F)) {
@@ -422,43 +432,20 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         return false;
     }
 
-    private void showFareInfo() {
-        infoTitle = Component.translatable("gui.trdm.terminal.fare").getString();
-        infoLines.clear();
-        infoLines.add(Component.translatable("gui.trdm.terminal.sold_at", "刘园|LIYUAN").getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.ticket_amount", 2).getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.fare_due", 3).getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.extra", 1).getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 1).getString());
-        infoAmount = 1;
-        infoNeedsPayment = true;
-        infoFromRecord = false;
-        view = VIEW_INFO;
-    }
-
-    private void showRecordInfo() {
-        infoTitle = Component.translatable("gui.trdm.terminal.record").getString();
-        infoLines.clear();
-        infoLines.add(Component.translatable("gui.trdm.terminal.entry", "刘园|LIYUAN").getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.fare_due", 3).getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 3).getString());
-        infoAmount = 3;
-        view = VIEW_INFO;
+    private void openStationPicker(int mode) {
+        recordMode = mode;
+        view = VIEW_STATION;
+        stationQuery = "";
+        stationScroll = 0F;
     }
 
     private boolean clickRecordType(float mx, float my) {
         if (hit(mx, my, 250F, 170F, 200F, 160F)) {
-            recordIsEntry = true;
-            view = VIEW_STATION;
-            stationQuery = "";
-            stationScroll = 0F;
+            openStationPicker(RECORD_ENTRY);
             return true;
         }
         if (hit(mx, my, 510F, 170F, 200F, 160F)) {
-            recordIsEntry = false;
-            view = VIEW_STATION;
-            stationQuery = "";
-            stationScroll = 0F;
+            openStationPicker(RECORD_EXIT);
             return true;
         }
         return false;
@@ -484,8 +471,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             for (final StationRow row : group.stations()) {
                 if (my >= top && my < top + 24F) {
                     recordStation = row.name();
-                    recordPrice = row.price();
-                    showRecordInfo(recordIsEntry);
+                    recordFareCents = row.fareCents();
+                    showRecordInfo(recordMode);
                     return true;
                 }
                 top += 24F;
@@ -494,23 +481,29 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         return false;
     }
 
-    private void showRecordInfo(boolean entry) {
+    private void showRecordInfo(int mode) {
         infoFromRecord = true;
-        if (entry) {
+        if (mode == RECORD_ENTRY) {
             infoTitle = Component.translatable("gui.trdm.terminal.entry_record").getString();
             infoLines.clear();
             infoLines.add(Component.translatable("gui.trdm.terminal.entry", recordStation).getString());
-            infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 0).getString());
-            infoAmount = 0;
+            infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                    FareMoney.text(0L)).getString());
+            infoAmountCents = 0L;
             infoNeedsPayment = false;
         } else {
-            infoTitle = Component.translatable("gui.trdm.terminal.exit_record").getString();
+            infoTitle = Component.translatable(mode == RECORD_FARE
+                    ? "gui.trdm.terminal.fare" : "gui.trdm.terminal.exit_record").getString();
             infoLines.clear();
-            infoLines.add(Component.translatable("gui.trdm.terminal.entry", "刘园|LIYUAN").getString());
-            infoLines.add(Component.translatable("gui.trdm.terminal.exit_station", recordStation).getString());
-            infoLines.add(Component.translatable("gui.trdm.terminal.fare_due", recordPrice).getString());
-            infoLines.add(Component.translatable("gui.trdm.terminal.total_line", recordPrice).getString());
-            infoAmount = recordPrice;
+            infoLines.add(Component.translatable("gui.trdm.terminal.entry", recordStation).getString());
+            if (mode == RECORD_EXIT) {
+                infoLines.add(Component.translatable("gui.trdm.terminal.exit_station", stationName).getString());
+            }
+            infoLines.add(Component.translatable("gui.trdm.terminal.fare_due",
+                    FareMoney.text(recordFareCents)).getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                    FareMoney.text(recordFareCents)).getString());
+            infoAmountCents = recordFareCents;
             infoNeedsPayment = true;
         }
         view = VIEW_INFO;
@@ -533,11 +526,18 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private void showNoTicketInfo() {
+        final long cap = FareRuntime.get().config().maxFareCapCents();
         infoTitle = Component.translatable("gui.trdm.terminal.no_ticket").getString();
         infoLines.clear();
-        infoLines.add(Component.translatable("gui.trdm.terminal.no_ticket_amount", 10).getString());
-        infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 10).getString());
-        infoAmount = 10;
+        if (cap <= 0L) {
+            infoLines.add(Component.translatable("gui.trdm.terminal.no_fare_rule").getString());
+        } else {
+            infoLines.add(Component.translatable("gui.trdm.terminal.no_ticket_amount",
+                    FareMoney.text(cap)).getString());
+        }
+        infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                FareMoney.text(cap)).getString());
+        infoAmountCents = cap;
         infoNeedsPayment = true;
         infoFromRecord = false;
         view = VIEW_INFO;
@@ -616,6 +616,6 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private record LineGroup(String name, List<StationRow> stations) {
     }
 
-    private record StationRow(String name, int price) {
+    private record StationRow(long id, String name, long fareCents) {
     }
 }

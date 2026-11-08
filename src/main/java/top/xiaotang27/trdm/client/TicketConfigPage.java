@@ -5,6 +5,8 @@ import mtr.data.Route;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import top.xiaotang27.trdm.fare.FareConfig;
+import top.xiaotang27.trdm.fare.FareRule;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -15,7 +17,8 @@ import java.util.Set;
 /**
  * 通用设置里的“票务系统”页：票务规则列表 + 通用车票模板列表、规则/模板详情、非管理员遮罩。
  * <p>
- * 目前是纯客户端界面骨架：规则/线路分配只是内存里的演示数据，等票务服务端快照接入后再替换。
+ * 规则和线路绑定来自 {@link FareRuntime} 的 {@link FareConfig}（{@code config/trdm-fares.json}）；
+ * 车票模板仍是界面骨架，等通票系统接入后替换。
  */
 final class TicketConfigPage {
 
@@ -65,14 +68,15 @@ final class TicketConfigPage {
     private static final int SELECT_TEMPLATE = 2;
 
     private final TrdmScreenBase host;
+    private final FareConfig config;
+    private final List<FareRule> rules;
 
     private final List<String> lines = new ArrayList<>();
-    private final List<RuleRow> rules = new ArrayList<>();
+    /** 线路名 → MTR 线路 ID；绑定按“维度|线路 ID”落盘。 */
+    private final java.util.Map<String, Long> lineIds = new java.util.HashMap<>();
     private final List<TemplateRow> templates = new ArrayList<>();
-    /** 线路名 → 自定义规则下标；不存在的线路 = 系统行（MTR 原版公式）。 */
+    /** 线路名 → 规则下标；不在表里 = 系统行（MTR 原版公式）。 */
     private final java.util.Map<String, Integer> lineOwner = new java.util.HashMap<>();
-
-    private boolean enabled = true;
 
     private int view = VIEW_MAIN;
     private int detailRuleIndex = -1;
@@ -91,6 +95,8 @@ final class TicketConfigPage {
 
     TicketConfigPage(TrdmScreenBase host) {
         this.host = host;
+        this.config = FareRuntime.get().config();
+        this.rules = config.rules;
         seed();
     }
 
@@ -101,14 +107,12 @@ final class TicketConfigPage {
         for (final Route route : ClientData.ROUTES) {
             if (route.name != null && !route.name.isBlank()) {
                 real.add(route.name);
+                lineIds.putIfAbsent(route.name, route.id);
             }
         }
         real.sort(String.CASE_INSENSITIVE_ORDER);
         lines.addAll(real);
-
-        rules.add(new RuleRow("按里程分段计费"));
-        rules.add(new RuleRow("按区间分段计费"));
-        rules.add(new RuleRow("自定义规则1"));
+        rebuildOwners();
 
         templates.add(new TemplateRow("一日票"));
         templates.add(new TemplateRow("三日票"));
@@ -121,6 +125,56 @@ final class TicketConfigPage {
 
         selectedKind = SELECT_SYSTEM;
         selectedIndex = -1;
+    }
+
+    /** 从配置里的线路绑定反推“线路名 → 规则下标”，供下拉勾选状态和摘要使用。 */
+    private void rebuildOwners() {
+        lineOwner.clear();
+        final String dimension = FareRuntime.dimensionId();
+        for (final String line : lines) {
+            final Long routeId = lineIds.get(line);
+            if (routeId == null) {
+                continue;
+            }
+            final FareRule rule = config.ruleById(
+                    config.routeRules.get(FareConfig.bindingKey(dimension, routeId)));
+            final int index = ruleIndex(rule == null ? null : rule.id);
+            if (index >= 0) {
+                lineOwner.put(line, index);
+            }
+        }
+    }
+
+    private int ruleIndex(String ruleId) {
+        if (ruleId == null) {
+            return -1;
+        }
+        for (int index = 0; index < rules.size(); index++) {
+            if (rules.get(index).id.equals(ruleId)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private void setBinding(String line, FareRule rule) {
+        final Long routeId = lineIds.get(line);
+        if (routeId == null) {
+            return;
+        }
+        config.routeRules.put(FareConfig.bindingKey(FareRuntime.dimensionId(), routeId), rule.id);
+        FareRuntime.get().save();
+        rebuildOwners();
+    }
+
+    private void clearBinding(String line) {
+        final Long routeId = lineIds.get(line);
+        if (routeId == null) {
+            return;
+        }
+        config.routeRules.remove(FareConfig.bindingKey(FareRuntime.dimensionId(), routeId));
+        FareRuntime.get().save();
+        rebuildOwners();
     }
 
     void onLeave() {
@@ -172,11 +226,11 @@ final class TicketConfigPage {
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.enable.sub"),
                 TrdmScreenBase.CONTENT_X, ENABLE_SUB_Y);
         final float toggleX = TrdmScreenBase.CONTENT_RIGHT - TrdmScreenBase.TOGGLE_W;
-        final Component state = Component.translatable(enabled
+        final Component state = Component.translatable(config.enabled
                 ? "gui.trdm.config.on" : "gui.trdm.config.off");
         host.textRight(guiGraphics, state, toggleX - 10F, ENABLE_LABEL_Y + 4F,
                 TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
-        host.toggle(guiGraphics, toggleX, ENABLE_TOGGLE_Y, enabled);
+        host.toggle(guiGraphics, toggleX, ENABLE_TOGGLE_Y, config.enabled);
 
         host.section(guiGraphics, "gui.trdm.ticket.rules", RULES_SECTION_Y);
         if (lines.isEmpty()) {
@@ -323,7 +377,7 @@ final class TicketConfigPage {
                     TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_WARN);
             return;
         }
-        final RuleRow rule = rules.get(detailRuleIndex);
+        final FareRule rule = rules.get(detailRuleIndex);
         host.section(guiGraphics, "gui.trdm.ticket.rule_name", DETAIL_NAME_SECTION_Y);
         host.field(guiGraphics, FIELD_NAME, TrdmScreenBase.CONTENT_X, DETAIL_NAME_FIELD_Y,
                 TrdmScreenBase.CONTENT_W * 0.62F, 24F, TrdmScreenBase.FONT_ROW, rule.name);
@@ -393,7 +447,8 @@ final class TicketConfigPage {
     private boolean clickMain(float mx, float my) {
         final float toggleX = TrdmScreenBase.CONTENT_RIGHT - TrdmScreenBase.TOGGLE_W;
         if (host.hit(mx, my, toggleX, ENABLE_TOGGLE_Y, TrdmScreenBase.TOGGLE_W, TrdmScreenBase.TOGGLE_H)) {
-            enabled = !enabled;
+            config.enabled = !config.enabled;
+            FareRuntime.get().save();
             return true;
         }
 
@@ -462,6 +517,7 @@ final class TicketConfigPage {
                             final String trimmed = value.trim();
                             if (view == VIEW_RULE) {
                                 rules.get(detailRuleIndex).name = trimmed;
+                                FareRuntime.get().save();
                             } else {
                                 templates.get(detailTemplateIndex).name = trimmed;
                             }
@@ -598,14 +654,14 @@ final class TicketConfigPage {
             return true;
         }
         switch (dropKind) {
-            case DROP_SYSTEM -> lineOwner.remove(lines.get(option));
+            case DROP_SYSTEM -> clearBinding(lines.get(option));
             case DROP_RULE, DROP_DETAIL_RULE -> {
                 final String line = lines.get(option);
                 final int ruleIndex = ruleIndexOfDrop();
                 if (lineOwner.getOrDefault(line, -1) == ruleIndex) {
-                    lineOwner.remove(line);
-                } else {
-                    lineOwner.put(line, ruleIndex);
+                    clearBinding(line);
+                } else if (ruleIndex >= 0 && ruleIndex < rules.size()) {
+                    setBinding(line, rules.get(ruleIndex));
                 }
             }
             case DROP_TEMPLATE, DROP_DETAIL_TEMPLATE -> {
@@ -689,6 +745,9 @@ final class TicketConfigPage {
         if (index < 0) {
             return Component.translatable("gui.trdm.ticket.mtr_rule").getString();
         }
+        if (index >= rules.size()) {
+            return "";
+        }
         return rules.get(index).name;
     }
 
@@ -728,14 +787,6 @@ final class TicketConfigPage {
             builder.append(value.charAt(index));
         }
         return builder + ellipsis;
-    }
-
-    private static final class RuleRow {
-        private String name;
-
-        private RuleRow(String name) {
-            this.name = name;
-        }
     }
 
     private static final class TemplateRow {
