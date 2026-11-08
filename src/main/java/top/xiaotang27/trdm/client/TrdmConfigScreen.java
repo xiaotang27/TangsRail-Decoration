@@ -11,9 +11,11 @@ import top.xiaotang27.trdm.render.TrdmPisVideo;
 /** 通用设置 / 关于。入口：/trdm config、快捷键、Mod Menu。 */
 public class TrdmConfigScreen extends TrdmScreenBase {
 
-    private static final String[] PAGES = {"gui.trdm.config.general", "gui.trdm.config.about"};
+    private static final String[] PAGES = {
+            "gui.trdm.config.general", "gui.trdm.config.ticket", "gui.trdm.config.about"};
     private static final int PAGE_GENERAL = 0;
-    private static final int PAGE_ABOUT = 1;
+    private static final int PAGE_TICKET = 1;
+    private static final int PAGE_ABOUT = 2;
 
     private static final ResourceLocation LOGO_WIDE = new ResourceLocation("trdm", "textures/gui/logo_wide.png");
     private static final ResourceLocation BRAND = new ResourceLocation("trdm", "textures/gui/brand.png");
@@ -23,6 +25,7 @@ public class TrdmConfigScreen extends TrdmScreenBase {
     private static final float TOGGLE_X = CONTENT_RIGHT - TOGGLE_W;
 
     private int page = PAGE_GENERAL;
+    private final TicketConfigPage ticketPage = new TicketConfigPage(this);
 
     public TrdmConfigScreen(Screen parent) {
         super(parent, Component.translatable("gui.trdm.config.title"));
@@ -47,6 +50,8 @@ public class TrdmConfigScreen extends TrdmScreenBase {
                     TrdmConfig.useTrdmFont(), null);
             toggleRow(guiGraphics, VIDEO_ROW_Y, "gui.trdm.config.video", "gui.trdm.config.video.sub",
                     TrdmConfig.pisVideoEnabled(), Component.translatable("gui.trdm.config.video.warn"));
+        } else if (page == PAGE_TICKET) {
+            ticketPage.render(guiGraphics, mx, my);
         } else {
             renderAbout(guiGraphics);
         }
@@ -94,6 +99,10 @@ public class TrdmConfigScreen extends TrdmScreenBase {
                 rect(guiGraphics, centreX - 8F, centreY - 2F, 3F, 4F, color);
                 rect(guiGraphics, centreX + 5F, centreY - 2F, 3F, 4F, color);
                 rect(guiGraphics, centreX - 2F, centreY - 2F, 4F, 4F, 0xFF000000);
+            } else if (index == 1) {
+                rect(guiGraphics, centreX - 8F, centreY - 5F, 16F, 10F, color);
+                rect(guiGraphics, centreX - 3F, centreY - 2F, 6F, 4F, 0xFF000000);
+                rect(guiGraphics, centreX - 1F, centreY - 2F, 2F, 4F, color);
             } else {
                 rect(guiGraphics, centreX - 1F, centreY - 7F, 2F, 3F, color);
                 rect(guiGraphics, centreX - 1F, centreY - 3F, 2F, 10F, color);
@@ -107,10 +116,18 @@ public class TrdmConfigScreen extends TrdmScreenBase {
             for (int index = 0; index < PAGES.length; index++) {
                 final float top = 8F + index * (SIDEBAR_BTN_H + 2F);
                 if (my >= top && my < top + SIDEBAR_BTN_H) {
-                    page = index;
+                    if (index != page) {
+                        if (page == PAGE_TICKET) {
+                            ticketPage.onLeave();
+                        }
+                        page = index;
+                    }
                     return true;
                 }
             }
+        }
+        if (page == PAGE_TICKET) {
+            return ticketPage.click(mx, my);
         }
         if (page != PAGE_GENERAL) {
             return false;
@@ -128,5 +145,21 @@ public class TrdmConfigScreen extends TrdmScreenBase {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (page == PAGE_TICKET && ticketPage.scroll(delta, designX(mouseX), designY(mouseY))) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (page == PAGE_TICKET && ticketPage.keyPressed(keyCode)) {
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 }
