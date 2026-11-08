@@ -45,6 +45,8 @@ public final class TicketGateHandler {
             result = singleTicket(level, player, station, held, entrance);
         } else if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
             result = transitCard(level, player, station, held, entrance);
+        } else if (held.is(Trdm.EXIT_TICKET_ITEM)) {
+            result = exitTicket(level, player, station, held, entrance);
         } else if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
             message(player, "gui.trdm.ticket.gate.invalid_ticket");
             result = TicketSystem.EnumTicketBarrierOpen.CLOSED;
@@ -64,6 +66,9 @@ public final class TicketGateHandler {
      * 单向设备直接按 canEnter。
      */
     private static boolean resolveEntrance(Player player, boolean canEnter, boolean canExit) {
+        if (canEnter && canExit && player.getMainHandItem().is(Trdm.EXIT_TICKET_ITEM)) {
+            return false;
+        }
         if (canEnter && canExit) {
             return TicketData.state(player.getMainHandItem()) != TicketData.State.ENTERED;
         }
@@ -148,6 +153,28 @@ public final class TicketGateHandler {
         TicketData.markExit(card, station, ServerFareRuntime.dimensionId(level), fare);
         message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.exit_card",
                 stationName(station), FareMoney.yuan(fare), FareMoney.yuan(remaining)), remaining));
+        return TicketSystem.EnumTicketBarrierOpen.OPEN;
+    }
+
+    /** 无票补票发出的出站票：只能在本站、有效期内出站一次。 */
+    private static TicketSystem.EnumTicketBarrierOpen exitTicket(ServerLevel level, Player player,
+                                                                 Station station, ItemStack ticket,
+                                                                 boolean entrance) {
+        if (entrance || !TicketData.isExitTicket(ticket)) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        if (TicketData.exitStation(ticket) != station.id
+                || !TicketData.exitDimension(ticket).equals(ServerFareRuntime.dimensionId(level))) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        if (TicketData.exitExpires(ticket) < System.currentTimeMillis()) {
+            message(player, "gui.trdm.ticket.gate.exit_ticket_expired");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        ticket.shrink(1);
+        message(player, "gui.trdm.ticket.gate.exit_ticket", stationName(station));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }
 

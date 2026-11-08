@@ -59,4 +59,24 @@ public final class TicketClientNetwork {
         buf.writeBlockPos(pos);
         ClientPlayNetworking.send(TicketNetwork.PAY_FARE, buf);
     }
+
+    public static void recordEntry(BlockPos pos, long entryStationId) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        buf.writeLong(entryStationId);
+        ClientPlayNetworking.send(TicketNetwork.RECORD_ENTRY, buf);
+    }
+
+    public static void recordExit(BlockPos pos, long exitStationId) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        buf.writeLong(exitStationId);
+        ClientPlayNetworking.send(TicketNetwork.RECORD_EXIT, buf);
+    }
+
+    public static void buyExitTicket(BlockPos pos) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        ClientPlayNetworking.send(TicketNetwork.EXIT_TICKET, buf);
+    }
 }

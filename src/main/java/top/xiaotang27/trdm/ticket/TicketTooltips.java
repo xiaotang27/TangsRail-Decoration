@@ -48,6 +48,24 @@ public final class TicketTooltips {
         }
     }
 
+    public static void exitTicket(ItemStack stack, List<Component> tooltip) {
+        if (!TicketData.isExitTicket(stack)) {
+            tooltip.add(Component.translatable("item.trdm.ticket.tooltip.invalid"));
+            return;
+        }
+        tooltip.add(Component.translatable("item.trdm.exit_ticket.tooltip.station",
+                TicketData.exitName(stack)));
+        tooltip.add(Component.translatable("item.trdm.exit_ticket.tooltip.expires",
+                formatTime(TicketData.exitExpires(stack))));
+        tooltip.add(Component.translatable("item.trdm.exit_ticket.tooltip.usage"));
+    }
+
+    private static String formatTime(long epochMillis) {
+        return java.time.Instant.ofEpochMilli(epochMillis)
+                .atZone(java.time.ZoneId.systemDefault())
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+    }
+
     private static Component stateLine(ItemStack stack) {
         final String key = switch (TicketData.state(stack)) {
             case EMPTY -> "item.trdm.ticket.state.empty";

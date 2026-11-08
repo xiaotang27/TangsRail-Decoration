@@ -196,6 +196,141 @@ public final class TicketPurchase {
         return new Result(true, "gui.trdm.ticket.fare.paid", emeralds);
     }
 
+    // ===== 补出入记录 / 无票出站票 =====
+
+    public static Result recordEntry(ServerPlayer player, BlockPos pos, long entryStationId) {
+        final ServerLevel level = player.serverLevel();
+        final Result invalid = validate(player, pos, Trdm.CUSTOMER_SERVICE_TERMINAL);
+        if (invalid != null) {
+            return invalid;
+        }
+        final Station station = ServerFareRuntime.stationById(level, entryStationId);
+        if (station == null) {
+            return error("gui.trdm.ticket.error.no_destination");
+        }
+        final ItemStack held = player.getMainHandItem();
+        final String dimension = ServerFareRuntime.dimensionId(level);
+        if (held.is(Trdm.SINGLE_TICKET_ITEM)) {
+            if (!TicketData.hasData(held) || !TicketData.TYPE_SINGLE.equals(TicketData.type(held))) {
+                return error("gui.trdm.ticket.error.invalid_ticket");
+            }
+            if (TicketData.state(held) == TicketData.State.ENTERED) {
+                return error("gui.trdm.ticket.error.already_entry");
+            }
+            TicketData.setEntry(held, station, dimension, System.currentTimeMillis());
+            TicketSync.sync(player);
+            return new Result(true, "gui.trdm.terminal.record_entry_success", 0L);
+        }
+        if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            TicketData.ensureCard(held, station, dimension);
+            if (TicketData.state(held) == TicketData.State.ENTERED) {
+                return error("gui.trdm.ticket.error.already_entry");
+            }
+            TicketData.setEntry(held, station, dimension, System.currentTimeMillis());
+            TicketSync.sync(player);
+            return new Result(true, "gui.trdm.terminal.record_entry_success", 0L);
+        }
+        return error("gui.trdm.ticket.error.no_item");
+    }
+
+    public static Result recordExit(ServerPlayer player, BlockPos pos, long exitStationId) {
+        final ServerLevel level = player.serverLevel();
+        final Result invalid = validate(player, pos, Trdm.CUSTOMER_SERVICE_TERMINAL);
+        if (invalid != null) {
+            return invalid;
+        }
+        final Station station = ServerFareRuntime.stationById(level, exitStationId);
+        if (station == null) {
+            return error("gui.trdm.ticket.error.no_destination");
+        }
+        final ItemStack held = player.getMainHandItem();
+        if (held.is(Trdm.SINGLE_TICKET_ITEM)) {
+            return recordExitSingle(level, player, station, held);
+        }
+        if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            return recordExitCard(level, player, station, held);
+        }
+        return error("gui.trdm.ticket.error.no_item");
+    }
+
+    private static Result recordExitSingle(ServerLevel level, ServerPlayer player, Station station,
+                                           ItemStack ticket) {
+        if (!TicketData.hasData(ticket) || !TicketData.TYPE_SINGLE.equals(TicketData.type(ticket))) {
+            return error("gui.trdm.ticket.error.invalid_ticket");
+        }
+        if (TicketData.state(ticket) != TicketData.State.ENTERED || !TicketData.hasEntry(ticket)) {
+            return error("gui.trdm.ticket.error.no_entry");
+        }
+        if (!TicketData.entryDimension(ticket).equals(ServerFareRuntime.dimensionId(level))) {
+            return error("gui.trdm.ticket.error.cross_dimension");
+        }
+        final long fare = ServerFareRuntime.quote(level, TicketData.entryStation(ticket), station.id)
+                .totalCents();
+        final long due = Math.max(0L, fare - TicketData.faceValue(ticket));
+        if (due > 0L) {
+            final long emeralds = FareMoney.emeralds(due);
+            if (!takeEmeralds(player, emeralds)) {
+                return new Result(false, "gui.trdm.ticket.error.no_emerald", emeralds);
+            }
+        }
+        ticket.shrink(1);
+        TicketSync.sync(player);
+        return new Result(true, "gui.trdm.terminal.record_exit_success", 0L);
+    }
+
+    private static Result recordExitCard(ServerLevel level, ServerPlayer player, Station station,
+                                         ItemStack card) {
+        TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
+        if (TicketData.state(card) != TicketData.State.ENTERED || !TicketData.hasEntry(card)) {
+            return error("gui.trdm.ticket.error.no_entry");
+        }
+        if (!TicketData.entryDimension(card).equals(ServerFareRuntime.dimensionId(level))) {
+            return error("gui.trdm.ticket.error.cross_dimension");
+        }
+        final long fare = ServerFareRuntime.quote(level, TicketData.entryStation(card), station.id)
+                .totalCents();
+        long balance = TicketData.balance(card);
+        final long due = Math.max(0L, fare - balance);
+        if (due > 0L) {
+            final long emeralds = FareMoney.emeralds(due);
+            if (!takeEmeralds(player, emeralds)) {
+                return new Result(false, "gui.trdm.ticket.error.no_emerald", emeralds);
+            }
+            balance += due;
+        }
+        final long remaining = balance - fare;
+        TicketData.setBalance(card, remaining);
+        TicketData.markExit(card, station, ServerFareRuntime.dimensionId(level), fare);
+        TicketSync.sync(player);
+        return new Result(true, "gui.trdm.terminal.record_exit_success", 0L);
+    }
+
+    public static Result buyExitTicket(ServerPlayer player, BlockPos pos) {
+        final ServerLevel level = player.serverLevel();
+        final Result invalid = validate(player, pos, Trdm.CUSTOMER_SERVICE_TERMINAL);
+        if (invalid != null) {
+            return invalid;
+        }
+        final Station station = ServerFareRuntime.stationAt(level, pos);
+        if (station == null) {
+            return error("gui.trdm.ticket.error.no_station");
+        }
+        final long cap = ServerFareRuntime.config().maxFareCapCents();
+        if (cap <= 0L) {
+            return error("gui.trdm.terminal.no_fare_rule");
+        }
+        final long cost = FareMoney.emeralds(cap);
+        if (!takeEmeralds(player, cost)) {
+            return new Result(false, "gui.trdm.ticket.error.no_emerald", cost);
+        }
+        final ItemStack exitTicket = new ItemStack(Trdm.EXIT_TICKET_ITEM);
+        TicketData.issueExitTicket(exitTicket, station, ServerFareRuntime.dimensionId(level),
+                System.currentTimeMillis() + 10L * 60L * 1000L);
+        give(player, exitTicket);
+        TicketSync.sync(player);
+        return new Result(true, "gui.trdm.ticket.exit_ticket.success", 0L);
+    }
+
     // ===== 工具 =====
 
     private static Result validate(ServerPlayer player, BlockPos pos, Block... devices) {

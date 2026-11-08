@@ -47,6 +47,7 @@ import top.xiaotang27.trdm.item.ItemTrdmBigSign;
 import top.xiaotang27.trdm.item.ItemSingleTicket;
 import top.xiaotang27.trdm.item.ItemTransitCard;
 import top.xiaotang27.trdm.item.ItemVariableTicket;
+import top.xiaotang27.trdm.item.ItemExitTicket;
 import top.xiaotang27.trdm.net.TicketNetwork;
 import top.xiaotang27.trdm.server.ServerFareRuntime;
 import top.xiaotang27.trdm.control.PsdManualHold;
@@ -118,6 +119,7 @@ public class Trdm implements ModInitializer {
     public static final Item SINGLE_TICKET_ITEM = new ItemSingleTicket();
     public static final Item VARIABLE_TICKET_ITEM = new ItemVariableTicket();
     public static final Item TRANSIT_CARD_ITEM = new ItemTransitCard();
+    public static final Item EXIT_TICKET_ITEM = new ItemExitTicket();
 
     public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
     public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
@@ -168,6 +170,7 @@ public class Trdm implements ModInitializer {
         registerItem("single_ticket", SINGLE_TICKET_ITEM);
         registerItem("variable_ticket", VARIABLE_TICKET_ITEM);
         registerItem("transit_card", TRANSIT_CARD_ITEM);
+        registerItem("exit_ticket", EXIT_TICKET_ITEM);
 
         PSD_DOOR_1_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_door_1"),
                 BlockEntityType.Builder.of(BlockTrdmPSDDoor.TileEntityTrdmPSDDoor::new, PSD_DOOR_1).build(null));
@@ -220,6 +223,7 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(SINGLE_TICKET_ITEM));
                     entries.accept(new ItemStack(VARIABLE_TICKET_ITEM));
                     entries.accept(new ItemStack(TRANSIT_CARD_ITEM));
+                    entries.accept(new ItemStack(EXIT_TICKET_ITEM));
                 });
 
         LOGGER.info("TangsRail Decoration initialized —— Version {}", FabricLoader.getInstance()

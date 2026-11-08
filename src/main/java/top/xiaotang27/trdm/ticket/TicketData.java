@@ -20,6 +20,8 @@ public final class TicketData {
 
     public static final String TYPE_SINGLE = "single";
     public static final String TYPE_CARD = "card";
+    /** 无票补票后发的“出站票”：只能在一个指定车站出站一次。 */
+    public static final String TYPE_EXIT = "exit";
 
     public enum State {
         /** 未使用。 */
@@ -55,6 +57,10 @@ public final class TicketData {
     private static final String KEY_LAST_EXIT_DIM = "last_exit_dim";
     private static final String KEY_LAST_EXIT_TIME = "last_exit_time";
     private static final String KEY_TX = "tx";
+    private static final String KEY_EXIT_STATION = "exit_station";
+    private static final String KEY_EXIT_NAME = "exit_name";
+    private static final String KEY_EXIT_DIM = "exit_dim";
+    private static final String KEY_EXIT_EXPIRES = "exit_expires";
 
     private TicketData() {
     }
@@ -83,6 +89,19 @@ public final class TicketData {
         root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
         root.put(KEY_TX, new ListTag());
         putSold(root, sold, soldDimension);
+        commit(stack, root);
+    }
+
+    /** 无票补票后的出站票：只允许在 {@code station} 出站一次。 */
+    public static void issueExitTicket(ItemStack stack, Station station, String dimension, long expiresAt) {
+        final CompoundTag root = new CompoundTag();
+        root.putString(KEY_SERIAL, UUID.randomUUID().toString());
+        root.putString(KEY_TYPE, TYPE_EXIT);
+        root.putLong(KEY_EXIT_STATION, station == null ? 0L : station.id);
+        root.putString(KEY_EXIT_NAME, stationName(station));
+        root.putString(KEY_EXIT_DIM, dimension == null ? "" : dimension);
+        root.putLong(KEY_EXIT_EXPIRES, expiresAt);
+        root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
         commit(stack, root);
     }
 
@@ -203,6 +222,30 @@ public final class TicketData {
     public static String lastExitName(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? "" : root.getString(KEY_LAST_EXIT_NAME);
+    }
+
+    public static boolean isExitTicket(ItemStack stack) {
+        return hasData(stack) && TYPE_EXIT.equals(type(stack));
+    }
+
+    public static long exitStation(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_EXIT_STATION);
+    }
+
+    public static String exitName(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_EXIT_NAME);
+    }
+
+    public static String exitDimension(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_EXIT_DIM);
+    }
+
+    public static long exitExpires(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_EXIT_EXPIRES);
     }
 
     // ===== 改 =====

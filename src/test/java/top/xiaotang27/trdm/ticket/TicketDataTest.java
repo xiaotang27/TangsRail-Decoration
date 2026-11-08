@@ -92,6 +92,17 @@ class TicketDataTest {
     }
 
     @Test
+    void exitTicketKeepsStationAndExpiry() {
+        final ItemStack stack = new ItemStack(Items.PAPER);
+        TicketData.issueExitTicket(stack, station, "minecraft:overworld", 987654L);
+        assertTrue(TicketData.isExitTicket(stack));
+        assertEquals(7L, TicketData.exitStation(stack));
+        assertEquals("Test Station", TicketData.exitName(stack));
+        assertEquals("minecraft:overworld", TicketData.exitDimension(stack));
+        assertEquals(987654L, TicketData.exitExpires(stack));
+    }
+
+    @Test
     void blankStackHasNoData() {
         assertFalse(TicketData.hasData(new ItemStack(Items.PAPER)));
         assertFalse(TicketData.hasEntry(new ItemStack(Items.PAPER)));

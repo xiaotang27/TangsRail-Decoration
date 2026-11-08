@@ -24,6 +24,15 @@ public final class TicketNetwork {
     /** C2S：BlockPos（客服终端），按主手车票/交通卡补车费。 */
     public static final ResourceLocation PAY_FARE = Trdm.id("ticket_pay_fare");
 
+    /** C2S：BlockPos + 入闸站 id，补写主手票卡的入站记录。 */
+    public static final ResourceLocation RECORD_ENTRY = Trdm.id("ticket_record_entry");
+
+    /** C2S：BlockPos + 出闸站 id，补写主手票卡的出站记录。 */
+    public static final ResourceLocation RECORD_EXIT = Trdm.id("ticket_record_exit");
+
+    /** C2S：BlockPos（客服终端），无票补票并领取出站票。 */
+    public static final ResourceLocation EXIT_TICKET = Trdm.id("ticket_exit_ticket");
+
     /** S2C：成功标志 + 翻译键 + 数值。 */
     public static final ResourceLocation RESULT = Trdm.id("ticket_result");
 
@@ -53,6 +62,20 @@ public final class TicketNetwork {
         ServerPlayNetworking.registerGlobalReceiver(PAY_FARE, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();
             server.execute(() -> send(player, TicketPurchase.payFare(player, pos)));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(RECORD_ENTRY, (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final long station = buf.readLong();
+            server.execute(() -> send(player, TicketPurchase.recordEntry(player, pos, station)));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(RECORD_EXIT, (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final long station = buf.readLong();
+            server.execute(() -> send(player, TicketPurchase.recordExit(player, pos, station)));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(EXIT_TICKET, (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            server.execute(() -> send(player, TicketPurchase.buyExitTicket(player, pos)));
         });
     }
 

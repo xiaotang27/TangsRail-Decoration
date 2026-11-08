@@ -89,16 +89,20 @@ public final class ServerFareRuntime {
     }
 
     public static boolean hasStation(Level level, long stationId) {
+        return stationById(level, stationId) != null;
+    }
+
+    public static Station stationById(Level level, long stationId) {
         final RailwayData data = RailwayData.getInstance(level);
         if (data == null || stationId == 0L) {
-            return false;
+            return null;
         }
         for (final Station station : data.stations) {
             if (station.id == stationId) {
-                return true;
+                return station;
             }
         }
-        return false;
+        return null;
     }
 
     public static void reset() {

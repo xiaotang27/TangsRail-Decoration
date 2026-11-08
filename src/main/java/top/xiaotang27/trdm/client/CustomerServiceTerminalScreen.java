@@ -50,10 +50,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
 
     private static final Object FIELD_STATION = new Object();
 
-    /** 补票/补记录时，选择的车站代表“入闸站”；出闸站固定为终端所在站。 */
+    /** 补票/补记录时，选择的车站代表“入闸站”；出闸站临时改为所选站。 */
     private static final int RECORD_ENTRY = 0;
     private static final int RECORD_EXIT = 1;
-    private static final int RECORD_FARE = 2;
+
+    private static final int ACTION_NONE = 0;
+    private static final int ACTION_PAY_FARE = 1;
+    private static final int ACTION_RECORD_ENTRY = 2;
+    private static final int ACTION_RECORD_EXIT = 3;
+    private static final int ACTION_EXIT_TICKET = 4;
 
     private final String stationName;
     private final long stationId;
@@ -69,13 +74,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     private long infoAmountCents;
     private boolean infoNeedsPayment;
     private boolean infoFromRecord;
+    private int infoAction = ACTION_NONE;
+    private long infoStationId;
 
     private final List<LineGroup> stationGroups = new ArrayList<>();
     private String stationQuery = "";
     private float stationScroll;
     private int recordMode = RECORD_ENTRY;
     private String recordStation = "";
-    private long recordFareCents;
+    private long recordStationId;
 
     public CustomerServiceTerminalScreen(String stationName, long stationId, BlockPos pos) {
         super(null, Component.translatable("block.trdm.customer_service_terminal"));
@@ -208,7 +215,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     }
 
     private void renderStationPicker(GuiGraphics guiGraphics, float mx, float my) {
-        text(guiGraphics, Component.translatable("gui.trdm.terminal.choose_station"),
+        final String titleKey = recordMode == RECORD_EXIT
+                ? "gui.trdm.terminal.choose_exit_station"
+                : "gui.trdm.terminal.choose_entry_station";
+        text(guiGraphics, Component.translatable(titleKey),
                 TicketUi.PANEL_X + 20F, 70F, FONT_SECTION, TicketUi.TEXT_DARK);
         field(guiGraphics, FIELD_STATION, TicketUi.PANEL_X + 20F, 98F,
                 TicketUi.PANEL_W - 40F, 22F, FONT_ROW, stationQuery);
@@ -254,9 +264,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                             hovered ? TicketUi.ROW_HOVER : TicketUi.ROW);
                     text(guiGraphics, Component.literal(row.name()), TicketUi.PANEL_X + 22F, top + 6F,
                             FONT_ROW, TicketUi.TEXT_DARK);
-                    textRight(guiGraphics, Component.literal(FareMoney.yuan(row.fareCents())),
-                            TicketUi.PANEL_X + TicketUi.PANEL_W - 22F, top + 6F,
-                            FONT_ROW, TicketUi.TEXT_DARK);
+                    if (recordMode == RECORD_EXIT) {
+                        textRight(guiGraphics, Component.literal(FareMoney.yuan(row.fareCents())),
+                                TicketUi.PANEL_X + TicketUi.PANEL_W - 22F, top + 6F,
+                                FONT_ROW, TicketUi.TEXT_DARK);
+                    } else {
+                        textRight(guiGraphics, Component.literal("—"),
+                                TicketUi.PANEL_X + TicketUi.PANEL_W - 22F, top + 6F,
+                                FONT_ROW, TicketUi.TEXT_MUTED);
+                    }
                 }
                 top += 24F;
             }
@@ -463,18 +479,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
 
     private boolean clickRepair(float mx, float my) {
         if (hit(mx, my, 160F, 160F, 190F, 160F)) {
-            if (!purchasePending) {
-                purchasePending = true;
-                TicketClientNetwork.payFare(pos);
-            }
+            openFarePreview();
             return true;
         }
         if (hit(mx, my, 385F, 160F, 190F, 160F)) {
-            showMessage(Component.translatable("gui.trdm.terminal.todo"));
+            openRecordType();
             return true;
         }
         if (hit(mx, my, 610F, 160F, 190F, 160F)) {
-            showMessage(Component.translatable("gui.trdm.terminal.todo"));
+            openNoTicketPreview();
             return true;
         }
         return false;
@@ -494,23 +507,125 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         }
     }
 
+    // ===== 补票 / 补记录确认界面 =====
+
+    private void openFarePreview() {
+        final ItemStack held = heldItem();
+        if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
+            return;
+        }
+        if (!TicketData.hasData(held) || TicketData.state(held) != TicketData.State.ENTERED
+                || !TicketData.hasEntry(held)) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
+            return;
+        }
+        if (!TicketData.entryDimension(held).equals(FareRuntime.dimensionId())) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
+            return;
+        }
+        final boolean card = held.is(Trdm.TRANSIT_CARD_ITEM);
+        final long fare = FareRuntime.get().quote(TicketData.entryStation(held), stationId).totalCents();
+        final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
+        final long due = Math.max(0L, fare - value);
+        infoAction = ACTION_PAY_FARE;
+        infoStationId = TicketData.entryStation(held);
+        infoTitle = Component.translatable("gui.trdm.terminal.fare").getString();
+        infoLines.clear();
+        final String soldName = TicketData.soldName(held);
+        if (!soldName.isEmpty()) {
+            infoLines.add(Component.translatable("gui.trdm.terminal.sold_at", soldName).getString());
+        }
+        infoLines.add(Component.translatable("gui.trdm.terminal.entry",
+                TicketData.entryName(held)).getString());
+        infoLines.add(card
+                ? Component.translatable("gui.trdm.terminal.card_balance", FareMoney.yuan(value)).getString()
+                : Component.translatable("gui.trdm.terminal.ticket_amount", FareMoney.text(value)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.fare_due",
+                FareMoney.text(fare)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.extra",
+                FareMoney.text(due)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                FareMoney.text(due)).getString());
+        infoAmountCents = due;
+        infoNeedsPayment = due > 0L;
+        infoFromRecord = false;
+        view = VIEW_INFO;
+    }
+
+    private void openRecordType() {
+        final ItemStack held = heldItem();
+        if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
+            return;
+        }
+        view = VIEW_RECORD_TYPE;
+    }
+
+    private boolean clickRecordType(float mx, float my) {
+        if (hit(mx, my, 250F, 170F, 200F, 160F)) {
+            final ItemStack held = heldItem();
+            if (held.is(Trdm.SINGLE_TICKET_ITEM)) {
+                if (!TicketData.hasData(held) || !TicketData.TYPE_SINGLE.equals(TicketData.type(held))) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
+                    return true;
+                }
+            } else if (!held.is(Trdm.TRANSIT_CARD_ITEM)) {
+                showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
+                return true;
+            }
+            if (TicketData.state(held) == TicketData.State.ENTERED) {
+                showMessage(Component.translatable("gui.trdm.ticket.error.already_entry"));
+                return true;
+            }
+            openStationPicker(RECORD_ENTRY);
+            return true;
+        }
+        if (hit(mx, my, 510F, 170F, 200F, 160F)) {
+            final ItemStack held = heldItem();
+            if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
+                showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
+                return true;
+            }
+            if (!TicketData.hasData(held) || TicketData.state(held) != TicketData.State.ENTERED
+                    || !TicketData.hasEntry(held)) {
+                showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
+                return true;
+            }
+            if (!TicketData.entryDimension(held).equals(FareRuntime.dimensionId())) {
+                showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
+                return true;
+            }
+            openStationPicker(RECORD_EXIT);
+            return true;
+        }
+        return false;
+    }
+
     private void openStationPicker(int mode) {
         recordMode = mode;
         view = VIEW_STATION;
         stationQuery = "";
         stationScroll = 0F;
+        final ItemStack held = heldItem();
+        repriceStationGroups(mode == RECORD_EXIT ? TicketData.entryStation(held) : 0L, mode == RECORD_EXIT);
     }
 
-    private boolean clickRecordType(float mx, float my) {
-        if (hit(mx, my, 250F, 170F, 200F, 160F)) {
-            openStationPicker(RECORD_ENTRY);
-            return true;
+    /** 按“入闸站 → 该站”的票价重算列表；补入站记录不需要票价。 */
+    private void repriceStationGroups(long fromStationId, boolean withFares) {
+        final FareRuntime fares = FareRuntime.get();
+        final List<LineGroup> repriced = new ArrayList<>();
+        for (final LineGroup group : stationGroups) {
+            final List<StationRow> rows = new ArrayList<>();
+            for (final StationRow row : group.stations()) {
+                final long fare = withFares && fromStationId > 0L
+                        ? fares.quote(fromStationId, row.id()).totalCents() : 0L;
+                rows.add(new StationRow(row.id(), row.name(), fare));
+            }
+            repriced.add(new LineGroup(group.name(), rows));
         }
-        if (hit(mx, my, 510F, 170F, 200F, 160F)) {
-            openStationPicker(RECORD_EXIT);
-            return true;
-        }
-        return false;
+        stationGroups.clear();
+        stationGroups.addAll(repriced);
     }
 
     private boolean clickStation(float mx, float my) {
@@ -532,9 +647,13 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
             top += 22F;
             for (final StationRow row : group.stations()) {
                 if (my >= top && my < top + 24F) {
+                    recordStationId = row.id();
                     recordStation = row.name();
-                    recordFareCents = row.fareCents();
-                    showRecordInfo(recordMode);
+                    if (recordMode == RECORD_ENTRY) {
+                        showEntryRecordPreview(row);
+                    } else {
+                        showExitRecordPreview(row);
+                    }
                     return true;
                 }
                 top += 24F;
@@ -543,31 +662,73 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         return false;
     }
 
-    private void showRecordInfo(int mode) {
+    private void showEntryRecordPreview(StationRow row) {
+        infoAction = ACTION_RECORD_ENTRY;
+        infoStationId = row.id();
+        infoTitle = Component.translatable("gui.trdm.terminal.entry_record").getString();
+        infoLines.clear();
+        infoLines.add(Component.translatable("gui.trdm.terminal.entry", row.name()).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                FareMoney.text(0L)).getString());
+        infoAmountCents = 0L;
+        infoNeedsPayment = false;
         infoFromRecord = true;
-        if (mode == RECORD_ENTRY) {
-            infoTitle = Component.translatable("gui.trdm.terminal.entry_record").getString();
-            infoLines.clear();
-            infoLines.add(Component.translatable("gui.trdm.terminal.entry", recordStation).getString());
-            infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
-                    FareMoney.text(0L)).getString());
-            infoAmountCents = 0L;
-            infoNeedsPayment = false;
-        } else {
-            infoTitle = Component.translatable(mode == RECORD_FARE
-                    ? "gui.trdm.terminal.fare" : "gui.trdm.terminal.exit_record").getString();
-            infoLines.clear();
-            infoLines.add(Component.translatable("gui.trdm.terminal.entry", recordStation).getString());
-            if (mode == RECORD_EXIT) {
-                infoLines.add(Component.translatable("gui.trdm.terminal.exit_station", stationName).getString());
-            }
-            infoLines.add(Component.translatable("gui.trdm.terminal.fare_due",
-                    FareMoney.text(recordFareCents)).getString());
-            infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
-                    FareMoney.text(recordFareCents)).getString());
-            infoAmountCents = recordFareCents;
-            infoNeedsPayment = true;
+        view = VIEW_INFO;
+    }
+
+    private void showExitRecordPreview(StationRow row) {
+        final ItemStack held = heldItem();
+        if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
+            return;
         }
+        if (!TicketData.hasData(held) || !TicketData.hasEntry(held)) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
+            return;
+        }
+        final boolean card = held.is(Trdm.TRANSIT_CARD_ITEM);
+        final long fare = row.fareCents();
+        final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
+        final long due = Math.max(0L, fare - value);
+        infoAction = ACTION_RECORD_EXIT;
+        infoStationId = row.id();
+        infoTitle = Component.translatable("gui.trdm.terminal.exit_record").getString();
+        infoLines.clear();
+        infoLines.add(Component.translatable("gui.trdm.terminal.entry",
+                TicketData.entryName(held)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.exit_station", row.name()).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.fare_line",
+                FareMoney.text(fare)).getString());
+        infoLines.add(card
+                ? Component.translatable("gui.trdm.terminal.card_balance", FareMoney.yuan(value)).getString()
+                : Component.translatable("gui.trdm.terminal.ticket_amount", FareMoney.text(value)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.extra",
+                FareMoney.text(due)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                FareMoney.text(due)).getString());
+        infoAmountCents = due;
+        infoNeedsPayment = due > 0L;
+        infoFromRecord = true;
+        view = VIEW_INFO;
+    }
+
+    private void openNoTicketPreview() {
+        final long cap = FareRuntime.get().config().maxFareCapCents();
+        if (cap <= 0L) {
+            showMessage(Component.translatable("gui.trdm.terminal.no_fare_rule"));
+            return;
+        }
+        infoAction = ACTION_EXIT_TICKET;
+        infoStationId = stationId;
+        infoTitle = Component.translatable("gui.trdm.terminal.no_ticket").getString();
+        infoLines.clear();
+        infoLines.add(Component.translatable("gui.trdm.terminal.no_ticket_amount",
+                FareMoney.text(cap)).getString());
+        infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                FareMoney.text(cap)).getString());
+        infoAmountCents = cap;
+        infoNeedsPayment = true;
+        infoFromRecord = false;
         view = VIEW_INFO;
     }
 
@@ -587,27 +748,19 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
-    private void showNoTicketInfo() {
-        final long cap = FareRuntime.get().config().maxFareCapCents();
-        infoTitle = Component.translatable("gui.trdm.terminal.no_ticket").getString();
-        infoLines.clear();
-        if (cap <= 0L) {
-            infoLines.add(Component.translatable("gui.trdm.terminal.no_fare_rule").getString());
-        } else {
-            infoLines.add(Component.translatable("gui.trdm.terminal.no_ticket_amount",
-                    FareMoney.text(cap)).getString());
-        }
-        infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
-                FareMoney.text(cap)).getString());
-        infoAmountCents = cap;
-        infoNeedsPayment = true;
-        infoFromRecord = false;
-        view = VIEW_INFO;
-    }
-
     private boolean clickInfo(float mx, float my) {
         if (hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F)) {
-            dialog = "ok";
+            if (purchasePending) {
+                return true;
+            }
+            purchasePending = true;
+            switch (infoAction) {
+                case ACTION_PAY_FARE -> TicketClientNetwork.payFare(pos);
+                case ACTION_RECORD_ENTRY -> TicketClientNetwork.recordEntry(pos, infoStationId);
+                case ACTION_RECORD_EXIT -> TicketClientNetwork.recordExit(pos, infoStationId);
+                case ACTION_EXIT_TICKET -> TicketClientNetwork.buyExitTicket(pos);
+                default -> purchasePending = false;
+            }
             return true;
         }
         if (hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 100F, 28F)) {
