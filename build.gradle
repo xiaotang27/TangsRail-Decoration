@@ -87,10 +87,11 @@ jar {
 
 // 目标 Java 版本用 toolchain 声明：环境 JDK 低于目标（例如环境是 17、目标是 21）时，
 // 只有 toolchain 会让 foojay 自动 provision 对应 JDK，否则 javac 报「不支持发行版本」。
+// 1.20.1 本身可以在 Java 21 上运行；产物不再兼容仍用 Java 17 启动的客户端。
 java {
     withSourcesJar()
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
