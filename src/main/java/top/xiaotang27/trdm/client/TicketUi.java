@@ -2,6 +2,7 @@ package top.xiaotang27.trdm.client;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 /** 售票机 / 客服终端共用的浅色窗口、带阴影的按钮、数字键盘和弹窗。 */
 final class TicketUi {
@@ -32,6 +33,8 @@ final class TicketUi {
     static final int ROW_ALT = 0xFFDEDEDE;
     static final int ROW_HOVER = 0xFFEFEFEF;
     static final int ROW_HEADER = 0xFFC6C6C6;
+
+    static final ResourceLocation EMERALD = new ResourceLocation("minecraft", "textures/item/emerald.png");
 
     private static final String[] KEYS = {
             "1", "2", "3",
@@ -139,16 +142,21 @@ final class TicketUi {
 
     /** 客服终端的三色业务卡：参考图里卡片右下角有明显投影。 */
     static void card(TrdmScreenBase host, GuiGraphics guiGraphics, float x, float y, float w, float h,
-                     int color, Component title, Component subtitle, float mx, float my) {
+                     ResourceLocation icon, int color, Component title, Component subtitle,
+                     float mx, float my) {
         final boolean hovered = host.hit(mx, my, x, y, w, h);
         shadow(host, guiGraphics, x, y, w, h, 4F);
         host.rect(guiGraphics, x, y, w, h, 0xFF6A6A6A);
         host.rect(guiGraphics, x + 1F, y + 1F, w - 2F, h - 2F, hovered ? brighten(color) : color);
         host.rect(guiGraphics, x + 1F, y + 1F, w - 2F, 3F, 0x35FFFFFF);
-        host.centred(guiGraphics, title, x + w / 2F, y + h / 2F - 12F,
+        if (icon != null) {
+            final float iconSize = 58F;
+            host.image(guiGraphics, icon, x + (w - iconSize) / 2F, y + 18F, iconSize, iconSize);
+        }
+        host.centred(guiGraphics, title, x + w / 2F, y + h - 48F,
                 TrdmScreenBase.FONT_BODY, TEXT_LIGHT);
         if (subtitle != null && !subtitle.getString().isEmpty()) {
-            host.centred(guiGraphics, subtitle, x + w / 2F, y + h / 2F + 10F,
+            host.centred(guiGraphics, subtitle, x + w / 2F, y + h - 26F,
                     TrdmScreenBase.FONT_SUB, 0xFFE8E8E8);
         }
     }
@@ -156,6 +164,10 @@ final class TicketUi {
     static void shadow(TrdmScreenBase host, GuiGraphics guiGraphics, float x, float y, float w, float h,
                        float offset) {
         host.rect(guiGraphics, x + offset, y + offset, w, h, SHADOW);
+    }
+
+    static void emerald(TrdmScreenBase host, GuiGraphics guiGraphics, float x, float y, float size) {
+        host.image(guiGraphics, EMERALD, x, y, size, size);
     }
 
     static int brighten(int color) {

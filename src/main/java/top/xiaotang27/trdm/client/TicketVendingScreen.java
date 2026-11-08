@@ -246,8 +246,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private void renderRightPanel(GuiGraphics guiGraphics, float mx, float my) {
         rect(guiGraphics, RIGHT_X - 8F, 58F, RIGHT_W + 16F, 66F, 0xFF8A8A8A);
-        final String shownStation = selectedStationName.isEmpty() ? stationName : selectedStationName;
-        text(guiGraphics, Component.literal(ellipsize(shownStation, RIGHT_W, FONT_SECTION)),
+        text(guiGraphics, Component.literal(ellipsize(stationName, RIGHT_W, FONT_SECTION)),
                 RIGHT_X, 66F, FONT_SECTION, TicketUi.TEXT_LIGHT);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.in_service"),
                 RIGHT_X, 88F, FONT_SUB, 0xFFE0E0E0);
@@ -303,6 +302,9 @@ public class TicketVendingScreen extends TrdmScreenBase {
                 LIST_X, 164F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.pay_emerald", 18 + topUp),
                 LIST_X, 188F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.emerald(this, guiGraphics,
+                LIST_X + textWidth(Component.translatable("gui.trdm.ticket_machine.pay_emerald", 18 + topUp),
+                        FONT_ROW) + 6F, 187F, 14F);
         TicketUi.button(this, guiGraphics, LIST_X, 400F, 150F, 28F,
                 Component.translatable("gui.trdm.ticket_machine.pay"),
                 hit(mx, my, LIST_X, 400F, 150F, 28F), FONT_ROW);
@@ -337,6 +339,9 @@ public class TicketVendingScreen extends TrdmScreenBase {
                 LIST_X, 160F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.pay_emerald", unitPrice * quantity),
                 LIST_X, 184F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.emerald(this, guiGraphics,
+                LIST_X + textWidth(Component.translatable("gui.trdm.ticket_machine.pay_emerald",
+                        unitPrice * quantity), FONT_ROW) + 6F, 183F, 14F);
 
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.quantity"),
                 LIST_X, 226F, FONT_ROW, TicketUi.TEXT_DARK);
@@ -426,6 +431,11 @@ public class TicketVendingScreen extends TrdmScreenBase {
                     if (my >= top && my < top + ROW_H) {
                         selectedStationName = row.name();
                         priceInput = String.valueOf(row.price());
+                        transactionTitle = Component.translatable("gui.trdm.ticket_machine.single_title",
+                                row.name()).getString();
+                        unitPrice = row.price();
+                        quantity = 1;
+                        transactionOpen = true;
                         return true;
                     }
                     top += ROW_H;

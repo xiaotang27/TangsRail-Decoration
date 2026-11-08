@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private static final float BACK_W = 84F;
     private static final float BACK_H = 24F;
 
+    private static final ResourceLocation ICON_TICKETS =
+            new ResourceLocation("mtr", "textures/block/sign/tickets.png");
+    private static final ResourceLocation ICON_GATE =
+            new ResourceLocation("mtr", "textures/item/ticket_processor.png");
+    private static final ResourceLocation ICON_CARD =
+            new ResourceLocation("trdm", "textures/item/transit_card.png");
+    private static final ResourceLocation ICON_MACHINE =
+            new ResourceLocation("mtr", "textures/item/ticket_machine.png");
+
     private final String stationName;
     private final BlockPos pos;
 
@@ -29,6 +39,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private String dialog;
     private String infoTitle = "";
     private final List<String> infoLines = new ArrayList<>();
+    private int infoAmount;
 
     public CustomerServiceTerminalScreen(String stationName, BlockPos pos) {
         super(null, Component.translatable("block.trdm.customer_service_terminal"));
@@ -71,11 +82,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private void renderHome(GuiGraphics guiGraphics, float mx, float my) {
         centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose"),
                 DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
-        TicketUi.card(this, guiGraphics, 120F, 150F, 200F, 180F, 0xFF1E6FD9,
+        TicketUi.card(this, guiGraphics, 140F, 150F, 200F, 180F, ICON_TICKETS, 0xFF1E6FD9,
                 Component.translatable("gui.trdm.terminal.repair"), Component.empty(), mx, my);
-        TicketUi.card(this, guiGraphics, 360F, 150F, 200F, 180F, 0xFF0A7A1E,
+        TicketUi.card(this, guiGraphics, 380F, 150F, 200F, 180F, ICON_CARD, 0xFF0A7A1E,
                 Component.translatable("gui.trdm.terminal.card"), Component.empty(), mx, my);
-        TicketUi.card(this, guiGraphics, 600F, 150F, 200F, 180F, 0xFF9A5A12,
+        TicketUi.card(this, guiGraphics, 620F, 150F, 200F, 180F, ICON_MACHINE, 0xFF9A5A12,
                 Component.translatable("gui.trdm.terminal.sales"),
                 Component.translatable("gui.trdm.terminal.sales.sub"), mx, my);
     }
@@ -83,11 +94,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private void renderRepair(GuiGraphics guiGraphics, float mx, float my) {
         centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose_repair"),
                 DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
-        TicketUi.card(this, guiGraphics, 140F, 160F, 190F, 160F, 0xFF1E6FD9,
+        TicketUi.card(this, guiGraphics, 160F, 160F, 190F, 160F, ICON_TICKETS, 0xFF1E6FD9,
                 Component.translatable("gui.trdm.terminal.fare"), Component.empty(), mx, my);
-        TicketUi.card(this, guiGraphics, 365F, 160F, 190F, 160F, 0xFF0A7A1E,
+        TicketUi.card(this, guiGraphics, 385F, 160F, 190F, 160F, ICON_GATE, 0xFF0A7A1E,
                 Component.translatable("gui.trdm.terminal.record"), Component.empty(), mx, my);
-        TicketUi.card(this, guiGraphics, 590F, 160F, 190F, 160F, 0xFF9A5A12,
+        TicketUi.card(this, guiGraphics, 610F, 160F, 190F, 160F, ICON_TICKETS, 0xFF9A5A12,
                 Component.translatable("gui.trdm.terminal.no_ticket"),
                 Component.translatable("gui.trdm.terminal.no_ticket.sub"), mx, my);
     }
@@ -99,6 +110,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             text(guiGraphics, Component.literal(infoLines.get(index)), TicketUi.PANEL_X + 20F,
                     120F + index * 24F, FONT_ROW, TicketUi.TEXT_DARK);
         }
+        final float payY = 120F + infoLines.size() * 24F + 6F;
+        final Component pay = Component.translatable("gui.trdm.terminal.pay_emerald", infoAmount);
+        text(guiGraphics, pay, TicketUi.PANEL_X + 20F, payY, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.emerald(this, guiGraphics,
+                TicketUi.PANEL_X + 20F + textWidth(pay, FONT_ROW) + 6F, payY - 1F, 14F);
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
                 Component.translatable("gui.trdm.terminal.pay"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
@@ -110,9 +126,9 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private void renderCardMenu(GuiGraphics guiGraphics, float mx, float my) {
         centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose_card"),
                 DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
-        TicketUi.card(this, guiGraphics, 220F, 170F, 200F, 160F, 0xFF1E6FD9,
+        TicketUi.card(this, guiGraphics, 250F, 170F, 200F, 160F, ICON_CARD, 0xFF1E6FD9,
                 Component.translatable("gui.trdm.terminal.recharge"), Component.empty(), mx, my);
-        TicketUi.card(this, guiGraphics, 480F, 170F, 200F, 160F, 0xFF9A5A12,
+        TicketUi.card(this, guiGraphics, 510F, 170F, 200F, 160F, ICON_CARD, 0xFF9A5A12,
                 Component.translatable("gui.trdm.terminal.records"), Component.empty(), mx, my);
     }
 
@@ -123,6 +139,9 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
                 TicketUi.PANEL_X + 20F, 120F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.pay_emerald", parseAmount()),
                 TicketUi.PANEL_X + 20F, 144F, FONT_ROW, TicketUi.TEXT_DARK);
+        final Component rechargePay = Component.translatable("gui.trdm.terminal.pay_emerald", parseAmount());
+        TicketUi.emerald(this, guiGraphics,
+                TicketUi.PANEL_X + 20F + textWidth(rechargePay, FONT_ROW) + 6F, 143F, 14F);
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
                 Component.translatable("gui.trdm.terminal.confirm"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
@@ -211,15 +230,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private boolean clickHome(float mx, float my) {
-        if (hit(mx, my, 120F, 150F, 200F, 180F)) {
+        if (hit(mx, my, 140F, 150F, 200F, 180F)) {
             view = VIEW_REPAIR;
             return true;
         }
-        if (hit(mx, my, 360F, 150F, 200F, 180F)) {
+        if (hit(mx, my, 380F, 150F, 200F, 180F)) {
             view = VIEW_CARD;
             return true;
         }
-        if (hit(mx, my, 600F, 150F, 200F, 180F)) {
+        if (hit(mx, my, 620F, 150F, 200F, 180F)) {
             Minecraft.getInstance().setScreen(new TicketVendingScreen(this, stationName, pos));
             return true;
         }
@@ -227,15 +246,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private boolean clickRepair(float mx, float my) {
-        if (hit(mx, my, 140F, 160F, 190F, 160F)) {
+        if (hit(mx, my, 160F, 160F, 190F, 160F)) {
             showFareInfo();
             return true;
         }
-        if (hit(mx, my, 365F, 160F, 190F, 160F)) {
+        if (hit(mx, my, 385F, 160F, 190F, 160F)) {
             showRecordInfo();
             return true;
         }
-        if (hit(mx, my, 590F, 160F, 190F, 160F)) {
+        if (hit(mx, my, 610F, 160F, 190F, 160F)) {
             showNoTicketInfo();
             return true;
         }
@@ -250,6 +269,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         infoLines.add(Component.translatable("gui.trdm.terminal.fare_due", 3).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.extra", 1).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 1).getString());
+        infoAmount = 1;
         view = VIEW_INFO;
     }
 
@@ -259,6 +279,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         infoLines.add(Component.translatable("gui.trdm.terminal.entry", "刘园|LIYUAN").getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.fare_due", 3).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 3).getString());
+        infoAmount = 3;
         view = VIEW_INFO;
     }
 
@@ -267,6 +288,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         infoLines.clear();
         infoLines.add(Component.translatable("gui.trdm.terminal.no_ticket_amount", 10).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 10).getString());
+        infoAmount = 10;
         view = VIEW_INFO;
     }
 
@@ -283,12 +305,12 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private boolean clickCardMenu(float mx, float my) {
-        if (hit(mx, my, 220F, 170F, 200F, 160F)) {
+        if (hit(mx, my, 250F, 170F, 200F, 160F)) {
             view = VIEW_RECHARGE;
             amountInput = "";
             return true;
         }
-        if (hit(mx, my, 480F, 170F, 200F, 160F)) {
+        if (hit(mx, my, 510F, 170F, 200F, 160F)) {
             view = VIEW_RECORDS;
             return true;
         }
