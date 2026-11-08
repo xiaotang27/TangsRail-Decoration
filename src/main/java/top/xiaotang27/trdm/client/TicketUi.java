@@ -155,8 +155,8 @@ final class TicketUi {
         host.rect(guiGraphics, x + 1F, y + 1F, w - 2F, h - 2F, hovered ? brighten(color) : color);
         host.rect(guiGraphics, x + 1F, y + 1F, w - 2F, 3F, 0x35FFFFFF);
         if (icon != null) {
-            final float iconSize = 58F;
-            host.image(guiGraphics, icon, x + (w - iconSize) / 2F, y + 18F, iconSize, iconSize);
+            final float iconSize = Math.min(w, h) * 0.52F;
+            host.image(guiGraphics, icon, x + (w - iconSize) / 2F, y + 12F, iconSize, iconSize);
         }
         host.centred(guiGraphics, title, x + w / 2F, y + h - 48F,
                 TrdmScreenBase.FONT_BODY, TEXT_LIGHT);
