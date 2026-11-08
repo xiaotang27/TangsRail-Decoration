@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.fare.FareConfig;
+import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareRule;
 
 import java.util.ArrayList;
@@ -45,8 +46,45 @@ final class TicketConfigPage {
     private static final float DETAIL_SCOPE_Y = 66F;
     private static final float DETAIL_NAME_SECTION_Y = 118F;
     private static final float DETAIL_NAME_FIELD_Y = 142F;
-    private static final float DETAIL_EDIT_SECTION_Y = 192F;
-    private static final float DETAIL_EDIT_BUTTON_Y = 198F;
+    private static final float DETAIL_CONTENT_SECTION_Y = 192F;
+    private static final float DETAIL_CONTENT_TOP = 222F;
+    private static final float DETAIL_CONTENT_LINE = 24F;
+    private static final float DETAIL_CONTENT_VALUE_X = 170F;
+    private static final float DETAIL_EDIT_BUTTON_Y = 466F;
+
+    // ===== 规则编辑器 =====
+    private static final float EDITOR_TYPE_SECTION_Y = 64F;
+    private static final float EDITOR_TYPE_BUTTON_Y = 88F;
+    private static final float EDITOR_TYPE_BUTTON_W = 190F;
+    private static final float EDITOR_TYPE_BUTTON_H = 26F;
+    private static final float EDITOR_TYPE_GAP = 200F;
+
+    private static final float EDITOR_CONTENT_SECTION_Y = 136F;
+    private static final float EDITOR_FLAT_FIELD_Y = 164F;
+    private static final float EDITOR_TABLE_HEADER_Y = 160F;
+    private static final float EDITOR_TABLE_TOP = 176F;
+    private static final float EDITOR_TABLE_ROW_H = 24F;
+    private static final float EDITOR_TABLE_FIELD_H = 20F;
+    private static final float EDITOR_LIMIT_X = 72F;
+    private static final float EDITOR_LIMIT_W = 110F;
+    private static final float EDITOR_UNIT_X = 190F;
+    private static final float EDITOR_FARE_LABEL_X = 262F;
+    private static final float EDITOR_FARE_X = 276F;
+    private static final float EDITOR_FARE_W = 110F;
+    private static final float EDITOR_DELETE_X = 396F;
+    private static final float EDITOR_DELETE_W = 56F;
+    private static final float EDITOR_ADD_W = 120F;
+    private static final float EDITOR_ADD_H = 24F;
+    private static final int EDITOR_MAX_TIERS = 8;
+
+    private static final float EDITOR_CAP_FIELD_W = 160F;
+    private static final float EDITOR_CAP_FIELD_H = 24F;
+    private static final float EDITOR_BUTTON_Y = 476F;
+    private static final float EDITOR_SAVE_W = 120F;
+    private static final float EDITOR_CANCEL_X = 128F;
+    private static final float EDITOR_CANCEL_W = 100F;
+    private static final float EDITOR_BUTTON_H = 28F;
+    private static final float EDITOR_MESSAGE_X = 300F;
 
     private static final Object FIELD_NAME = new Object();
 
@@ -54,6 +92,7 @@ final class TicketConfigPage {
     private static final int VIEW_MAIN = 0;
     private static final int VIEW_RULE = 1;
     private static final int VIEW_TEMPLATE = 2;
+    private static final int VIEW_RULE_EDIT = 3;
 
     private static final int DROP_NONE = 0;
     private static final int DROP_RULE = 1;
@@ -77,6 +116,14 @@ final class TicketConfigPage {
     private final List<TemplateRow> templates = new ArrayList<>();
     /** 线路名 → 规则下标；不在表里 = 系统行（MTR 原版公式）。 */
     private final java.util.Map<String, Integer> lineOwner = new java.util.HashMap<>();
+
+    // 规则编辑器状态：draft 是编辑中的副本，保存时写回 rules。
+    private final Object flatFareField = new Object();
+    private final Object maxFareField = new Object();
+    private final List<Object> tierLimitFields = new ArrayList<>();
+    private final List<Object> tierFareFields = new ArrayList<>();
+    private FareRule draft;
+    private String editorMessage = "";
 
     private int view = VIEW_MAIN;
     private int detailRuleIndex = -1;
@@ -182,6 +229,8 @@ final class TicketConfigPage {
             host.endField(false);
         }
         view = VIEW_MAIN;
+        draft = null;
+        editorMessage = "";
         dropKind = DROP_NONE;
         dropIndex = -1;
         dropScroll = 0F;
@@ -345,6 +394,10 @@ final class TicketConfigPage {
     }
 
     private void renderDetail(GuiGraphics guiGraphics, float mx, float my) {
+        if (view == VIEW_RULE_EDIT) {
+            renderRuleEditor(guiGraphics, mx, my);
+            return;
+        }
         final String title = view == VIEW_RULE ? ruleName(detailRuleIndex)
                 : templates.get(detailTemplateIndex).name;
         host.title(guiGraphics, Component.literal(title));
@@ -375,6 +428,10 @@ final class TicketConfigPage {
             host.text(guiGraphics, Component.translatable("gui.trdm.ticket.mtr_locked"),
                     TrdmScreenBase.CONTENT_X, DETAIL_NAME_SECTION_Y,
                     TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_WARN);
+            host.section(guiGraphics, "gui.trdm.ticket.rule_content", DETAIL_CONTENT_SECTION_Y);
+            host.text(guiGraphics, Component.translatable("gui.trdm.ticket.rule_vanilla_line"),
+                    TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_TOP,
+                    TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
             return;
         }
         final FareRule rule = rules.get(detailRuleIndex);
@@ -384,12 +441,64 @@ final class TicketConfigPage {
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.name_placeholder"),
                 TrdmScreenBase.CONTENT_X, DETAIL_NAME_FIELD_Y + 30F);
 
-        host.section(guiGraphics, "gui.trdm.ticket.edit_rule", DETAIL_EDIT_SECTION_Y);
-        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint"),
-                TrdmScreenBase.CONTENT_X, DETAIL_EDIT_SECTION_Y + 20F);
-        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint2"),
-                TrdmScreenBase.CONTENT_X, DETAIL_EDIT_SECTION_Y + 34F);
+        host.section(guiGraphics, "gui.trdm.ticket.rule_content", DETAIL_CONTENT_SECTION_Y);
+        renderRuleSummary(guiGraphics, rule);
         renderEditButton(guiGraphics, mx, my);
+    }
+
+    /** 规则详情：类型、票价档位、最高票价。 */
+    private void renderRuleSummary(GuiGraphics guiGraphics, FareRule rule) {
+        float y = DETAIL_CONTENT_TOP;
+        summaryRow(guiGraphics, Component.translatable("gui.trdm.ticket.rule_type"), kindLabel(rule.kind), y);
+        y += DETAIL_CONTENT_LINE;
+        if (rule.kind == FareRule.Kind.FLAT) {
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.ticket.rule_fare"),
+                    FareMoney.yuan(rule.flatFareCents), y);
+            y += DETAIL_CONTENT_LINE;
+        } else {
+            int shown = 0;
+            for (final FareRule.Tier tier : rule.tiers) {
+                if (shown >= 6) {
+                    summaryRow(guiGraphics, Component.literal("…"), "", y);
+                    y += DETAIL_CONTENT_LINE;
+                    break;
+                }
+                final Component label = tier.upTo() == null
+                        ? Component.translatable("gui.trdm.ticket.rule_other")
+                        : Component.literal("≤ " + tier.upTo() + " " + unitLabel(rule.kind));
+                summaryRow(guiGraphics, label, FareMoney.yuan(tier.fareCents()), y);
+                y += DETAIL_CONTENT_LINE;
+                shown++;
+            }
+        }
+        summaryRow(guiGraphics, Component.translatable("gui.trdm.ticket.rule_cap"),
+                rule.maxFareCents > 0L ? FareMoney.yuan(rule.maxFareCents)
+                        : Component.translatable("gui.trdm.ticket.rule_uncapped").getString(), y);
+    }
+
+    private void summaryRow(GuiGraphics guiGraphics, Component label, String value, float y) {
+        host.text(guiGraphics, label, TrdmScreenBase.CONTENT_X, y,
+                TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_SUB);
+        if (value != null && !value.isEmpty()) {
+            host.text(guiGraphics, Component.literal(value),
+                    TrdmScreenBase.CONTENT_X + DETAIL_CONTENT_VALUE_X, y,
+                    TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+        }
+    }
+
+    private String kindLabel(FareRule.Kind kind) {
+        final String key = switch (kind) {
+            case MTR_VANILLA -> "gui.trdm.ticket.kind.vanilla";
+            case FLAT -> "gui.trdm.ticket.kind.flat";
+            case INTERVAL_TABLE -> "gui.trdm.ticket.kind.interval";
+            case DISTANCE_TABLE -> "gui.trdm.ticket.kind.distance";
+        };
+        return Component.translatable(key).getString();
+    }
+
+    private String unitLabel(FareRule.Kind kind) {
+        return Component.translatable(kind == FareRule.Kind.DISTANCE_TABLE
+                ? "gui.trdm.ticket.unit.meter" : "gui.trdm.ticket.unit.interval").getString();
     }
 
     private void renderTemplateDetail(GuiGraphics guiGraphics, float mx, float my) {
@@ -400,11 +509,11 @@ final class TicketConfigPage {
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.name_placeholder"),
                 TrdmScreenBase.CONTENT_X, DETAIL_NAME_FIELD_Y + 30F);
 
-        host.section(guiGraphics, "gui.trdm.ticket.edit_template", DETAIL_EDIT_SECTION_Y);
+        host.section(guiGraphics, "gui.trdm.ticket.edit_template", DETAIL_CONTENT_SECTION_Y);
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint"),
-                TrdmScreenBase.CONTENT_X, DETAIL_EDIT_SECTION_Y + 20F);
+                TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_SECTION_Y + 20F);
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint2"),
-                TrdmScreenBase.CONTENT_X, DETAIL_EDIT_SECTION_Y + 34F);
+                TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_SECTION_Y + 34F);
         renderEditButton(guiGraphics, mx, my);
     }
 
@@ -414,6 +523,476 @@ final class TicketConfigPage {
                 Component.translatable("gui.trdm.ticket.edit_button"), false,
                 host.hit(mx, my, x, DETAIL_EDIT_BUTTON_Y, 120F, 24F), TrdmScreenBase.FONT_ROW);
     }
+
+    // ===== 规则编辑器 =====
+
+    private void renderRuleEditor(GuiGraphics guiGraphics, float mx, float my) {
+        host.title(guiGraphics, Component.translatable("gui.trdm.ticket.editor.title"));
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - BACK_W, TrdmScreenBase.TITLE_Y,
+                BACK_W, BACK_H, Component.translatable("gui.trdm.ticket.back"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - BACK_W, TrdmScreenBase.TITLE_Y, BACK_W, BACK_H),
+                TrdmScreenBase.FONT_ROW);
+        if (draft == null) {
+            return;
+        }
+
+        host.section(guiGraphics, "gui.trdm.ticket.rule_type", EDITOR_TYPE_SECTION_Y);
+        renderKindButton(guiGraphics, mx, my, 0, FareRule.Kind.FLAT, "gui.trdm.ticket.kind.flat");
+        renderKindButton(guiGraphics, mx, my, 1, FareRule.Kind.INTERVAL_TABLE, "gui.trdm.ticket.kind.interval");
+        renderKindButton(guiGraphics, mx, my, 2, FareRule.Kind.DISTANCE_TABLE, "gui.trdm.ticket.kind.distance");
+
+        if (draft.kind == FareRule.Kind.FLAT) {
+            host.section(guiGraphics, "gui.trdm.ticket.rule_fare", EDITOR_CONTENT_SECTION_Y);
+            host.field(guiGraphics, flatFareField, TrdmScreenBase.CONTENT_X, EDITOR_FLAT_FIELD_Y, 200F, 24F,
+                    TrdmScreenBase.FONT_ROW, FareMoney.text(draft.flatFareCents));
+            host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.editor.yuan"),
+                    TrdmScreenBase.CONTENT_X + 210F, EDITOR_FLAT_FIELD_Y + 7F);
+            host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.editor.flat_hint"),
+                    TrdmScreenBase.CONTENT_X, EDITOR_FLAT_FIELD_Y + 34F);
+        } else {
+            renderTierEditor(guiGraphics, mx, my);
+        }
+
+        final float capY = capSectionY();
+        host.section(guiGraphics, "gui.trdm.ticket.rule_cap", capY);
+        host.field(guiGraphics, maxFareField, TrdmScreenBase.CONTENT_X, capY + 26F,
+                EDITOR_CAP_FIELD_W, EDITOR_CAP_FIELD_H, TrdmScreenBase.FONT_ROW,
+                FareMoney.text(draft.maxFareCents));
+        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.editor.max_hint"),
+                TrdmScreenBase.CONTENT_X + 172F, capY + 33F);
+
+        renderEditorButtons(guiGraphics, mx, my);
+        final String note = !editorMessage.isEmpty() ? editorMessage : capWarning();
+        if (!note.isEmpty()) {
+            host.text(guiGraphics, Component.literal(note),
+                    TrdmScreenBase.CONTENT_X + EDITOR_MESSAGE_X, EDITOR_BUTTON_Y + 9F,
+                    TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_WARN);
+        }
+    }
+
+    /** 最高票价低于档位票价时提醒：超出的部分会被该规则封顶。 */
+    private String capWarning() {
+        if (draft == null || draft.maxFareCents <= 0L) {
+            return "";
+        }
+        long highest = draft.kind == FareRule.Kind.FLAT ? draft.flatFareCents : 0L;
+        if (draft.kind != FareRule.Kind.FLAT) {
+            for (final FareRule.Tier tier : draft.tiers) {
+                highest = Math.max(highest, tier.fareCents());
+            }
+        }
+        return draft.maxFareCents < highest
+                ? Component.translatable("gui.trdm.ticket.editor.cap_warning").getString() : "";
+    }
+
+    private void renderKindButton(GuiGraphics guiGraphics, float mx, float my, int slot,
+                                  FareRule.Kind kind, String key) {
+        final float x = TrdmScreenBase.CONTENT_X + slot * EDITOR_TYPE_GAP;
+        host.buttonText(guiGraphics, x, EDITOR_TYPE_BUTTON_Y, EDITOR_TYPE_BUTTON_W, EDITOR_TYPE_BUTTON_H,
+                Component.translatable(key), draft.kind == kind,
+                host.hit(mx, my, x, EDITOR_TYPE_BUTTON_Y, EDITOR_TYPE_BUTTON_W, EDITOR_TYPE_BUTTON_H),
+                TrdmScreenBase.FONT_ROW);
+    }
+
+    private void renderTierEditor(GuiGraphics guiGraphics, float mx, float my) {
+        host.section(guiGraphics, "gui.trdm.ticket.editor.tiers", EDITOR_CONTENT_SECTION_Y);
+        host.text(guiGraphics, Component.translatable("gui.trdm.ticket.editor.limit"),
+                EDITOR_LIMIT_X, EDITOR_TABLE_HEADER_Y, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        host.text(guiGraphics, Component.translatable("gui.trdm.ticket.editor.fare"),
+                EDITOR_FARE_X, EDITOR_TABLE_HEADER_Y, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+
+        for (int index = 0; index < draft.tiers.size(); index++) {
+            final FareRule.Tier tier = draft.tiers.get(index);
+            final float rowY = EDITOR_TABLE_TOP + index * EDITOR_TABLE_ROW_H;
+            final boolean open = tier.upTo() == null;
+            if (open) {
+                host.text(guiGraphics, Component.translatable("gui.trdm.ticket.rule_other"),
+                        EDITOR_LIMIT_X, rowY + 5F, TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+            } else {
+                host.text(guiGraphics, Component.literal("≤"), TrdmScreenBase.CONTENT_X, rowY + 5F,
+                        TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+                host.field(guiGraphics, tierLimitFields.get(index), EDITOR_LIMIT_X, rowY + 1F,
+                        EDITOR_LIMIT_W, EDITOR_TABLE_FIELD_H, TrdmScreenBase.FONT_ROW,
+                        Long.toString(tier.upTo()));
+                host.text(guiGraphics, Component.literal(unitLabel(draft.kind)),
+                        EDITOR_UNIT_X, rowY + 5F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+            }
+            host.text(guiGraphics, Component.literal("¥"), EDITOR_FARE_LABEL_X, rowY + 5F,
+                    TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+            host.field(guiGraphics, tierFareFields.get(index), EDITOR_FARE_X, rowY + 1F,
+                    EDITOR_FARE_W, EDITOR_TABLE_FIELD_H, TrdmScreenBase.FONT_ROW,
+                    FareMoney.text(tier.fareCents()));
+            if (!open) {
+                host.buttonText(guiGraphics, EDITOR_DELETE_X, rowY + 1F, EDITOR_DELETE_W, EDITOR_TABLE_FIELD_H,
+                        Component.translatable("gui.trdm.ticket.editor.delete"), false,
+                        host.hit(mx, my, EDITOR_DELETE_X, rowY + 1F, EDITOR_DELETE_W, EDITOR_TABLE_FIELD_H),
+                        TrdmScreenBase.FONT_SUB);
+            }
+        }
+
+        final float addY = addTierButtonY();
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_X, addY, EDITOR_ADD_W, EDITOR_ADD_H,
+                Component.translatable("gui.trdm.ticket.editor.add_tier"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_X, addY, EDITOR_ADD_W, EDITOR_ADD_H),
+                TrdmScreenBase.FONT_SUB);
+        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.editor.hint"),
+                TrdmScreenBase.CONTENT_X + 136F, addY + 8F);
+    }
+
+    private float addTierButtonY() {
+        return EDITOR_TABLE_TOP + draft.tiers.size() * EDITOR_TABLE_ROW_H + 6F;
+    }
+
+    private float capSectionY() {
+        if (draft != null && draft.kind == FareRule.Kind.FLAT) {
+            return EDITOR_FLAT_FIELD_Y + 48F;
+        }
+        return addTierButtonY() + 40F;
+    }
+
+    private void renderEditorButtons(GuiGraphics guiGraphics, float mx, float my) {
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_X, EDITOR_BUTTON_Y, EDITOR_SAVE_W, EDITOR_BUTTON_H,
+                Component.translatable("gui.trdm.ticket.editor.save"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_X, EDITOR_BUTTON_Y, EDITOR_SAVE_W, EDITOR_BUTTON_H),
+                TrdmScreenBase.FONT_ROW);
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_X + EDITOR_CANCEL_X, EDITOR_BUTTON_Y,
+                EDITOR_CANCEL_W, EDITOR_BUTTON_H,
+                Component.translatable("gui.trdm.ticket.editor.cancel"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_X + EDITOR_CANCEL_X, EDITOR_BUTTON_Y,
+                        EDITOR_CANCEL_W, EDITOR_BUTTON_H), TrdmScreenBase.FONT_ROW);
+    }
+
+    private boolean clickRuleEditor(float mx, float my) {
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - BACK_W, TrdmScreenBase.TITLE_Y, BACK_W, BACK_H)) {
+            cancelEditor();
+            return true;
+        }
+        if (draft == null) {
+            return false;
+        }
+        final FareRule.Kind[] kinds = {
+                FareRule.Kind.FLAT, FareRule.Kind.INTERVAL_TABLE, FareRule.Kind.DISTANCE_TABLE
+        };
+        for (int slot = 0; slot < kinds.length; slot++) {
+            final float x = TrdmScreenBase.CONTENT_X + slot * EDITOR_TYPE_GAP;
+            if (host.hit(mx, my, x, EDITOR_TYPE_BUTTON_Y, EDITOR_TYPE_BUTTON_W, EDITOR_TYPE_BUTTON_H)) {
+                switchKind(kinds[slot]);
+                return true;
+            }
+        }
+        if (draft.kind == FareRule.Kind.FLAT) {
+            if (host.hit(mx, my, TrdmScreenBase.CONTENT_X, EDITOR_FLAT_FIELD_Y, 200F, 24F)) {
+                host.beginField(flatFareField, TrdmScreenBase.CONTENT_X, EDITOR_FLAT_FIELD_Y, 200F, 24F,
+                        FareMoney.text(draft.flatFareCents), 7, TrdmScreenBase.FONT_ROW, this::commitFlatFare);
+                return true;
+            }
+        } else {
+            for (int index = 0; index < draft.tiers.size(); index++) {
+                final int slot = index;
+                final FareRule.Tier tier = draft.tiers.get(index);
+                final float rowY = EDITOR_TABLE_TOP + index * EDITOR_TABLE_ROW_H;
+                final boolean open = tier.upTo() == null;
+                if (!open && host.hit(mx, my, EDITOR_LIMIT_X, rowY + 1F, EDITOR_LIMIT_W, EDITOR_TABLE_FIELD_H)) {
+                    host.beginField(tierLimitFields.get(index), EDITOR_LIMIT_X, rowY + 1F,
+                            EDITOR_LIMIT_W, EDITOR_TABLE_FIELD_H, Long.toString(tier.upTo()), 7,
+                            TrdmScreenBase.FONT_ROW, value -> commitTierLimit(slot, value));
+                    return true;
+                }
+                if (host.hit(mx, my, EDITOR_FARE_X, rowY + 1F, EDITOR_FARE_W, EDITOR_TABLE_FIELD_H)) {
+                    host.beginField(tierFareFields.get(index), EDITOR_FARE_X, rowY + 1F,
+                            EDITOR_FARE_W, EDITOR_TABLE_FIELD_H, FareMoney.text(tier.fareCents()), 7,
+                            TrdmScreenBase.FONT_ROW, value -> commitTierFare(slot, value));
+                    return true;
+                }
+                if (!open && host.hit(mx, my, EDITOR_DELETE_X, rowY + 1F, EDITOR_DELETE_W, EDITOR_TABLE_FIELD_H)) {
+                    deleteTier(index);
+                    return true;
+                }
+            }
+            if (host.hit(mx, my, TrdmScreenBase.CONTENT_X, addTierButtonY(), EDITOR_ADD_W, EDITOR_ADD_H)) {
+                addTier();
+                return true;
+            }
+        }
+
+        final float capY = capSectionY();
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_X, capY + 26F, EDITOR_CAP_FIELD_W, EDITOR_CAP_FIELD_H)) {
+            host.beginField(maxFareField, TrdmScreenBase.CONTENT_X, capY + 26F, EDITOR_CAP_FIELD_W,
+                    EDITOR_CAP_FIELD_H, FareMoney.text(draft.maxFareCents), 7,
+                    TrdmScreenBase.FONT_ROW, this::commitMaxFare);
+            return true;
+        }
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_X, EDITOR_BUTTON_Y, EDITOR_SAVE_W, EDITOR_BUTTON_H)) {
+            applyDraft();
+            return true;
+        }
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_X + EDITOR_CANCEL_X, EDITOR_BUTTON_Y,
+                EDITOR_CANCEL_W, EDITOR_BUTTON_H)) {
+            cancelEditor();
+            return true;
+        }
+        return false;
+    }
+
+    private void openEditor() {
+        if (detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
+            return;
+        }
+        draft = rules.get(detailRuleIndex).copy();
+        if (draft.kind == FareRule.Kind.MTR_VANILLA) {
+            draft.kind = FareRule.Kind.FLAT;
+            if (draft.flatFareCents <= 0L) {
+                draft.flatFareCents = 200L;
+            }
+        }
+        if (draft.tiers.isEmpty() || draft.tiers.get(draft.tiers.size() - 1).upTo() != null) {
+            final long fare = draft.tiers.isEmpty() ? 0L
+                    : draft.tiers.get(draft.tiers.size() - 1).fareCents();
+            draft.tiers.add(new FareRule.Tier(null, fare));
+        }
+        resetEditorFields();
+        editorMessage = "";
+        view = VIEW_RULE_EDIT;
+    }
+
+    private void cancelEditor() {
+        if (host.isEditing()) {
+            host.endField(false);
+        }
+        draft = null;
+        editorMessage = "";
+        view = VIEW_RULE;
+    }
+
+    /** 切换规则类型时把票价“带过去”，避免切到阶梯后出现 0 元票价。 */
+    private void switchKind(FareRule.Kind kind) {
+        if (draft == null || draft.kind == kind) {
+            return;
+        }
+        final FareRule.Kind previous = draft.kind;
+        draft.kind = kind;
+        if (kind == FareRule.Kind.FLAT) {
+            final FareRule.Tier open = lastOpenTier();
+            if (open != null && open.fareCents() > 0L) {
+                draft.flatFareCents = open.fareCents();
+            }
+        } else if (previous == FareRule.Kind.FLAT || previous == FareRule.Kind.MTR_VANILLA) {
+            ensureTableTiers(kind);
+        }
+        editorMessage = "";
+    }
+
+    private void ensureTableTiers(FareRule.Kind kind) {
+        final boolean empty = draft.tiers.isEmpty();
+        final boolean singleZeroOpen = draft.tiers.size() == 1
+                && draft.tiers.get(0).upTo() == null && draft.tiers.get(0).fareCents() <= 0L;
+        if (!empty && !singleZeroOpen) {
+            return;
+        }
+        final long base = draft.flatFareCents > 0L ? draft.flatFareCents : 200L;
+        draft.tiers.clear();
+        if (kind == FareRule.Kind.DISTANCE_TABLE) {
+            draft.tiers.add(new FareRule.Tier(1000L, base));
+            draft.tiers.add(new FareRule.Tier(null, base + 100L));
+        } else {
+            draft.tiers.add(new FareRule.Tier(2L, base));
+            draft.tiers.add(new FareRule.Tier(null, base + 100L));
+        }
+        if (draft.maxFareCents > 0L && draft.maxFareCents < base + 100L) {
+            draft.maxFareCents = base + 100L;
+        }
+        resetEditorFields();
+    }
+
+    private FareRule.Tier lastOpenTier() {
+        for (int index = draft.tiers.size() - 1; index >= 0; index--) {
+            if (draft.tiers.get(index).upTo() == null) {
+                return draft.tiers.get(index);
+            }
+        }
+        return null;
+    }
+
+    private void applyDraft() {
+        if (draft == null || detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
+            cancelEditor();
+            return;
+        }
+        final FareRule target = rules.get(detailRuleIndex);
+        target.kind = draft.kind;
+        target.flatFareCents = Math.max(0L, draft.flatFareCents);
+        target.maxFareCents = Math.max(0L, draft.maxFareCents);
+        target.tiers.clear();
+        if (target.kind != FareRule.Kind.FLAT) {
+            target.tiers.addAll(normalizedTiers());
+        }
+        FareRuntime.get().save();
+        rebuildOwners();
+        draft = null;
+        editorMessage = "";
+        view = VIEW_RULE;
+    }
+
+    private List<FareRule.Tier> normalizedTiers() {
+        final List<FareRule.Tier> bounded = new ArrayList<>();
+        FareRule.Tier open = null;
+        for (final FareRule.Tier tier : draft.tiers) {
+            if (tier.upTo() == null) {
+                open = tier;
+            } else {
+                bounded.add(tier);
+            }
+        }
+        bounded.sort(java.util.Comparator.comparingLong(FareRule.Tier::upTo));
+        final List<FareRule.Tier> result = new ArrayList<>(bounded);
+        if (open != null) {
+            result.add(open);
+        } else if (!bounded.isEmpty()) {
+            result.add(new FareRule.Tier(null, bounded.get(bounded.size() - 1).fareCents()));
+        }
+        return result;
+    }
+
+    private void resetEditorFields() {
+        tierLimitFields.clear();
+        tierFareFields.clear();
+        if (draft == null) {
+            return;
+        }
+        for (int index = 0; index < draft.tiers.size(); index++) {
+            tierLimitFields.add(new Object());
+            tierFareFields.add(new Object());
+        }
+    }
+
+    private void addTier() {
+        if (draft == null || draft.kind == FareRule.Kind.FLAT) {
+            return;
+        }
+        if (draft.tiers.size() >= EDITOR_MAX_TIERS) {
+            editorMessage = Component.translatable("gui.trdm.ticket.editor.max_tiers",
+                    EDITOR_MAX_TIERS).getString();
+            return;
+        }
+        final long step = draft.kind == FareRule.Kind.DISTANCE_TABLE ? 1000L : 1L;
+        long upTo = step;
+        long fare = 0L;
+        if (draft.tiers.size() >= 2) {
+            final FareRule.Tier previous = draft.tiers.get(draft.tiers.size() - 2);
+            if (previous.upTo() != null) {
+                upTo = previous.upTo() + step;
+                fare = previous.fareCents();
+            }
+        }
+        draft.tiers.add(Math.max(0, draft.tiers.size() - 1), new FareRule.Tier(upTo, fare));
+        resetEditorFields();
+        editorMessage = "";
+    }
+
+    private void deleteTier(int index) {
+        if (draft == null || index < 0 || index >= draft.tiers.size() - 1) {
+            return;
+        }
+        draft.tiers.remove(index);
+        if (draft.tiers.isEmpty()) {
+            draft.tiers.add(new FareRule.Tier(null, 0L));
+        } else if (draft.tiers.get(draft.tiers.size() - 1).upTo() != null) {
+            draft.tiers.add(new FareRule.Tier(null,
+                    draft.tiers.get(draft.tiers.size() - 1).fareCents()));
+        }
+        resetEditorFields();
+        editorMessage = "";
+    }
+
+    private void commitFlatFare(String value) {
+        final Long cents = parseMoneyCents(value);
+        if (cents == null) {
+            editorMessage = invalidMessage();
+            return;
+        }
+        draft.flatFareCents = cents;
+        editorMessage = "";
+    }
+
+    private void commitMaxFare(String value) {
+        final Long cents = parseMoneyCents(value);
+        if (cents == null) {
+            editorMessage = invalidMessage();
+            return;
+        }
+        draft.maxFareCents = cents;
+        editorMessage = "";
+    }
+
+    private void commitTierLimit(int index, String value) {
+        final Long limit = parseCount(value);
+        if (limit == null) {
+            editorMessage = invalidMessage();
+            return;
+        }
+        if (draft == null || index < 0 || index >= draft.tiers.size()) {
+            return;
+        }
+        final FareRule.Tier tier = draft.tiers.get(index);
+        draft.tiers.set(index, new FareRule.Tier(limit, tier.fareCents()));
+        editorMessage = "";
+    }
+
+    private void commitTierFare(int index, String value) {
+        final Long cents = parseMoneyCents(value);
+        if (cents == null) {
+            editorMessage = invalidMessage();
+            return;
+        }
+        if (draft == null || index < 0 || index >= draft.tiers.size()) {
+            return;
+        }
+        final FareRule.Tier tier = draft.tiers.get(index);
+        draft.tiers.set(index, new FareRule.Tier(tier.upTo(), cents));
+        editorMessage = "";
+    }
+
+    private String invalidMessage() {
+        return Component.translatable("gui.trdm.ticket.editor.invalid").getString();
+    }
+
+    /** 解析“元”文本为分；最多两位小数。非法返回 {@code null}。 */
+    private static Long parseMoneyCents(String text) {
+        if (text == null) {
+            return null;
+        }
+        final String trimmed = text.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            final java.math.BigDecimal value = new java.math.BigDecimal(trimmed);
+            if (value.signum() < 0 || value.scale() > 2) {
+                return null;
+            }
+            return value.movePointRight(2).longValueExact();
+        } catch (NumberFormatException | ArithmeticException exception) {
+            return null;
+        }
+    }
+
+    /** 解析档位上限，必须是正整数。 */
+    private static Long parseCount(String text) {
+        if (text == null) {
+            return null;
+        }
+        final String trimmed = text.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            final long value = Long.parseLong(trimmed);
+            return value > 0L ? value : null;
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
 
     private void renderOverlay(GuiGraphics guiGraphics) {
         host.rect(guiGraphics, TrdmScreenBase.SIDEBAR_W, 0F,
@@ -495,6 +1074,9 @@ final class TicketConfigPage {
     }
 
     private boolean clickDetail(float mx, float my) {
+        if (view == VIEW_RULE_EDIT) {
+            return clickRuleEditor(mx, my);
+        }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - BACK_W, TrdmScreenBase.TITLE_Y, BACK_W, BACK_H)) {
             backToMain();
             return true;
@@ -526,10 +1108,14 @@ final class TicketConfigPage {
             return true;
         }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 120F, DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
-            final Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player != null) {
-                minecraft.player.displayClientMessage(
-                        Component.translatable("gui.trdm.ticket.editor_todo"), true);
+            if (view == VIEW_RULE && detailRuleIndex >= 0) {
+                openEditor();
+            } else {
+                final Minecraft minecraft = Minecraft.getInstance();
+                if (minecraft.player != null) {
+                    minecraft.player.displayClientMessage(
+                            Component.translatable("gui.trdm.ticket.editor_todo"), true);
+                }
             }
             return true;
         }
@@ -551,9 +1137,15 @@ final class TicketConfigPage {
     }
 
     boolean keyPressed(int keyCode) {
-        if (keyCode == 256 && view != VIEW_MAIN && !host.isEditing()) {
-            backToMain();
-            return true;
+        if (keyCode == 256 && !host.isEditing()) {
+            if (view == VIEW_RULE_EDIT) {
+                cancelEditor();
+                return true;
+            }
+            if (view != VIEW_MAIN) {
+                backToMain();
+                return true;
+            }
         }
         return false;
     }
@@ -585,6 +1177,8 @@ final class TicketConfigPage {
             host.endField(true);
         }
         view = VIEW_MAIN;
+        draft = null;
+        editorMessage = "";
         dropKind = DROP_NONE;
         dropScroll = 0F;
         selectedKind = SELECT_NONE;

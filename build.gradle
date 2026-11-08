@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "top.xiaotang27.trdm"
-version = "DEV_0.1"
+// 版本号统一由 gradle.properties 的 version 提供，避免两处各写一份。
 
 // ===== 本机专属配置 =====
 // 依赖 jar 的路径、本地素材位置这些「每台机器都不一样」的值不进仓库，写在 mod 根目录的

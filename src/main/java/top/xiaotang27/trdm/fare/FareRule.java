@@ -56,6 +56,16 @@ public final class FareRule {
         return new FareRule(VANILLA_ID, VANILLA_NAME, Kind.MTR_VANILLA);
     }
 
+    /** 深拷贝，供规则编辑器“取消/保存”使用（{@link Tier} 不可变，直接共享）。 */
+    public FareRule copy() {
+        final FareRule copy = new FareRule(id, name, kind);
+        copy.enabled = enabled;
+        copy.maxFareCents = maxFareCents;
+        copy.flatFareCents = flatFareCents;
+        copy.tiers.addAll(tiers);
+        return copy;
+    }
+
     public boolean isVanilla() {
         return kind == Kind.MTR_VANILLA;
     }

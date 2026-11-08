@@ -1,6 +1,7 @@
 package top.xiaotang27.trdm;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -214,7 +215,10 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(TRANSIT_CARD_ITEM));
                 });
 
-        LOGGER.info("TangsRail Decoration initialized —— Version DEV_0.1");
+        LOGGER.info("TangsRail Decoration initialized —— Version {}", FabricLoader.getInstance()
+                .getModContainer(MOD_ID)
+                .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                .orElse("?"));
     }
 
     public static ResourceLocation id(String path) {
