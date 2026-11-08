@@ -79,6 +79,12 @@ public abstract class TrdmScreenBase extends Screen {
     private int scissorDepth;
     private Consumer<String> fieldCommit;
 
+    // 浅色界面可以覆盖输入框配色（默认沿用深色主题）
+    protected int themeFieldBg = COLOR_FIELD_BG;
+    protected int themeFieldBorder = COLOR_FIELD_BORDER;
+    protected int themeFieldText = COLOR_TEXT;
+    protected int themeFieldFocus = COLOR_FIELD_FOCUS;
+
     protected TrdmScreenBase(Screen parent, Component title) {
         super(title);
         this.parentScreen = parent;
@@ -436,14 +442,14 @@ public abstract class TrdmScreenBase extends Screen {
     protected void field(GuiGraphics guiGraphics, Object id, float x, float y, float w, float h, float designFont,
                          String value) {
         final boolean active = fieldActive(id);
-        rect(guiGraphics, x, y, w, h, active ? COLOR_FIELD_FOCUS : COLOR_FIELD_BORDER);
-        rect(guiGraphics, x + 1F, y + 1F, w - 2F, h - 2F, COLOR_FIELD_BG);
+        rect(guiGraphics, x, y, w, h, active ? themeFieldFocus : themeFieldBorder);
+        rect(guiGraphics, x + 1F, y + 1F, w - 2F, h - 2F, themeFieldBg);
         final float pad = 9F;
         final float textY = y + (h - designFont) / 2F - 1F;
         final String shown = active ? fieldValue : (value == null ? "" : value);
         if (!active) {
             scissorOn(guiGraphics, x + 2F, y + 2F, w - 4F, h - 4F);
-            text(guiGraphics, Component.literal(shown), x + pad, textY, designFont, COLOR_TEXT);
+            text(guiGraphics, Component.literal(shown), x + pad, textY, designFont, themeFieldText);
             scissorOff(guiGraphics);
             return;
         }
@@ -459,7 +465,7 @@ public abstract class TrdmScreenBase extends Screen {
             fieldScroll = cursorX;
         }
         scissorOn(guiGraphics, x + 2F, y + 2F, w - 4F, h - 4F);
-        text(guiGraphics, Component.literal(shown), x + pad - fieldScroll, textY, designFont, COLOR_TEXT);
+        text(guiGraphics, Component.literal(shown), x + pad - fieldScroll, textY, designFont, themeFieldText);
         rect(guiGraphics, x + pad - fieldScroll + cursorX, y + h / 2F - designFont * 0.55F, 2F, designFont * 1.1F,
                 0xFFFFFFFF);
         scissorOff(guiGraphics);

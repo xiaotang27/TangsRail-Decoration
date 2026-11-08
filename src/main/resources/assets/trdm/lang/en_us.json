@@ -180,6 +180,7 @@
   "gui.trdm.ticket_machine.quantity": "Quantity",
   "gui.trdm.ticket_machine.back": "Back",
   "gui.trdm.ticket_machine.by_price": "Single ticket: by fare",
+  "gui.trdm.ticket_machine.single_title": "Single ticket: %s",
   "gui.trdm.terminal.station": "Station: %s",
   "gui.trdm.terminal.choose": "Choose a service",
   "gui.trdm.terminal.repair": "Fare / record adjustment",

@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。目前是演示数据。 */
+/** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。浅色主题，演示数据。 */
 public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private static final int VIEW_HOME = 0;
@@ -19,7 +19,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private static final int VIEW_RECORDS = 5;
 
     private static final float BACK_W = 84F;
-    private static final float BACK_H = 26F;
+    private static final float BACK_H = 24F;
 
     private final String stationName;
     private final BlockPos pos;
@@ -34,6 +34,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         super(null, Component.translatable("block.trdm.customer_service_terminal"));
         this.stationName = stationName == null ? "" : stationName;
         this.pos = pos;
+        themeFieldBg = 0xFFFFFFFF;
+        themeFieldBorder = TicketUi.BORDER;
+        themeFieldText = TicketUi.TEXT_DARK;
+        themeFieldFocus = TicketUi.GREEN;
     }
 
     @Override
@@ -55,18 +59,18 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private void renderHeader(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.terminal.station", stationName),
-                TicketUi.PANEL_X + 12F, TicketUi.PANEL_Y + 10F, FONT_ROW, COLOR_TEXT);
+                TicketUi.PANEL_X + 12F, TicketUi.PANEL_Y + 10F, FONT_ROW, TicketUi.TEXT_LIGHT);
         if (view != VIEW_HOME) {
             final float x = TicketUi.PANEL_X + TicketUi.PANEL_W - BACK_W - 10F;
-            buttonText(guiGraphics, x, TicketUi.PANEL_Y + 4F, BACK_W, BACK_H,
-                    Component.translatable("gui.trdm.ticket.back"), false,
-                    hit(mx, my, x, TicketUi.PANEL_Y + 4F, BACK_W, BACK_H), FONT_ROW);
+            TicketUi.button(this, guiGraphics, x, TicketUi.PANEL_Y + 5F, BACK_W, BACK_H,
+                    Component.translatable("gui.trdm.ticket.back"),
+                    hit(mx, my, x, TicketUi.PANEL_Y + 5F, BACK_W, BACK_H), FONT_ROW);
         }
     }
 
     private void renderHome(GuiGraphics guiGraphics, float mx, float my) {
         centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose"),
-                DESIGN_W / 2F, 84F, FONT_SECTION, COLOR_TEXT);
+                DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
         TicketUi.card(this, guiGraphics, 120F, 150F, 200F, 180F, 0xFF1E6FD9,
                 Component.translatable("gui.trdm.terminal.repair"), Component.empty(), mx, my);
         TicketUi.card(this, guiGraphics, 360F, 150F, 200F, 180F, 0xFF0A7A1E,
@@ -78,7 +82,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private void renderRepair(GuiGraphics guiGraphics, float mx, float my) {
         centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose_repair"),
-                DESIGN_W / 2F, 84F, FONT_SECTION, COLOR_TEXT);
+                DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
         TicketUi.card(this, guiGraphics, 140F, 160F, 190F, 160F, 0xFF1E6FD9,
                 Component.translatable("gui.trdm.terminal.fare"), Component.empty(), mx, my);
         TicketUi.card(this, guiGraphics, 365F, 160F, 190F, 160F, 0xFF0A7A1E,
@@ -90,22 +94,22 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private void renderInfo(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.literal(infoTitle), TicketUi.PANEL_X + 20F, 78F,
-                FONT_SECTION, COLOR_TEXT);
+                FONT_SECTION, TicketUi.TEXT_DARK);
         for (int index = 0; index < infoLines.size(); index++) {
             text(guiGraphics, Component.literal(infoLines.get(index)), TicketUi.PANEL_X + 20F,
-                    120F + index * 22F, FONT_ROW, COLOR_TEXT);
+                    120F + index * 24F, FONT_ROW, TicketUi.TEXT_DARK);
         }
-        buttonText(guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
-                Component.translatable("gui.trdm.terminal.pay"), false,
+        TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
+                Component.translatable("gui.trdm.terminal.pay"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
-        buttonText(guiGraphics, TicketUi.PANEL_X + 184F, 400F, 100F, 28F,
-                Component.translatable("gui.trdm.ticket.back"), false,
+        TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 184F, 400F, 100F, 28F,
+                Component.translatable("gui.trdm.ticket.back"),
                 hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 100F, 28F), FONT_ROW);
     }
 
     private void renderCardMenu(GuiGraphics guiGraphics, float mx, float my) {
         centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose_card"),
-                DESIGN_W / 2F, 84F, FONT_SECTION, COLOR_TEXT);
+                DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
         TicketUi.card(this, guiGraphics, 220F, 170F, 200F, 160F, 0xFF1E6FD9,
                 Component.translatable("gui.trdm.terminal.recharge"), Component.empty(), mx, my);
         TicketUi.card(this, guiGraphics, 480F, 170F, 200F, 160F, 0xFF9A5A12,
@@ -114,36 +118,39 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private void renderRecharge(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.terminal.recharge_title"),
-                TicketUi.PANEL_X + 20F, 78F, FONT_SECTION, COLOR_TEXT);
+                TicketUi.PANEL_X + 20F, 78F, FONT_SECTION, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.total", parseAmount()),
-                TicketUi.PANEL_X + 20F, 120F, FONT_ROW, COLOR_TEXT);
+                TicketUi.PANEL_X + 20F, 120F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.pay_emerald", parseAmount()),
-                TicketUi.PANEL_X + 20F, 144F, FONT_ROW, COLOR_TEXT);
-        buttonText(guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
-                Component.translatable("gui.trdm.terminal.confirm"), false,
+                TicketUi.PANEL_X + 20F, 144F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
+                Component.translatable("gui.trdm.terminal.confirm"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
 
         final float keypadX = 552F;
         text(guiGraphics, Component.translatable("gui.trdm.terminal.enter_amount"),
-                keypadX, 254F, FONT_ROW, COLOR_TEXT);
-        rect(guiGraphics, keypadX, 274F, 190F, 24F, COLOR_FIELD_BORDER);
-        rect(guiGraphics, keypadX + 1F, 275F, 188F, 22F, 0xFF161616);
+                keypadX, 282F, FONT_ROW, TicketUi.TEXT_DARK);
+        rect(guiGraphics, keypadX, 302F, 190F, 24F, TicketUi.BORDER);
+        rect(guiGraphics, keypadX + 1F, 303F, 188F, 22F, 0xFFFFFFFF);
         text(guiGraphics, Component.literal(amountInput.isEmpty() ? "¥" : "¥" + amountInput),
-                keypadX + 8F, 280F, FONT_ROW, COLOR_TEXT);
-        TicketUi.keypad(this, guiGraphics, keypadX, 306F, mx, my);
+                keypadX + 8F, 308F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.keypad(this, guiGraphics, keypadX, 334F, mx, my);
     }
 
     private void renderRecords(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.terminal.records_title"),
-                TicketUi.PANEL_X + 20F, 78F, FONT_SECTION, COLOR_TEXT);
+                TicketUi.PANEL_X + 20F, 78F, FONT_SECTION, TicketUi.TEXT_DARK);
+        rect(guiGraphics, TicketUi.PANEL_X + 12F, 104F, TicketUi.PANEL_W - 24F, 156F, TicketUi.BORDER);
+        rect(guiGraphics, TicketUi.PANEL_X + 13F, 105F, TicketUi.PANEL_W - 26F, 154F, 0xFFFFFFFF);
+        rect(guiGraphics, TicketUi.PANEL_X + 13F, 105F, TicketUi.PANEL_W - 26F, 26F, TicketUi.ROW_HEADER);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.col_time"),
-                TicketUi.PANEL_X + 24F, 120F, FONT_SUB, COLOR_SUB);
+                TicketUi.PANEL_X + 24F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.col_reason"),
-                TicketUi.PANEL_X + 250F, 120F, FONT_SUB, COLOR_SUB);
+                TicketUi.PANEL_X + 250F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.col_change"),
-                TicketUi.PANEL_X + 400F, 120F, FONT_SUB, COLOR_SUB);
+                TicketUi.PANEL_X + 400F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.col_balance"),
-                TicketUi.PANEL_X + 540F, 120F, FONT_SUB, COLOR_SUB);
+                TicketUi.PANEL_X + 540F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
 
         final String[][] rows = {
                 {"2026-11-01 10:00:00", "gui.trdm.terminal.reason.fare", "- ¥10", "¥100"},
@@ -151,17 +158,21 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
                 {"2026-01-01 00:00:00", "gui.trdm.terminal.reason.initial", "+ ¥100", "¥100"}
         };
         for (int index = 0; index < rows.length; index++) {
-            final float y = 146F + index * 24F;
+            final float y = 140F + index * 26F;
+            if (index > 0) {
+                rect(guiGraphics, TicketUi.PANEL_X + 14F, y - 5F, TicketUi.PANEL_W - 28F, 1F, 0xFFDDDDDD);
+            }
             text(guiGraphics, Component.literal(rows[index][0]), TicketUi.PANEL_X + 24F, y,
-                    FONT_SUB, COLOR_TEXT);
+                    FONT_SUB, TicketUi.TEXT_DARK);
             text(guiGraphics, Component.translatable(rows[index][1]), TicketUi.PANEL_X + 250F, y,
-                    FONT_SUB, COLOR_TEXT);
+                    FONT_SUB, TicketUi.TEXT_DARK);
             text(guiGraphics, Component.literal(rows[index][2]), TicketUi.PANEL_X + 400F, y,
-                    FONT_SUB, COLOR_TEXT);
+                    FONT_SUB, TicketUi.TEXT_DARK);
             text(guiGraphics, Component.literal(rows[index][3]), TicketUi.PANEL_X + 540F, y,
-                    FONT_SUB, COLOR_TEXT);
+                    FONT_SUB, TicketUi.TEXT_DARK);
         }
-        hint(guiGraphics, "gui.trdm.terminal.records.demo", TicketUi.PANEL_X + 24F, 240F);
+        text(guiGraphics, Component.translatable("gui.trdm.terminal.records.demo"),
+                TicketUi.PANEL_X + 24F, 276F, FONT_SUB, TicketUi.TEXT_MUTED);
     }
 
     // ===== 点击 =====
@@ -183,7 +194,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
         if (view != VIEW_HOME) {
             final float x = TicketUi.PANEL_X + TicketUi.PANEL_W - BACK_W - 10F;
-            if (hit(mx, my, x, TicketUi.PANEL_Y + 4F, BACK_W, BACK_H)) {
+            if (hit(mx, my, x, TicketUi.PANEL_Y + 5F, BACK_W, BACK_H)) {
                 back();
                 return true;
             }
@@ -285,7 +296,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     }
 
     private boolean clickRecharge(float mx, float my) {
-        final String key = TicketUi.keypadHit(552F, 306F, mx, my);
+        final String key = TicketUi.keypadHit(552F, 334F, mx, my);
         if (key != null) {
             if ("<".equals(key)) {
                 if (!amountInput.isEmpty()) {

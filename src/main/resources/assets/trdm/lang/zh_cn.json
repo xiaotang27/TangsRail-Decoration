@@ -148,6 +148,7 @@
   "gui.trdm.ticket_machine.quantity": "数量",
   "gui.trdm.ticket_machine.back": "返回",
   "gui.trdm.ticket_machine.by_price": "单程票：按价格选择",
+  "gui.trdm.ticket_machine.single_title": "单程票：%s",
   "gui.trdm.terminal.station": "当前站 %s",
   "gui.trdm.terminal.choose": "请选择要办理的业务",
   "gui.trdm.terminal.repair": "补票/补记录出入站",

@@ -10,10 +10,11 @@ import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
-/** 售票机界面：单程票 / 通用票 / 交通卡三个页签，目前是演示数据。 */
+/** 售票机界面：单程票 / 通用票 / 交通卡三个页签，浅色主题，演示数据。 */
 public class TicketVendingScreen extends TrdmScreenBase {
 
     private static final int TAB_SINGLE = 0;
@@ -26,8 +27,9 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private static final float LIST_X = 104F;
     private static final float LIST_W = 430F;
-    private static final float LIST_TOP = 126F;
+    private static final float LIST_TOP = 116F;
     private static final float LIST_BOTTOM = 478F;
+    private static final float GROUP_H = 22F;
     private static final float ROW_H = 24F;
 
     private static final float RIGHT_X = 552F;
@@ -35,8 +37,11 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private static final Object FIELD_SEARCH = new Object();
 
-    private static final String[] SAMPLE_STATIONS = {
-            "刘园|LIUYUAN", "天津站|TIANJIN", "双桥河|SHUANGQIAOHE", "车站|CHEZHAN", "名字|MINGZI"
+    private static final String[][] SAMPLE_GROUPS = {
+            {"1号线|Line 1", "刘园|LIUYUAN", "名字|MINGZI", "车站|CHEZHAN", "双桥河|SHUANGQIAOHE"},
+            {"2号线|Line 2", "梅江会展中心|MEIJIANG", "文化中心|WENHUA", "天塔|TIANTA", "天泰路|TIANTAILU"},
+            {"3号线|Line 3", "西站|XIZHAN", "红旗南路|HONGQINANLU", "解放南路|JIEFANGNANLU", "迎风道|YINGFENGDAO"},
+            {"6号线|Line 6", "金钟河大街|JINZHONGHE", "金钟街|JINZHONGJIE", "民权门|MINQUANMEN", "北宁公园|BEINING"}
     };
 
     private static final PassRow[] PASSES = {
@@ -48,14 +53,13 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private final String stationName;
     private final BlockPos pos;
-    private final List<StationRow> stations = new ArrayList<>();
+    private final List<LineGroup> groups = new ArrayList<>();
 
     private int tab = TAB_SINGLE;
     private String query = "";
-    private String lastQuery = "";
     private float listScroll;
-    private int selectedStation = -1;
     private int selectedLine = -1;
+    private String selectedStationName = "";
 
     private String priceInput = "";
     private boolean transactionOpen;
@@ -72,22 +76,50 @@ public class TicketVendingScreen extends TrdmScreenBase {
         super(parent, Component.translatable("block.trdm.ticket_vending_machine"));
         this.stationName = stationName == null ? "" : stationName;
         this.pos = pos;
+        themeFieldBg = 0xFFFFFFFF;
+        themeFieldBorder = TicketUi.BORDER;
+        themeFieldText = TicketUi.TEXT_DARK;
+        themeFieldFocus = TicketUi.GREEN;
         loadStations();
     }
 
     private void loadStations() {
-        final List<Station> all = new ArrayList<>(ClientData.STATIONS);
-        all.sort(Comparator.comparing((Station station) -> station.name == null ? "" : station.name,
+        final List<Route> routes = new ArrayList<>(ClientData.ROUTES);
+        routes.sort(Comparator.comparing((Route route) -> route.name == null ? "" : route.name,
                 String.CASE_INSENSITIVE_ORDER));
-        for (int index = 0; index < all.size(); index++) {
-            final String name = all.get(index).name;
-            stations.add(new StationRow(name == null ? "?" : name, 2 + index % 3));
-        }
-        if (stations.isEmpty()) {
-            for (int index = 0; index < SAMPLE_STATIONS.length; index++) {
-                stations.add(new StationRow(SAMPLE_STATIONS[index], 2 + index % 3));
+        for (int groupIndex = 0; groupIndex < routes.size(); groupIndex++) {
+            final Route route = routes.get(groupIndex);
+            final LinkedHashSet<String> names = new LinkedHashSet<>();
+            for (final Route.RoutePlatform platform : route.platformIds) {
+                final Station station = ClientData.DATA_CACHE.platformIdToStation.get(platform.platformId);
+                if (station != null && station.name != null && !station.name.isBlank()) {
+                    names.add(station.name);
+                }
+            }
+            if (!names.isEmpty()) {
+                groups.add(new LineGroup(route.name == null ? "?" : route.name,
+                        rowsOf(names, groupIndex)));
             }
         }
+        if (groups.isEmpty()) {
+            for (int groupIndex = 0; groupIndex < SAMPLE_GROUPS.length; groupIndex++) {
+                final LinkedHashSet<String> names = new LinkedHashSet<>();
+                for (int index = 1; index < SAMPLE_GROUPS[groupIndex].length; index++) {
+                    names.add(SAMPLE_GROUPS[groupIndex][index]);
+                }
+                groups.add(new LineGroup(SAMPLE_GROUPS[groupIndex][0], rowsOf(names, groupIndex)));
+            }
+        }
+    }
+
+    private List<StationRow> rowsOf(LinkedHashSet<String> names, int groupIndex) {
+        final List<StationRow> rows = new ArrayList<>();
+        int index = 0;
+        for (final String name : names) {
+            rows.add(new StationRow(name, 2 + (groupIndex + index) % 3));
+            index++;
+        }
+        return rows;
     }
 
     @Override
@@ -125,114 +157,136 @@ public class TicketVendingScreen extends TrdmScreenBase {
         };
         for (int index = 0; index < keys.length; index++) {
             final float x = 100F + index * 138F;
-            buttonText(guiGraphics, x, TAB_Y, TAB_W, TAB_H, Component.translatable(keys[index]),
-                    tab == index, hit(mx, my, x, TAB_Y, TAB_W, TAB_H), FONT_ROW);
+            TicketUi.tab(this, guiGraphics, x, TAB_Y, TAB_W, TAB_H,
+                    Component.translatable(keys[index]), tab == index,
+                    hit(mx, my, x, TAB_Y, TAB_W, TAB_H));
         }
     }
 
     // ===== 单程票 =====
 
     private void renderSingle(GuiGraphics guiGraphics, float mx, float my) {
+        rect(guiGraphics, LIST_X - 6F, 58F, LIST_W + 12F, LIST_BOTTOM - 58F, TicketUi.BORDER);
+        rect(guiGraphics, LIST_X - 5F, 59F, LIST_W + 10F, LIST_BOTTOM - 60F, TicketUi.BG_LIGHT);
+
         field(guiGraphics, FIELD_SEARCH, LIST_X, 64F, LIST_W, 22F, FONT_ROW, query);
         if (query.isEmpty() && !fieldActive(FIELD_SEARCH)) {
             text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.search"),
-                    LIST_X + 8F, 70F, FONT_ROW, 0xFF808080);
+                    LIST_X + 8F, 70F, FONT_ROW, TicketUi.TEXT_MUTED);
         }
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_stations"),
-                LIST_X, 98F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 96F, FONT_ROW, TicketUi.TEXT_DARK);
 
-        final List<StationRow> visible = visibleStations();
-        if (visible.isEmpty()) {
-            hint(guiGraphics, "gui.trdm.ticket_machine.empty", LIST_X, LIST_TOP + 4F);
+        final List<LineGroup> visible = visibleGroups();
+        final float total = totalHeight(visible);
+        if (total <= 0F) {
+            hintDark(guiGraphics, "gui.trdm.ticket_machine.empty", LIST_X, LIST_TOP + 4F);
             return;
         }
-        scissorOn(guiGraphics, LIST_X, LIST_TOP, LIST_W, LIST_BOTTOM - LIST_TOP);
+        scissorOn(guiGraphics, LIST_X - 4F, LIST_TOP, LIST_W + 8F, LIST_BOTTOM - LIST_TOP);
         float top = LIST_TOP - listScroll;
-        for (int index = 0; index < visible.size(); index++) {
-            final StationRow row = visible.get(index);
-            if (top + ROW_H >= LIST_TOP && top <= LIST_BOTTOM) {
-                final boolean hovered = mx >= LIST_X && mx < LIST_X + LIST_W && my >= top && my < top + ROW_H;
-                row(guiGraphics, LIST_X, top, LIST_W, ROW_H - 1F, index == selectedStation, hovered);
-                text(guiGraphics, Component.literal(row.name()), LIST_X + 8F, top + 7F, FONT_ROW, COLOR_TEXT);
-                textRight(guiGraphics, Component.literal("¥" + row.price()), LIST_X + LIST_W - 10F,
-                        top + 7F, FONT_ROW, COLOR_TEXT);
+        for (final LineGroup group : visible) {
+            if (top + GROUP_H >= LIST_TOP && top <= LIST_BOTTOM) {
+                rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, GROUP_H - 1F, TicketUi.ROW_HEADER);
+                text(guiGraphics, Component.literal(group.name()), LIST_X + 4F, top + 5F,
+                        FONT_SUB, TicketUi.TEXT_DARK);
             }
-            top += ROW_H;
+            top += GROUP_H;
+            for (final StationRow row : group.stations()) {
+                if (top + ROW_H >= LIST_TOP && top <= LIST_BOTTOM) {
+                    final boolean selected = row.name().equals(selectedStationName);
+                    final boolean hovered = mx >= LIST_X && mx < LIST_X + LIST_W
+                            && my >= top && my < top + ROW_H;
+                    rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, ROW_H - 1F,
+                            selected ? TicketUi.GREEN : (hovered ? TicketUi.ROW_HOVER : TicketUi.ROW));
+                    text(guiGraphics, Component.literal(row.name()), LIST_X + 4F, top + 7F,
+                            FONT_ROW, selected ? TicketUi.TEXT_LIGHT : TicketUi.TEXT_DARK);
+                    textRight(guiGraphics, Component.literal("¥" + row.price()),
+                            LIST_X + LIST_W - 4F, top + 7F, FONT_ROW,
+                            selected ? TicketUi.TEXT_LIGHT : TicketUi.TEXT_DARK);
+                }
+                top += ROW_H;
+            }
         }
         scissorOff(guiGraphics);
-        scrollbar(guiGraphics, LIST_X + LIST_W - 4F, LIST_TOP, LIST_BOTTOM - LIST_TOP,
-                visible.size() * ROW_H, LIST_BOTTOM - LIST_TOP, listScroll);
+        scrollbar(guiGraphics, LIST_X + LIST_W + 2F, LIST_TOP, LIST_BOTTOM - LIST_TOP,
+                total, LIST_BOTTOM - LIST_TOP, listScroll);
     }
 
-    private List<StationRow> visibleStations() {
+    private List<LineGroup> visibleGroups() {
         final String raw = fieldActive(FIELD_SEARCH) ? editingValue() : query;
         final String needle = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        final List<LineGroup> base = selectedLine >= 0 && selectedLine < groups.size()
+                ? List.of(groups.get(selectedLine)) : groups;
         if (needle.isEmpty()) {
-            return stations;
+            return base;
         }
-        final List<StationRow> filtered = new ArrayList<>();
-        for (final StationRow row : stations) {
-            if (row.name().toLowerCase(Locale.ROOT).contains(needle)) {
-                filtered.add(row);
+        final List<LineGroup> filtered = new ArrayList<>();
+        for (final LineGroup group : base) {
+            final List<StationRow> rows = new ArrayList<>();
+            for (final StationRow row : group.stations()) {
+                if (row.name().toLowerCase(Locale.ROOT).contains(needle)) {
+                    rows.add(row);
+                }
+            }
+            if (!rows.isEmpty()) {
+                filtered.add(new LineGroup(group.name(), rows));
             }
         }
         return filtered;
     }
 
-    private void renderRightPanel(GuiGraphics guiGraphics, float mx, float my) {
-        text(guiGraphics, Component.literal(stationName), RIGHT_X, 64F, FONT_SECTION, COLOR_TEXT);
-        hint(guiGraphics, "gui.trdm.ticket_machine.in_service", RIGHT_X, 86F);
-        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.choose_line"),
-                RIGHT_X, 112F, FONT_ROW, COLOR_TEXT);
+    private float totalHeight(List<LineGroup> visible) {
+        float total = 0F;
+        for (final LineGroup group : visible) {
+            total += GROUP_H + group.stations().size() * ROW_H;
+        }
+        return total;
+    }
 
-        final List<String> lines = lineNames();
-        for (int index = 0; index < Math.min(4, lines.size()); index++) {
-            final float y = 132F + index * 26F;
-            buttonText(guiGraphics, RIGHT_X, y, 190F, 22F, Component.literal(lines.get(index)),
-                    selectedLine == index, hit(mx, my, RIGHT_X, y, 190F, 22F), FONT_SUB);
+    private void renderRightPanel(GuiGraphics guiGraphics, float mx, float my) {
+        rect(guiGraphics, RIGHT_X - 8F, 58F, RIGHT_W + 16F, 66F, 0xFF8A8A8A);
+        final String shownStation = selectedStationName.isEmpty() ? stationName : selectedStationName;
+        text(guiGraphics, Component.literal(ellipsize(shownStation, RIGHT_W, FONT_SECTION)),
+                RIGHT_X, 66F, FONT_SECTION, TicketUi.TEXT_LIGHT);
+        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.in_service"),
+                RIGHT_X, 88F, FONT_SUB, 0xFFE0E0E0);
+
+        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.choose_line"),
+                RIGHT_X, 134F, FONT_ROW, TicketUi.TEXT_DARK);
+        final int lineCount = Math.min(4, groups.size());
+        for (int index = 0; index < lineCount; index++) {
+            final float y = 154F + index * 28F;
+            TicketUi.option(this, guiGraphics, RIGHT_X, y, 220F, 24F,
+                    Component.literal(ellipsize(groups.get(index).name(), 210F, FONT_SUB)),
+                    selectedLine == index, hit(mx, my, RIGHT_X, y, 220F, 24F), FONT_SUB);
         }
 
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.choose_price"),
-                RIGHT_X, 254F, FONT_ROW, COLOR_TEXT);
-        rect(guiGraphics, RIGHT_X, 274F, 190F, 24F, COLOR_FIELD_BORDER);
-        rect(guiGraphics, RIGHT_X + 1F, 275F, 188F, 22F, 0xFF161616);
+                RIGHT_X, 282F, FONT_ROW, TicketUi.TEXT_DARK);
+        rect(guiGraphics, RIGHT_X, 302F, 190F, 24F, TicketUi.BORDER);
+        rect(guiGraphics, RIGHT_X + 1F, 303F, 188F, 22F, 0xFFFFFFFF);
         text(guiGraphics, Component.literal(priceInput.isEmpty() ? "¥" : "¥" + priceInput),
-                RIGHT_X + 8F, 280F, FONT_ROW, COLOR_TEXT);
-        TicketUi.keypad(this, guiGraphics, RIGHT_X, 306F, mx, my);
-    }
-
-    private List<String> lineNames() {
-        final List<String> names = new ArrayList<>();
-        final List<Route> routes = new ArrayList<>(ClientData.ROUTES);
-        routes.sort(Comparator.comparing((Route route) -> route.name == null ? "" : route.name,
-                String.CASE_INSENSITIVE_ORDER));
-        for (final Route route : routes) {
-            if (route.name != null && !route.name.isBlank()) {
-                names.add(route.name);
-            }
-        }
-        if (names.isEmpty()) {
-            names.add("1号线|Line 1");
-            names.add("2号线|Line 2");
-            names.add("3号线|Line 3");
-        }
-        return names;
+                RIGHT_X + 8F, 308F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.keypad(this, guiGraphics, RIGHT_X, 334F, mx, my);
     }
 
     // ===== 通用票 =====
 
     private void renderPasses(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_passes"),
-                LIST_X, 64F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 64F, FONT_ROW, TicketUi.TEXT_DARK);
         for (int index = 0; index < PASSES.length; index++) {
             final PassRow pass = PASSES[index];
-            final float top = 90F + index * 32F;
-            row(guiGraphics, LIST_X, top, LIST_W, 30F, false, hit(mx, my, LIST_X, top, LIST_W, 30F));
-            text(guiGraphics, Component.literal(pass.name()), LIST_X + 8F, top + 10F, FONT_ROW, COLOR_TEXT);
-            textRight(guiGraphics, Component.literal("¥" + pass.price()), LIST_X + LIST_W - 10F,
-                    top + 10F, FONT_ROW, COLOR_TEXT);
+            final float top = 92F + index * 34F;
+            rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, 32F,
+                    hit(mx, my, LIST_X, top, LIST_W, 32F) ? TicketUi.ROW_HOVER : TicketUi.ROW);
+            text(guiGraphics, Component.literal(pass.name()), LIST_X + 4F, top + 10F,
+                    FONT_ROW, TicketUi.TEXT_DARK);
+            textRight(guiGraphics, Component.literal("¥" + pass.price()), LIST_X + LIST_W - 4F,
+                    top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
         }
-        hint(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, 236F);
+        hintDark(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, 244F);
     }
 
     // ===== 交通卡 =====
@@ -240,61 +294,64 @@ public class TicketVendingScreen extends TrdmScreenBase {
     private void renderCard(GuiGraphics guiGraphics, float mx, float my) {
         final int topUp = parsePrice();
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.card_info"),
-                LIST_X, 64F, FONT_SECTION, COLOR_TEXT);
+                LIST_X, 64F, FONT_SECTION, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.card_fee"),
-                LIST_X, 104F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 108F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.card_topup", topUp),
-                LIST_X, 128F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 132F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.card_total", 18 + topUp),
-                LIST_X, 160F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 164F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.pay_emerald", 18 + topUp),
-                LIST_X, 184F, FONT_ROW, COLOR_TEXT);
-        buttonText(guiGraphics, LIST_X, 400F, 150F, 28F,
-                Component.translatable("gui.trdm.ticket_machine.pay"), false,
+                LIST_X, 188F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.button(this, guiGraphics, LIST_X, 400F, 150F, 28F,
+                Component.translatable("gui.trdm.ticket_machine.pay"),
                 hit(mx, my, LIST_X, 400F, 150F, 28F), FONT_ROW);
     }
 
     private void renderKeypadPanel(GuiGraphics guiGraphics, float mx, float my, String labelKey) {
-        text(guiGraphics, Component.translatable(labelKey), RIGHT_X, 254F, FONT_ROW, COLOR_TEXT);
-        rect(guiGraphics, RIGHT_X, 274F, 190F, 24F, COLOR_FIELD_BORDER);
-        rect(guiGraphics, RIGHT_X + 1F, 275F, 188F, 22F, 0xFF161616);
+        text(guiGraphics, Component.translatable(labelKey), RIGHT_X, 282F, FONT_ROW, TicketUi.TEXT_DARK);
+        rect(guiGraphics, RIGHT_X, 302F, 190F, 24F, TicketUi.BORDER);
+        rect(guiGraphics, RIGHT_X + 1F, 303F, 188F, 22F, 0xFFFFFFFF);
         text(guiGraphics, Component.literal(priceInput.isEmpty() ? "¥" : "¥" + priceInput),
-                RIGHT_X + 8F, 280F, FONT_ROW, COLOR_TEXT);
-        TicketUi.keypad(this, guiGraphics, RIGHT_X, 306F, mx, my);
+                RIGHT_X + 8F, 308F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.keypad(this, guiGraphics, RIGHT_X, 334F, mx, my);
     }
 
     private void renderStationInfo(GuiGraphics guiGraphics) {
-        text(guiGraphics, Component.literal(stationName), RIGHT_X, 64F, FONT_SECTION, COLOR_TEXT);
-        hint(guiGraphics, "gui.trdm.ticket_machine.in_service", RIGHT_X, 86F);
+        rect(guiGraphics, RIGHT_X - 8F, 58F, RIGHT_W + 16F, 66F, 0xFF8A8A8A);
+        text(guiGraphics, Component.literal(ellipsize(stationName, RIGHT_W, FONT_SECTION)),
+                RIGHT_X, 66F, FONT_SECTION, TicketUi.TEXT_LIGHT);
+        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.in_service"),
+                RIGHT_X, 88F, FONT_SUB, 0xFFE0E0E0);
     }
 
     // ===== 交易信息 =====
 
     private void renderTransaction(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.transaction"),
-                LIST_X, 64F, FONT_SECTION, COLOR_TEXT);
-        text(guiGraphics, Component.literal(transactionTitle), LIST_X, 104F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 64F, FONT_SECTION, TicketUi.TEXT_DARK);
+        text(guiGraphics, Component.literal(transactionTitle), LIST_X, 108F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.fare_amount", unitPrice),
-                LIST_X, 126F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 132F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.total", unitPrice * quantity),
-                LIST_X, 154F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 160F, FONT_ROW, TicketUi.TEXT_DARK);
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.pay_emerald", unitPrice * quantity),
-                LIST_X, 176F, FONT_ROW, COLOR_TEXT);
+                LIST_X, 184F, FONT_ROW, TicketUi.TEXT_DARK);
 
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.quantity"),
-                LIST_X, 222F, FONT_ROW, COLOR_TEXT);
-        buttonText(guiGraphics, LIST_X + 70F, 214F, 26F, 24F, Component.literal("-"), false,
-                hit(mx, my, LIST_X + 70F, 214F, 26F, 24F), FONT_ROW);
+                LIST_X, 226F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.button(this, guiGraphics, LIST_X + 70F, 218F, 26F, 24F,
+                Component.literal("-"), hit(mx, my, LIST_X + 70F, 218F, 26F, 24F), FONT_ROW);
         textCentred(guiGraphics, Component.literal(String.valueOf(quantity)), LIST_X + 100F, 28F,
-                220F, FONT_ROW, COLOR_TEXT);
-        buttonText(guiGraphics, LIST_X + 132F, 214F, 26F, 24F, Component.literal("+"), false,
-                hit(mx, my, LIST_X + 132F, 214F, 26F, 24F), FONT_ROW);
+                222F, FONT_ROW, TicketUi.TEXT_DARK);
+        TicketUi.button(this, guiGraphics, LIST_X + 132F, 218F, 26F, 24F,
+                Component.literal("+"), hit(mx, my, LIST_X + 132F, 218F, 26F, 24F), FONT_ROW);
 
-        buttonText(guiGraphics, LIST_X, 400F, 150F, 28F,
-                Component.translatable("gui.trdm.ticket_machine.pay"), false,
+        TicketUi.button(this, guiGraphics, LIST_X, 400F, 150F, 28F,
+                Component.translatable("gui.trdm.ticket_machine.pay"),
                 hit(mx, my, LIST_X, 400F, 150F, 28F), FONT_ROW);
-        buttonText(guiGraphics, LIST_X + 164F, 400F, 100F, 28F,
-                Component.translatable("gui.trdm.ticket_machine.back"), false,
+        TicketUi.button(this, guiGraphics, LIST_X + 164F, 400F, 100F, 28F,
+                Component.translatable("gui.trdm.ticket_machine.back"),
                 hit(mx, my, LIST_X + 164F, 400F, 100F, 28F), FONT_ROW);
     }
 
@@ -334,11 +391,11 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private boolean clickSingle(float mx, float my) {
         if (transactionOpen) {
-            if (hit(mx, my, LIST_X + 70F, 214F, 26F, 24F)) {
+            if (hit(mx, my, LIST_X + 70F, 218F, 26F, 24F)) {
                 quantity = Math.max(1, quantity - 1);
                 return true;
             }
-            if (hit(mx, my, LIST_X + 132F, 214F, 26F, 24F)) {
+            if (hit(mx, my, LIST_X + 132F, 218F, 26F, 24F)) {
                 quantity = Math.min(64, quantity + 1);
                 return true;
             }
@@ -356,30 +413,39 @@ public class TicketVendingScreen extends TrdmScreenBase {
         if (hit(mx, my, LIST_X, 64F, LIST_W, 22F)) {
             beginField(FIELD_SEARCH, LIST_X, 64F, LIST_W, 22F, query, 64, FONT_ROW, value -> {
                 query = value == null ? "" : value;
-                lastQuery = query;
                 clampScroll();
             });
             return true;
         }
 
-        final List<StationRow> visible = visibleStations();
         if (my >= LIST_TOP && my < LIST_BOTTOM && mx >= LIST_X && mx < LIST_X + LIST_W) {
-            final int index = (int) ((my - LIST_TOP + listScroll) / ROW_H);
-            if (index >= 0 && index < visible.size()) {
-                selectedStation = index;
-                priceInput = String.valueOf(visible.get(index).price());
+            float top = LIST_TOP - listScroll;
+            for (final LineGroup group : visibleGroups()) {
+                top += GROUP_H;
+                for (final StationRow row : group.stations()) {
+                    if (my >= top && my < top + ROW_H) {
+                        selectedStationName = row.name();
+                        priceInput = String.valueOf(row.price());
+                        return true;
+                    }
+                    top += ROW_H;
+                }
+            }
+        }
+
+        final int lineCount = Math.min(4, groups.size());
+        for (int index = 0; index < lineCount; index++) {
+            final float y = 154F + index * 28F;
+            if (hit(mx, my, RIGHT_X, y, 220F, 24F)) {
+                selectedLine = selectedLine == index ? -1 : index;
+                selectedStationName = "";
+                priceInput = "";
+                listScroll = 0F;
                 return true;
             }
         }
 
-        for (int index = 0; index < Math.min(4, lineNames().size()); index++) {
-            if (hit(mx, my, RIGHT_X, 132F + index * 26F, 190F, 22F)) {
-                selectedLine = index;
-                return true;
-            }
-        }
-
-        final String key = TicketUi.keypadHit(RIGHT_X, 306F, mx, my);
+        final String key = TicketUi.keypadHit(RIGHT_X, 334F, mx, my);
         if (key != null) {
             handleKey(key);
             return true;
@@ -389,11 +455,11 @@ public class TicketVendingScreen extends TrdmScreenBase {
 
     private boolean clickPass(float mx, float my) {
         if (transactionOpen) {
-            if (hit(mx, my, LIST_X + 70F, 214F, 26F, 24F)) {
+            if (hit(mx, my, LIST_X + 70F, 218F, 26F, 24F)) {
                 quantity = Math.max(1, quantity - 1);
                 return true;
             }
-            if (hit(mx, my, LIST_X + 132F, 214F, 26F, 24F)) {
+            if (hit(mx, my, LIST_X + 132F, 218F, 26F, 24F)) {
                 quantity = Math.min(64, quantity + 1);
                 return true;
             }
@@ -408,7 +474,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
             return false;
         }
         for (int index = 0; index < PASSES.length; index++) {
-            if (hit(mx, my, LIST_X, 90F + index * 32F, LIST_W, 30F)) {
+            if (hit(mx, my, LIST_X, 92F + index * 34F, LIST_W, 32F)) {
                 transactionTitle = PASSES[index].name();
                 unitPrice = PASSES[index].price();
                 quantity = 1;
@@ -420,7 +486,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
     }
 
     private boolean clickCard(float mx, float my) {
-        final String key = TicketUi.keypadHit(RIGHT_X, 306F, mx, my);
+        final String key = TicketUi.keypadHit(RIGHT_X, 334F, mx, my);
         if (key != null) {
             handleKey(key);
             return true;
@@ -441,7 +507,10 @@ public class TicketVendingScreen extends TrdmScreenBase {
             }
             case "OK" -> {
                 if (tab == TAB_SINGLE && !priceInput.isEmpty()) {
-                    transactionTitle = Component.translatable("gui.trdm.ticket_machine.by_price").getString();
+                    transactionTitle = selectedStationName.isEmpty()
+                            ? Component.translatable("gui.trdm.ticket_machine.by_price").getString()
+                            : Component.translatable("gui.trdm.ticket_machine.single_title",
+                            selectedStationName).getString();
                     unitPrice = parsePrice();
                     quantity = 1;
                     transactionOpen = true;
@@ -467,7 +536,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
     }
 
     private void clampScroll() {
-        final float total = visibleStations().size() * ROW_H;
+        final float total = totalHeight(visibleGroups());
         listScroll = Math.max(0F, Math.min(listScroll, Math.max(0F, total - (LIST_BOTTOM - LIST_TOP))));
     }
 
@@ -485,6 +554,31 @@ public class TicketVendingScreen extends TrdmScreenBase {
     private boolean inPanel(float mx, float my) {
         return mx >= TicketUi.PANEL_X && mx < TicketUi.PANEL_X + TicketUi.PANEL_W
                 && my >= TicketUi.PANEL_Y && my < TicketUi.PANEL_Y + TicketUi.PANEL_H;
+    }
+
+    private void hintDark(GuiGraphics guiGraphics, String key, float x, float y) {
+        text(guiGraphics, Component.translatable(key), x, y, FONT_SUB, TicketUi.TEXT_MUTED);
+    }
+
+    private String ellipsize(String text, float maxWidth, float fontPx) {
+        final String value = text == null ? "" : text;
+        if (textWidth(Component.literal(value), fontPx) <= maxWidth) {
+            return value;
+        }
+        final String ellipsis = "…";
+        final float tail = textWidth(Component.literal(ellipsis), fontPx);
+        final StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < value.length(); index++) {
+            final String next = builder.toString() + value.charAt(index);
+            if (textWidth(Component.literal(next), fontPx) + tail > maxWidth) {
+                break;
+            }
+            builder.append(value.charAt(index));
+        }
+        return builder + ellipsis;
+    }
+
+    private record LineGroup(String name, List<StationRow> stations) {
     }
 
     private record StationRow(String name, int price) {
