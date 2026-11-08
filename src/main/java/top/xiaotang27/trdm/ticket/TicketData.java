@@ -123,6 +123,14 @@ public final class TicketData {
         root.putLong(KEY_ENTRY_TIME, time);
     }
 
+    /** 确保手上的交通卡有数据；空白卡（例如创造模式直接拿到的）按 0 余额初始化。 */
+    public static void ensureCard(ItemStack stack, Station sold, String dimension) {
+        if (hasData(stack) && TYPE_CARD.equals(type(stack))) {
+            return;
+        }
+        issueCard(stack, 0L, 0, sold, dimension);
+    }
+
     // ===== 读 =====
 
     /** 没有 {@code trdm_ticket} 标签（例如创造模式直接拿到的物品）时返回 false。 */

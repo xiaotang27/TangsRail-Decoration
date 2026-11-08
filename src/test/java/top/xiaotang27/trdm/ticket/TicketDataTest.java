@@ -77,6 +77,21 @@ class TicketDataTest {
     }
 
     @Test
+    void blankCardCanBeInitialized() {
+        final ItemStack card = new ItemStack(Items.PAPER);
+        assertFalse(TicketData.hasData(card));
+        TicketData.ensureCard(card, null, "minecraft:overworld");
+        assertTrue(TicketData.hasData(card));
+        assertEquals(TicketData.TYPE_CARD, TicketData.type(card));
+        assertEquals(0L, TicketData.balance(card));
+        assertEquals(TicketData.State.EMPTY, TicketData.state(card));
+
+        TicketData.setBalance(card, 500L);
+        TicketData.ensureCard(card, null, "minecraft:overworld");
+        assertEquals(500L, TicketData.balance(card));
+    }
+
+    @Test
     void blankStackHasNoData() {
         assertFalse(TicketData.hasData(new ItemStack(Items.PAPER)));
         assertFalse(TicketData.hasEntry(new ItemStack(Items.PAPER)));

@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.fare.FareConfig;
+import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareQuote;
 import top.xiaotang27.trdm.server.ServerFareRuntime;
 
@@ -79,7 +80,7 @@ public final class TicketGateHandler {
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
             TicketData.enter(ticket, station, ServerFareRuntime.dimensionId(level));
-            message(player, "gui.trdm.ticket.gate.entry_ok");
+            message(player, "gui.trdm.ticket.gate.entry_ticket", stationName(station));
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
         }
         if (TicketData.state(ticket) != TicketData.State.ENTERED || !TicketData.hasEntry(ticket)) {
@@ -100,24 +101,23 @@ public final class TicketGateHandler {
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
         ticket.shrink(1);
-        message(player, "gui.trdm.ticket.gate.exit_ok");
+        message(player, "gui.trdm.ticket.gate.exit_ticket", stationName(station));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }
 
     private static TicketSystem.EnumTicketBarrierOpen transitCard(ServerLevel level, Player player,
                                                                   Station station, ItemStack card,
                                                                   boolean entrance) {
-        if (!TicketData.hasData(card) || !TicketData.TYPE_CARD.equals(TicketData.type(card))) {
-            message(player, "gui.trdm.ticket.gate.bad_card");
-            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
-        }
+        // 空白交通卡（例如从创造模式物品栏拿的）也能用：先按 0 余额初始化。
+        TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
         if (entrance) {
             if (TicketData.state(card) == TicketData.State.ENTERED) {
                 message(player, "gui.trdm.ticket.gate.already_entered");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
             TicketData.enter(card, station, ServerFareRuntime.dimensionId(level));
-            message(player, "gui.trdm.ticket.gate.entry_ok");
+            message(player, "gui.trdm.ticket.gate.entry_card", stationName(station),
+                    FareMoney.yuan(TicketData.balance(card)));
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
         }
         if (TicketData.state(card) != TicketData.State.ENTERED || !TicketData.hasEntry(card)) {
@@ -140,7 +140,8 @@ public final class TicketGateHandler {
         }
         TicketData.setBalance(card, balance - fare);
         TicketData.markExit(card, station, ServerFareRuntime.dimensionId(level), fare);
-        message(player, "gui.trdm.ticket.gate.exit_ok");
+        message(player, "gui.trdm.ticket.gate.exit_card", stationName(station),
+                FareMoney.yuan(fare), FareMoney.yuan(TicketData.balance(card)));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }
 
@@ -157,7 +158,11 @@ public final class TicketGateHandler {
         return quote.totalCents();
     }
 
-    private static void message(Player player, String key) {
-        player.displayClientMessage(Component.translatable(key), true);
+    private static void message(Player player, String key, Object... args) {
+        player.displayClientMessage(Component.translatable(key, args), true);
+    }
+
+    private static String stationName(Station station) {
+        return station == null || station.name == null ? "" : station.name;
     }
 }

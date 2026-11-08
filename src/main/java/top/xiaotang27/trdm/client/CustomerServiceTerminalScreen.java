@@ -315,9 +315,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         TicketUi.emerald(this, guiGraphics,
                 TicketUi.PANEL_X + 20F + textWidth(rechargePay, FONT_ROW) + 6F, 143F, 14F);
         final ItemStack held = heldItem();
-        if (held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.hasData(held)) {
+        if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            final long balance = TicketData.hasData(held) ? TicketData.balance(held) : 0L;
             text(guiGraphics, Component.translatable("gui.trdm.terminal.card_balance",
-                            FareMoney.yuan(TicketData.balance(held))),
+                            FareMoney.yuan(balance)),
                     TicketUi.PANEL_X + 20F, 172F, FONT_ROW, TicketUi.TEXT_DARK);
         }
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
@@ -337,8 +338,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     private void renderRecords(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.terminal.records_title"),
                 TicketUi.PANEL_X + 20F, 78F, FONT_SECTION, TicketUi.TEXT_DARK);
-        rect(guiGraphics, TicketUi.PANEL_X + 12F, 104F, TicketUi.PANEL_W - 24F, 156F, TicketUi.BORDER);
-        rect(guiGraphics, TicketUi.PANEL_X + 13F, 105F, TicketUi.PANEL_W - 26F, 154F, 0xFFFFFFFF);
+        rect(guiGraphics, TicketUi.PANEL_X + 12F, 104F, TicketUi.PANEL_W - 24F, 344F, TicketUi.BORDER);
+        rect(guiGraphics, TicketUi.PANEL_X + 13F, 105F, TicketUi.PANEL_W - 26F, 342F, 0xFFFFFFFF);
         rect(guiGraphics, TicketUi.PANEL_X + 13F, 105F, TicketUi.PANEL_W - 26F, 26F, TicketUi.ROW_HEADER);
         text(guiGraphics, Component.translatable("gui.trdm.terminal.col_time"),
                 TicketUi.PANEL_X + 24F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
@@ -370,17 +371,17 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                     TicketUi.PANEL_X + 24F, 146F, FONT_SUB, TicketUi.TEXT_MUTED);
         }
         text(guiGraphics, Component.translatable("gui.trdm.terminal.records.hint"),
-                TicketUi.PANEL_X + 24F, 276F, FONT_SUB, TicketUi.TEXT_MUTED);
+                TicketUi.PANEL_X + 24F, 424F, FONT_SUB, TicketUi.TEXT_MUTED);
     }
 
-    /** 从主手交通卡里读最近 3 条交易记录。 */
+    /** 从主手交通卡里读最近 10 条交易记录。 */
     private List<String[]> recordRows() {
         final List<String[]> rows = new ArrayList<>();
         final ItemStack held = heldItem();
         if (!held.is(Trdm.TRANSIT_CARD_ITEM) || !TicketData.hasData(held)) {
             return rows;
         }
-        final int count = Math.min(3, TicketData.txCount(held));
+        final int count = Math.min(10, TicketData.txCount(held));
         for (int index = 0; index < count; index++) {
             final TicketData.Tx tx = TicketData.txAt(held, index);
             if (tx == null) {

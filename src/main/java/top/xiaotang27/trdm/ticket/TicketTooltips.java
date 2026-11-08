@@ -37,8 +37,6 @@ public final class TicketTooltips {
         }
         tooltip.add(Component.translatable("item.trdm.ticket.tooltip.balance",
                 FareMoney.yuan(TicketData.balance(stack))));
-        tooltip.add(Component.translatable("item.trdm.ticket.tooltip.deposit",
-                TicketData.deposit(stack)));
         tooltip.add(stateLine(stack));
         if (TicketData.hasEntry(stack)) {
             tooltip.add(Component.translatable("item.trdm.ticket.tooltip.entry",

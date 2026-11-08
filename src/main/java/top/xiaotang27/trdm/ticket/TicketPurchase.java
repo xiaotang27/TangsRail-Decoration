@@ -108,9 +108,8 @@ public final class TicketPurchase {
         if (!held.is(Trdm.TRANSIT_CARD_ITEM)) {
             return error("gui.trdm.ticket.error.no_card");
         }
-        if (!TicketData.hasData(held) || !TicketData.TYPE_CARD.equals(TicketData.type(held))) {
-            return error("gui.trdm.ticket.error.invalid_card");
-        }
+        // 空白交通卡（例如从物品栏里拿到的）也可以直接充值，充完就是一张可用的卡。
+        TicketData.ensureCard(held, null, ServerFareRuntime.dimensionId(level));
         final int amount = Math.max(1, Math.min(999, amountEmeralds));
         if (!takeEmeralds(player, amount)) {
             return new Result(false, "gui.trdm.ticket.error.no_emerald", amount);
@@ -172,9 +171,7 @@ public final class TicketPurchase {
     }
 
     private static Result payFareCard(ServerLevel level, ServerPlayer player, Station station, ItemStack card) {
-        if (!TicketData.hasData(card) || !TicketData.TYPE_CARD.equals(TicketData.type(card))) {
-            return error("gui.trdm.ticket.error.invalid_card");
-        }
+        TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
         if (TicketData.state(card) != TicketData.State.ENTERED || !TicketData.hasEntry(card)) {
             return error("gui.trdm.ticket.error.no_entry");
         }
