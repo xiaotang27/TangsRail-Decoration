@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "trdm:block/ticket/ticket_vending_machine"
+  }
+}

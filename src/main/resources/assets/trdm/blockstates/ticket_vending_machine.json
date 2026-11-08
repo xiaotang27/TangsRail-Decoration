@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "trdm:block/ticket_vending_machine"
+    }
+  }
+}

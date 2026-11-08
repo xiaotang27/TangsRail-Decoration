@@ -37,6 +37,8 @@ import top.xiaotang27.trdm.block.BlockTrdmEndGateModels;
 import top.xiaotang27.trdm.block.BlockTrdmPSDExtension;
 import top.xiaotang27.trdm.block.BlockTrdmPisPole;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
+import top.xiaotang27.trdm.block.BlockTicketVendingMachine;
+import top.xiaotang27.trdm.block.BlockCustomerServiceTerminal;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePaving;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePavingStep;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
@@ -81,6 +83,10 @@ public class Trdm implements ModInitializer {
     public static final BlockTrdmPSDEndGate PSD_END_GATE = new BlockTrdmPSDEndGate();
     /** 纯技术方块：只为把端门门扇的 4 个模型烘进模型管理器，永远不会被放置、也没有物品。 */
     public static final BlockTrdmEndGateModels PSD_END_GATE_MODELS = new BlockTrdmEndGateModels();
+    /** 售票机：右键打开售票界面。 */
+    public static final BlockTicketVendingMachine TICKET_VENDING_MACHINE = new BlockTicketVendingMachine();
+    /** 客服终端：右键打开客服界面。 */
+    public static final BlockCustomerServiceTerminal CUSTOMER_SERVICE_TERMINAL = new BlockCustomerServiceTerminal();
     /** 高站台门延伸板：在门楣高度把门楣往两侧/拐角延伸，直线 / 转角 / 拐弯后自动换门楣模型。 */
     public static final BlockTrdmPSDExtension PSD_EXTENSION = new BlockTrdmPSDExtension();
     /** 屏蔽门端门：门楣 + 可旋开的门 + 固定玻璃。 */
@@ -99,6 +105,13 @@ public class Trdm implements ModInitializer {
     public static final Item TACTILE_PAVING_STEP_ITEM = new BlockItem(TACTILE_PAVING_STEP, new Item.Properties());
     public static final ItemTrdmPSD PSD_END_GATE_ITEM = new ItemTrdmPSD(ItemTrdmPSD.Kind.END_GATE);
     public static final Item PSD_EXTENSION_ITEM = new BlockItem(PSD_EXTENSION, new Item.Properties());
+    public static final Item TICKET_VENDING_MACHINE_ITEM =
+            new BlockItem(TICKET_VENDING_MACHINE, new Item.Properties());
+    public static final Item CUSTOMER_SERVICE_TERMINAL_ITEM =
+            new BlockItem(CUSTOMER_SERVICE_TERMINAL, new Item.Properties());
+    public static final Item SINGLE_TICKET_ITEM = new Item(new Item.Properties().stacksTo(1));
+    public static final Item VARIABLE_TICKET_ITEM = new Item(new Item.Properties().stacksTo(1));
+    public static final Item TRANSIT_CARD_ITEM = new Item(new Item.Properties().stacksTo(1));
 
     public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
     public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
@@ -128,6 +141,8 @@ public class Trdm implements ModInitializer {
         registerBlock("psd_end_gate", PSD_END_GATE);
         registerBlock("psd_end_gate_models", PSD_END_GATE_MODELS);
         registerBlock("psd_extension", PSD_EXTENSION);
+        registerBlock("ticket_vending_machine", TICKET_VENDING_MACHINE);
+        registerBlock("customer_service_terminal", CUSTOMER_SERVICE_TERMINAL);
 
         registerItem("psd_door_1", PSD_DOOR_ITEM_1);
         registerItem("psd_glass_1", PSD_GLASS_ITEM_1);
@@ -142,6 +157,11 @@ public class Trdm implements ModInitializer {
         registerItem("tactile_paving_step", TACTILE_PAVING_STEP_ITEM);
         registerItem("psd_end_gate", PSD_END_GATE_ITEM);
         registerItem("psd_extension", PSD_EXTENSION_ITEM);
+        registerItem("ticket_vending_machine", TICKET_VENDING_MACHINE_ITEM);
+        registerItem("customer_service_terminal", CUSTOMER_SERVICE_TERMINAL_ITEM);
+        registerItem("single_ticket", SINGLE_TICKET_ITEM);
+        registerItem("variable_ticket", VARIABLE_TICKET_ITEM);
+        registerItem("transit_card", TRANSIT_CARD_ITEM);
 
         PSD_DOOR_1_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_door_1"),
                 BlockEntityType.Builder.of(BlockTrdmPSDDoor.TileEntityTrdmPSDDoor::new, PSD_DOOR_1).build(null));
@@ -187,6 +207,11 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(TACTILE_PAVING_STEP_ITEM));
                     entries.accept(new ItemStack(PSD_END_GATE_ITEM));
                     entries.accept(new ItemStack(PSD_EXTENSION_ITEM));
+                    entries.accept(new ItemStack(TICKET_VENDING_MACHINE_ITEM));
+                    entries.accept(new ItemStack(CUSTOMER_SERVICE_TERMINAL_ITEM));
+                    entries.accept(new ItemStack(SINGLE_TICKET_ITEM));
+                    entries.accept(new ItemStack(VARIABLE_TICKET_ITEM));
+                    entries.accept(new ItemStack(TRANSIT_CARD_ITEM));
                 });
 
         LOGGER.info("TangsRail Decoration initialized —— Version DEV_0.1");
