@@ -1,5 +1,8 @@
 package top.xiaotang27.trdm.client;
 
+import mtr.client.ClientData;
+import mtr.data.Route;
+import mtr.data.Station;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -7,7 +10,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 /** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。浅色主题，演示数据。 */
 public class CustomerServiceTerminalScreen extends TrdmScreenBase {
@@ -18,6 +24,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private static final int VIEW_CARD = 3;
     private static final int VIEW_RECHARGE = 4;
     private static final int VIEW_RECORDS = 5;
+    private static final int VIEW_RECORD_TYPE = 6;
+    private static final int VIEW_STATION = 7;
 
     private static final float BACK_W = 84F;
     private static final float BACK_H = 24F;
@@ -30,6 +38,18 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             new ResourceLocation("trdm", "textures/item/transit_card.png");
     private static final ResourceLocation ICON_MACHINE =
             new ResourceLocation("mtr", "textures/item/ticket_machine.png");
+    private static final ResourceLocation ICON_ENTRY =
+            new ResourceLocation("mtr", "textures/item/ticket_processor_entrance.png");
+    private static final ResourceLocation ICON_EXIT =
+            new ResourceLocation("mtr", "textures/item/ticket_processor_exit.png");
+
+    private static final Object FIELD_STATION = new Object();
+
+    private static final String[][] SAMPLE_STATION_GROUPS = {
+            {"1号线|Line 1", "刘园|LIUYUAN", "名字|MINGZI", "车站|CHEZHAN", "双桥河|SHUANGQIAOHE"},
+            {"2号线|Line 2", "梅江会展中心|MEIJIANG", "文化中心|WENHUA", "天塔|TIANTA", "天泰路|TIANTAILU"},
+            {"3号线|Line 3", "西站|XIZHAN", "红旗南路|HONGQINANLU", "解放南路|JIEFANGNANLU", "迎风道|YINGFENGDAO"}
+    };
 
     private final String stationName;
     private final BlockPos pos;
@@ -40,6 +60,15 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private String infoTitle = "";
     private final List<String> infoLines = new ArrayList<>();
     private int infoAmount;
+    private boolean infoNeedsPayment;
+    private boolean infoFromRecord;
+
+    private final List<LineGroup> stationGroups = new ArrayList<>();
+    private String stationQuery = "";
+    private float stationScroll;
+    private boolean recordIsEntry;
+    private String recordStation = "";
+    private int recordPrice;
 
     public CustomerServiceTerminalScreen(String stationName, BlockPos pos) {
         super(null, Component.translatable("block.trdm.customer_service_terminal"));
@@ -49,6 +78,47 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         themeFieldBorder = TicketUi.BORDER;
         themeFieldText = TicketUi.TEXT_DARK;
         themeFieldFocus = TicketUi.GREEN;
+        loadStationGroups();
+    }
+
+    private void loadStationGroups() {
+        final List<Route> routes = new ArrayList<>(ClientData.ROUTES);
+        routes.sort(Comparator.comparing((Route route) -> route.name == null ? "" : route.name,
+                String.CASE_INSENSITIVE_ORDER));
+        for (int groupIndex = 0; groupIndex < routes.size(); groupIndex++) {
+            final Route route = routes.get(groupIndex);
+            final LinkedHashSet<String> names = new LinkedHashSet<>();
+            for (final Route.RoutePlatform platform : route.platformIds) {
+                final Station station = ClientData.DATA_CACHE.platformIdToStation.get(platform.platformId);
+                if (station != null && station.name != null && !station.name.isBlank()) {
+                    names.add(station.name);
+                }
+            }
+            if (!names.isEmpty()) {
+                stationGroups.add(new LineGroup(route.name == null ? "?" : route.name,
+                        rowsOf(names, groupIndex)));
+            }
+        }
+        if (stationGroups.isEmpty()) {
+            for (int groupIndex = 0; groupIndex < SAMPLE_STATION_GROUPS.length; groupIndex++) {
+                final LinkedHashSet<String> names = new LinkedHashSet<>();
+                for (int index = 1; index < SAMPLE_STATION_GROUPS[groupIndex].length; index++) {
+                    names.add(SAMPLE_STATION_GROUPS[groupIndex][index]);
+                }
+                stationGroups.add(new LineGroup(SAMPLE_STATION_GROUPS[groupIndex][0],
+                        rowsOf(names, groupIndex)));
+            }
+        }
+    }
+
+    private List<StationRow> rowsOf(LinkedHashSet<String> names, int groupIndex) {
+        final List<StationRow> rows = new ArrayList<>();
+        int index = 0;
+        for (final String name : names) {
+            rows.add(new StationRow(name, 2 + (groupIndex + index) % 3));
+            index++;
+        }
+        return rows;
     }
 
     @Override
@@ -61,6 +131,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             case VIEW_CARD -> renderCardMenu(guiGraphics, mx, my);
             case VIEW_RECHARGE -> renderRecharge(guiGraphics, mx, my);
             case VIEW_RECORDS -> renderRecords(guiGraphics, mx, my);
+            case VIEW_RECORD_TYPE -> renderRecordType(guiGraphics, mx, my);
+            case VIEW_STATION -> renderStationPicker(guiGraphics, mx, my);
             default -> renderHome(guiGraphics, mx, my);
         }
         if (dialog != null) {
@@ -112,16 +184,110 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
                     120F + index * 24F, FONT_ROW, TicketUi.TEXT_DARK);
         }
         final float payY = 120F + infoLines.size() * 24F + 6F;
-        final Component pay = Component.translatable("gui.trdm.terminal.pay_emerald", infoAmount);
-        text(guiGraphics, pay, TicketUi.PANEL_X + 20F, payY, FONT_ROW, TicketUi.TEXT_DARK);
-        TicketUi.emerald(this, guiGraphics,
-                TicketUi.PANEL_X + 20F + textWidth(pay, FONT_ROW) + 6F, payY - 1F, 14F);
+        if (infoNeedsPayment) {
+            final Component pay = Component.translatable("gui.trdm.terminal.pay_emerald", infoAmount);
+            text(guiGraphics, pay, TicketUi.PANEL_X + 20F, payY, FONT_ROW, TicketUi.TEXT_DARK);
+            TicketUi.emerald(this, guiGraphics,
+                    TicketUi.PANEL_X + 20F + textWidth(pay, FONT_ROW) + 6F, payY - 1F, 14F);
+        }
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
-                Component.translatable("gui.trdm.terminal.pay"),
+                Component.translatable(infoNeedsPayment
+                        ? "gui.trdm.terminal.pay" : "gui.trdm.terminal.confirm"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 184F, 400F, 100F, 28F,
                 Component.translatable("gui.trdm.ticket.back"),
                 hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 100F, 28F), FONT_ROW);
+    }
+
+    private void renderRecordType(GuiGraphics guiGraphics, float mx, float my) {
+        centred(guiGraphics, Component.translatable("gui.trdm.terminal.choose_record"),
+                DESIGN_W / 2F, 84F, FONT_SECTION, TicketUi.TEXT_DARK);
+        TicketUi.card(this, guiGraphics, 250F, 170F, 200F, 160F, ICON_ENTRY, 0xFF1E6FD9,
+                Component.translatable("gui.trdm.terminal.entry_card"), Component.empty(), mx, my);
+        TicketUi.card(this, guiGraphics, 510F, 170F, 200F, 160F, ICON_EXIT, 0xFF9A5A12,
+                Component.translatable("gui.trdm.terminal.exit_card"), Component.empty(), mx, my);
+    }
+
+    private void renderStationPicker(GuiGraphics guiGraphics, float mx, float my) {
+        text(guiGraphics, Component.translatable("gui.trdm.terminal.choose_station"),
+                TicketUi.PANEL_X + 20F, 70F, FONT_SECTION, TicketUi.TEXT_DARK);
+        field(guiGraphics, FIELD_STATION, TicketUi.PANEL_X + 20F, 98F,
+                TicketUi.PANEL_W - 40F, 22F, FONT_ROW, stationQuery);
+        if (stationQuery.isEmpty() && !fieldActive(FIELD_STATION)) {
+            text(guiGraphics, Component.translatable("gui.trdm.terminal.search_station"),
+                    TicketUi.PANEL_X + 28F, 104F, FONT_ROW, TicketUi.TEXT_MUTED);
+        }
+        text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_stations"),
+                TicketUi.PANEL_X + 20F, 130F, FONT_ROW, TicketUi.TEXT_DARK);
+
+        final List<LineGroup> visible = visibleStationGroups();
+        final float total = stationTotalHeight(visible);
+        final float listTop = 154F;
+        final float listBottom = 470F;
+        if (total <= 0F) {
+            text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.empty"),
+                    TicketUi.PANEL_X + 20F, listTop + 4F, FONT_SUB, TicketUi.TEXT_MUTED);
+            return;
+        }
+        scissorOn(guiGraphics, TicketUi.PANEL_X + 16F, listTop,
+                TicketUi.PANEL_W - 32F, listBottom - listTop);
+        float top = listTop - stationScroll;
+        for (final LineGroup group : visible) {
+            if (top + 22F >= listTop && top <= listBottom) {
+                rect(guiGraphics, TicketUi.PANEL_X + 16F, top, TicketUi.PANEL_W - 32F, 21F,
+                        TicketUi.ROW_HEADER);
+                text(guiGraphics, Component.literal(group.name()), TicketUi.PANEL_X + 22F, top + 4F,
+                        FONT_SUB, TicketUi.TEXT_DARK);
+            }
+            top += 22F;
+            for (final StationRow row : group.stations()) {
+                if (top + 24F >= listTop && top <= listBottom) {
+                    final boolean hovered = mx >= TicketUi.PANEL_X + 16F
+                            && mx < TicketUi.PANEL_X + TicketUi.PANEL_W - 16F
+                            && my >= top && my < top + 24F;
+                    rect(guiGraphics, TicketUi.PANEL_X + 16F, top, TicketUi.PANEL_W - 32F, 23F,
+                            hovered ? TicketUi.ROW_HOVER : TicketUi.ROW);
+                    text(guiGraphics, Component.literal(row.name()), TicketUi.PANEL_X + 22F, top + 6F,
+                            FONT_ROW, TicketUi.TEXT_DARK);
+                    textRight(guiGraphics, Component.literal("¥" + row.price()),
+                            TicketUi.PANEL_X + TicketUi.PANEL_W - 22F, top + 6F,
+                            FONT_ROW, TicketUi.TEXT_DARK);
+                }
+                top += 24F;
+            }
+        }
+        scissorOff(guiGraphics);
+        scrollbar(guiGraphics, TicketUi.PANEL_X + TicketUi.PANEL_W - 24F, listTop,
+                listBottom - listTop, total, listBottom - listTop, stationScroll);
+    }
+
+    private List<LineGroup> visibleStationGroups() {
+        final String raw = fieldActive(FIELD_STATION) ? editingValue() : stationQuery;
+        final String needle = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        if (needle.isEmpty()) {
+            return stationGroups;
+        }
+        final List<LineGroup> filtered = new ArrayList<>();
+        for (final LineGroup group : stationGroups) {
+            final List<StationRow> rows = new ArrayList<>();
+            for (final StationRow row : group.stations()) {
+                if (row.name().toLowerCase(Locale.ROOT).contains(needle)) {
+                    rows.add(row);
+                }
+            }
+            if (!rows.isEmpty()) {
+                filtered.add(new LineGroup(group.name(), rows));
+            }
+        }
+        return filtered;
+    }
+
+    private float stationTotalHeight(List<LineGroup> visible) {
+        float total = 0F;
+        for (final LineGroup group : visible) {
+            total += 22F + group.stations().size() * 24F;
+        }
+        return total;
     }
 
     private void renderCardMenu(GuiGraphics guiGraphics, float mx, float my) {
@@ -226,6 +392,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             case VIEW_CARD -> clickCardMenu(mx, my);
             case VIEW_RECHARGE -> clickRecharge(mx, my);
             case VIEW_RECORDS -> false;
+            case VIEW_RECORD_TYPE -> clickRecordType(mx, my);
+            case VIEW_STATION -> clickStation(mx, my);
             default -> clickHome(mx, my);
         };
     }
@@ -252,7 +420,9 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             return true;
         }
         if (hit(mx, my, 385F, 160F, 190F, 160F)) {
-            showRecordInfo();
+            view = VIEW_RECORD_TYPE;
+            stationQuery = "";
+            stationScroll = 0F;
             return true;
         }
         if (hit(mx, my, 610F, 160F, 190F, 160F)) {
@@ -271,6 +441,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         infoLines.add(Component.translatable("gui.trdm.terminal.extra", 1).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 1).getString());
         infoAmount = 1;
+        infoNeedsPayment = true;
+        infoFromRecord = false;
         view = VIEW_INFO;
     }
 
@@ -284,12 +456,100 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         view = VIEW_INFO;
     }
 
+    private boolean clickRecordType(float mx, float my) {
+        if (hit(mx, my, 250F, 170F, 200F, 160F)) {
+            recordIsEntry = true;
+            view = VIEW_STATION;
+            stationQuery = "";
+            stationScroll = 0F;
+            return true;
+        }
+        if (hit(mx, my, 510F, 170F, 200F, 160F)) {
+            recordIsEntry = false;
+            view = VIEW_STATION;
+            stationQuery = "";
+            stationScroll = 0F;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean clickStation(float mx, float my) {
+        if (hit(mx, my, TicketUi.PANEL_X + 20F, 98F, TicketUi.PANEL_W - 40F, 22F)) {
+            beginField(FIELD_STATION, TicketUi.PANEL_X + 20F, 98F, TicketUi.PANEL_W - 40F, 22F,
+                    stationQuery, 64, FONT_ROW, value -> {
+                        stationQuery = value == null ? "" : value;
+                        clampStationScroll();
+                    });
+            return true;
+        }
+        final float listTop = 154F;
+        final float listBottom = 470F;
+        if (my < listTop || my >= listBottom) {
+            return false;
+        }
+        float top = listTop - stationScroll;
+        for (final LineGroup group : visibleStationGroups()) {
+            top += 22F;
+            for (final StationRow row : group.stations()) {
+                if (my >= top && my < top + 24F) {
+                    recordStation = row.name();
+                    recordPrice = row.price();
+                    showRecordInfo(recordIsEntry);
+                    return true;
+                }
+                top += 24F;
+            }
+        }
+        return false;
+    }
+
+    private void showRecordInfo(boolean entry) {
+        infoFromRecord = true;
+        if (entry) {
+            infoTitle = Component.translatable("gui.trdm.terminal.entry_record").getString();
+            infoLines.clear();
+            infoLines.add(Component.translatable("gui.trdm.terminal.entry", recordStation).getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 0).getString());
+            infoAmount = 0;
+            infoNeedsPayment = false;
+        } else {
+            infoTitle = Component.translatable("gui.trdm.terminal.exit_record").getString();
+            infoLines.clear();
+            infoLines.add(Component.translatable("gui.trdm.terminal.entry", "刘园|LIYUAN").getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.exit_station", recordStation).getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.fare_due", recordPrice).getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.total_line", recordPrice).getString());
+            infoAmount = recordPrice;
+            infoNeedsPayment = true;
+        }
+        view = VIEW_INFO;
+    }
+
+    private void clampStationScroll() {
+        final float total = stationTotalHeight(visibleStationGroups());
+        stationScroll = Math.max(0F, Math.min(stationScroll, Math.max(0F, total - (470F - 154F))));
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        final float my = designY(mouseY);
+        if (view == VIEW_STATION && my >= 154F && my < 470F) {
+            stationScroll -= (float) delta * 24F;
+            clampStationScroll();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
     private void showNoTicketInfo() {
         infoTitle = Component.translatable("gui.trdm.terminal.no_ticket").getString();
         infoLines.clear();
         infoLines.add(Component.translatable("gui.trdm.terminal.no_ticket_amount", 10).getString());
         infoLines.add(Component.translatable("gui.trdm.terminal.total_line", 10).getString());
         infoAmount = 10;
+        infoNeedsPayment = true;
+        infoFromRecord = false;
         view = VIEW_INFO;
     }
 
@@ -299,7 +559,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             return true;
         }
         if (hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 100F, 28F)) {
-            view = VIEW_REPAIR;
+            view = infoFromRecord ? VIEW_STATION : VIEW_REPAIR;
             return true;
         }
         return false;
@@ -350,7 +610,9 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private void back() {
         view = switch (view) {
-            case VIEW_INFO -> VIEW_REPAIR;
+            case VIEW_INFO -> infoFromRecord ? VIEW_STATION : VIEW_REPAIR;
+            case VIEW_STATION -> VIEW_RECORD_TYPE;
+            case VIEW_RECORD_TYPE -> VIEW_REPAIR;
             case VIEW_RECHARGE, VIEW_RECORDS -> VIEW_CARD;
             default -> VIEW_HOME;
         };
@@ -359,5 +621,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private boolean inPanel(float mx, float my) {
         return mx >= TicketUi.PANEL_X && mx < TicketUi.PANEL_X + TicketUi.PANEL_W
                 && my >= TicketUi.PANEL_Y && my < TicketUi.PANEL_Y + TicketUi.PANEL_H;
+    }
+
+    private record LineGroup(String name, List<StationRow> stations) {
+    }
+
+    private record StationRow(String name, int price) {
     }
 }
