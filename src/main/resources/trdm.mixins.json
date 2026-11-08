@@ -4,6 +4,7 @@
   "package": "top.xiaotang27.trdm.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "TicketSystemMixin",
     "TrainServerDoorMixin"
   ],
   "client": [

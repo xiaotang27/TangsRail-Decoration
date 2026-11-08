@@ -17,7 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** 售票机界面：单程票 / 通用票 / 交通卡三个页签，浅色主题；单程票价格来自计费引擎。 */
-public class TicketVendingScreen extends TrdmScreenBase {
+public class TicketVendingScreen extends TrdmScreenBase implements TicketResultReceiver {
 
     private static final int TAB_SINGLE = 0;
     private static final int TAB_PASS = 1;
@@ -61,9 +61,13 @@ public class TicketVendingScreen extends TrdmScreenBase {
     private String priceInput = "";
     private boolean transactionOpen;
     private String transactionTitle = "";
+    private long transactionStationId = -1L;
+    private boolean transactionByPrice;
     private long unitPriceCents = 200L;
     private int quantity = 1;
     private String dialog;
+    private Component dialogMessage = Component.empty();
+    private boolean purchasePending;
 
     public TicketVendingScreen(String stationName, long stationId, BlockPos pos) {
         this(null, stationName, stationId, pos);
@@ -134,7 +138,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
             renderKeypadPanel(guiGraphics, mx, my, "gui.trdm.ticket_machine.topup");
         }
         if (dialog != null) {
-            TicketUi.dialog(this, guiGraphics, Component.translatable("gui.trdm.ticket.demo_success"), mx, my);
+            TicketUi.dialog(this, guiGraphics, dialogMessage, mx, my);
         }
     }
 
@@ -277,10 +281,10 @@ public class TicketVendingScreen extends TrdmScreenBase {
                     hit(mx, my, LIST_X, top, LIST_W, 32F) ? TicketUi.ROW_HOVER : TicketUi.ROW);
             text(guiGraphics, Component.literal(pass.name()), LIST_X + 4F, top + 10F,
                     FONT_ROW, TicketUi.TEXT_DARK);
-            textRight(guiGraphics, Component.literal("¥" + pass.price()), LIST_X + LIST_W - 4F,
-                    top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
+            textRight(guiGraphics, Component.literal("—"), LIST_X + LIST_W - 4F,
+                    top + 10F, FONT_ROW, TicketUi.TEXT_MUTED);
         }
-        hintDark(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, 244F);
+        hintDark(guiGraphics, "gui.trdm.ticket.pass.todo", LIST_X, 244F);
     }
 
     // ===== 交通卡 =====
@@ -334,7 +338,7 @@ public class TicketVendingScreen extends TrdmScreenBase {
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.total",
                 FareMoney.text(totalCents)), LIST_X, 160F, FONT_ROW, TicketUi.TEXT_DARK);
         final Component pay = Component.translatable("gui.trdm.ticket_machine.pay_emerald",
-                FareMoney.emeralds(totalCents));
+                FareMoney.emeralds(unitPriceCents) * quantity);
         text(guiGraphics, pay, LIST_X, 184F, FONT_ROW, TicketUi.TEXT_DARK);
         TicketUi.emerald(this, guiGraphics, LIST_X + textWidth(pay, FONT_ROW) + 6F, 183F, 14F);
 
@@ -400,7 +404,11 @@ public class TicketVendingScreen extends TrdmScreenBase {
                 return true;
             }
             if (hit(mx, my, LIST_X, 400F, 150F, 28F)) {
-                dialog = "ok";
+                if (!purchasePending) {
+                    purchasePending = true;
+                    TicketClientNetwork.buySingle(pos, transactionByPrice ? 0L : transactionStationId,
+                            unitPriceCents, quantity, transactionByPrice);
+                }
                 return true;
             }
             if (hit(mx, my, LIST_X + 164F, 400F, 100F, 28F)) {
@@ -429,6 +437,8 @@ public class TicketVendingScreen extends TrdmScreenBase {
                         priceInput = FareMoney.input(row.fareCents());
                         transactionTitle = Component.translatable("gui.trdm.ticket_machine.single_title",
                                 row.name()).getString();
+                        transactionStationId = row.id();
+                        transactionByPrice = false;
                         unitPriceCents = row.fareCents();
                         quantity = 1;
                         transactionOpen = true;
@@ -482,10 +492,9 @@ public class TicketVendingScreen extends TrdmScreenBase {
         }
         for (int index = 0; index < PASSES.length; index++) {
             if (hit(mx, my, LIST_X, 92F + index * 34F, LIST_W, 32F)) {
-                transactionTitle = PASSES[index].name();
-                unitPriceCents = PASSES[index].price() * 100L;
-                quantity = 1;
-                transactionOpen = true;
+                dialogMessage = Component.translatable("gui.trdm.ticket.pass.todo");
+                dialog = "ok";
+                transactionOpen = false;
                 return true;
             }
         }
@@ -499,7 +508,10 @@ public class TicketVendingScreen extends TrdmScreenBase {
             return true;
         }
         if (hit(mx, my, LIST_X, 400F, 150F, 28F)) {
-            dialog = "ok";
+            if (!purchasePending) {
+                purchasePending = true;
+                TicketClientNetwork.buyCard(pos, parsePrice());
+            }
             return true;
         }
         return false;
@@ -513,11 +525,12 @@ public class TicketVendingScreen extends TrdmScreenBase {
                 }
             }
             case "OK" -> {
-                if (tab == TAB_SINGLE && !priceInput.isEmpty()) {
-                    transactionTitle = selectedStationName.isEmpty()
-                            ? Component.translatable("gui.trdm.ticket_machine.by_price").getString()
-                            : Component.translatable("gui.trdm.ticket_machine.single_title",
-                            selectedStationName).getString();
+                if (tab == TAB_SINGLE && !priceInput.isEmpty() && parsePrice() > 0) {
+                    transactionTitle = Component.translatable("gui.trdm.ticket_machine.by_price").getString();
+                    selectedStationId = -1L;
+                    selectedStationName = "";
+                    transactionStationId = -1L;
+                    transactionByPrice = true;
                     unitPriceCents = parsePrice() * 100L;
                     quantity = 1;
                     transactionOpen = true;
@@ -539,6 +552,16 @@ public class TicketVendingScreen extends TrdmScreenBase {
             return Math.max(0, Math.min(999, Integer.parseInt(priceInput)));
         } catch (NumberFormatException exception) {
             return 0;
+        }
+    }
+
+    @Override
+    public void showTicketResult(boolean success, Component message) {
+        purchasePending = false;
+        dialogMessage = message;
+        dialog = "ok";
+        if (success) {
+            transactionOpen = false;
         }
     }
 

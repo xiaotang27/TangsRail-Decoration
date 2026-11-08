@@ -8,7 +8,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.fare.FareMoney;
+import top.xiaotang27.trdm.ticket.TicketData;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,7 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。浅色主题；补票按计费引擎报价。 */
-public class CustomerServiceTerminalScreen extends TrdmScreenBase {
+public class CustomerServiceTerminalScreen extends TrdmScreenBase implements TicketResultReceiver {
 
     private static final int VIEW_HOME = 0;
     private static final int VIEW_REPAIR = 1;
@@ -59,6 +62,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
     private int view = VIEW_HOME;
     private String amountInput = "";
     private String dialog;
+    private Component dialogMessage = Component.empty();
+    private boolean purchasePending;
     private String infoTitle = "";
     private final List<String> infoLines = new ArrayList<>();
     private long infoAmountCents;
@@ -129,7 +134,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             default -> renderHome(guiGraphics, mx, my);
         }
         if (dialog != null) {
-            TicketUi.dialog(this, guiGraphics, Component.translatable("gui.trdm.ticket.demo_success"), mx, my);
+            TicketUi.dialog(this, guiGraphics, dialogMessage, mx, my);
         }
     }
 
@@ -309,6 +314,12 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         final Component rechargePay = Component.translatable("gui.trdm.terminal.pay_emerald", parseAmount());
         TicketUi.emerald(this, guiGraphics,
                 TicketUi.PANEL_X + 20F + textWidth(rechargePay, FONT_ROW) + 6F, 143F, 14F);
+        final ItemStack held = heldItem();
+        if (held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.hasData(held)) {
+            text(guiGraphics, Component.translatable("gui.trdm.terminal.card_balance",
+                            FareMoney.yuan(TicketData.balance(held))),
+                    TicketUi.PANEL_X + 20F, 172F, FONT_ROW, TicketUi.TEXT_DARK);
+        }
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
                 Component.translatable("gui.trdm.terminal.confirm"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
@@ -338,27 +349,62 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
         text(guiGraphics, Component.translatable("gui.trdm.terminal.col_balance"),
                 TicketUi.PANEL_X + 540F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
 
-        final String[][] rows = {
-                {"2026-11-01 10:00:00", "gui.trdm.terminal.reason.fare", "- ¥10", "¥100"},
-                {"2026-07-21 00:00:00", "gui.trdm.terminal.reason.topup", "+ ¥10", "¥110"},
-                {"2026-01-01 00:00:00", "gui.trdm.terminal.reason.initial", "+ ¥100", "¥100"}
-        };
-        for (int index = 0; index < rows.length; index++) {
+        final List<String[]> rows = recordRows();
+        for (int index = 0; index < rows.size(); index++) {
+            final String[] row = rows.get(index);
             final float y = 140F + index * 26F;
             if (index > 0) {
                 rect(guiGraphics, TicketUi.PANEL_X + 14F, y - 5F, TicketUi.PANEL_W - 28F, 1F, 0xFFDDDDDD);
             }
-            text(guiGraphics, Component.literal(rows[index][0]), TicketUi.PANEL_X + 24F, y,
+            text(guiGraphics, Component.literal(row[0]), TicketUi.PANEL_X + 24F, y,
                     FONT_SUB, TicketUi.TEXT_DARK);
-            text(guiGraphics, Component.translatable(rows[index][1]), TicketUi.PANEL_X + 250F, y,
+            text(guiGraphics, Component.literal(row[1]), TicketUi.PANEL_X + 250F, y,
                     FONT_SUB, TicketUi.TEXT_DARK);
-            text(guiGraphics, Component.literal(rows[index][2]), TicketUi.PANEL_X + 400F, y,
+            text(guiGraphics, Component.literal(row[2]), TicketUi.PANEL_X + 400F, y,
                     FONT_SUB, TicketUi.TEXT_DARK);
-            text(guiGraphics, Component.literal(rows[index][3]), TicketUi.PANEL_X + 540F, y,
+            text(guiGraphics, Component.literal(row[3]), TicketUi.PANEL_X + 540F, y,
                     FONT_SUB, TicketUi.TEXT_DARK);
         }
-        text(guiGraphics, Component.translatable("gui.trdm.terminal.records.demo"),
+        if (rows.isEmpty()) {
+            text(guiGraphics, Component.translatable("gui.trdm.terminal.records.empty"),
+                    TicketUi.PANEL_X + 24F, 146F, FONT_SUB, TicketUi.TEXT_MUTED);
+        }
+        text(guiGraphics, Component.translatable("gui.trdm.terminal.records.hint"),
                 TicketUi.PANEL_X + 24F, 276F, FONT_SUB, TicketUi.TEXT_MUTED);
+    }
+
+    /** 从主手交通卡里读最近 3 条交易记录。 */
+    private List<String[]> recordRows() {
+        final List<String[]> rows = new ArrayList<>();
+        final ItemStack held = heldItem();
+        if (!held.is(Trdm.TRANSIT_CARD_ITEM) || !TicketData.hasData(held)) {
+            return rows;
+        }
+        final int count = Math.min(3, TicketData.txCount(held));
+        for (int index = 0; index < count; index++) {
+            final TicketData.Tx tx = TicketData.txAt(held, index);
+            if (tx == null) {
+                continue;
+            }
+            final String reason = Component.translatable("topup".equals(tx.type())
+                    ? "gui.trdm.terminal.reason.topup" : "gui.trdm.terminal.reason.fare").getString();
+            final String change = (tx.amountCents() < 0 ? "- ¥" : "+ ¥")
+                    + FareMoney.text(Math.abs(tx.amountCents()));
+            rows.add(new String[]{formatTime(tx.time()), reason, change,
+                    FareMoney.yuan(tx.balanceAfter())});
+        }
+        return rows;
+    }
+
+    private static String formatTime(long epochMillis) {
+        return java.time.Instant.ofEpochMilli(epochMillis)
+                .atZone(java.time.ZoneId.systemDefault())
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+
+    private static ItemStack heldItem() {
+        final net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
+        return player == null ? ItemStack.EMPTY : player.getMainHandItem();
     }
 
     // ===== 点击 =====
@@ -416,20 +462,35 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
 
     private boolean clickRepair(float mx, float my) {
         if (hit(mx, my, 160F, 160F, 190F, 160F)) {
-            openStationPicker(RECORD_FARE);
+            if (!purchasePending) {
+                purchasePending = true;
+                TicketClientNetwork.payFare(pos);
+            }
             return true;
         }
         if (hit(mx, my, 385F, 160F, 190F, 160F)) {
-            view = VIEW_RECORD_TYPE;
-            stationQuery = "";
-            stationScroll = 0F;
+            showMessage(Component.translatable("gui.trdm.terminal.todo"));
             return true;
         }
         if (hit(mx, my, 610F, 160F, 190F, 160F)) {
-            showNoTicketInfo();
+            showMessage(Component.translatable("gui.trdm.terminal.todo"));
             return true;
         }
         return false;
+    }
+
+    private void showMessage(Component message) {
+        dialogMessage = message;
+        dialog = "ok";
+    }
+
+    @Override
+    public void showTicketResult(boolean success, Component message) {
+        purchasePending = false;
+        showMessage(message);
+        if (success) {
+            view = VIEW_HOME;
+        }
     }
 
     private void openStationPicker(int mode) {
@@ -575,13 +636,19 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
                 if (!amountInput.isEmpty()) {
                     amountInput = amountInput.substring(0, amountInput.length() - 1);
                 }
-            } else if (!"OK".equals(key) && amountInput.length() < 4) {
+            } else if (!"OK".equals(key) && amountInput.length() < 3) {
                 amountInput = amountInput.equals("0") ? key : amountInput + key;
             }
             return true;
         }
         if (hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F)) {
-            dialog = "ok";
+            final int amount = parseAmount();
+            if (amount <= 0) {
+                showMessage(Component.translatable("gui.trdm.terminal.enter_amount_hint"));
+            } else if (!purchasePending) {
+                purchasePending = true;
+                TicketClientNetwork.topUp(pos, amount);
+            }
             return true;
         }
         return false;
@@ -592,7 +659,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase {
             return 0;
         }
         try {
-            return Math.max(0, Math.min(9999, Integer.parseInt(amountInput)));
+            return Math.max(0, Math.min(999, Integer.parseInt(amountInput)));
         } catch (NumberFormatException exception) {
             return 0;
         }

@@ -44,6 +44,11 @@ import top.xiaotang27.trdm.block.BlockTrdmTactilePaving;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePavingStep;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
 import top.xiaotang27.trdm.item.ItemTrdmBigSign;
+import top.xiaotang27.trdm.item.ItemSingleTicket;
+import top.xiaotang27.trdm.item.ItemTransitCard;
+import top.xiaotang27.trdm.item.ItemVariableTicket;
+import top.xiaotang27.trdm.net.TicketNetwork;
+import top.xiaotang27.trdm.server.ServerFareRuntime;
 import top.xiaotang27.trdm.control.PsdManualHold;
 import top.xiaotang27.trdm.net.TrdmControlNetwork;
 
@@ -110,9 +115,9 @@ public class Trdm implements ModInitializer {
             new BlockItem(TICKET_VENDING_MACHINE, new Item.Properties());
     public static final Item CUSTOMER_SERVICE_TERMINAL_ITEM =
             new BlockItem(CUSTOMER_SERVICE_TERMINAL, new Item.Properties());
-    public static final Item SINGLE_TICKET_ITEM = new Item(new Item.Properties().stacksTo(1));
-    public static final Item VARIABLE_TICKET_ITEM = new Item(new Item.Properties().stacksTo(1));
-    public static final Item TRANSIT_CARD_ITEM = new Item(new Item.Properties().stacksTo(1));
+    public static final Item SINGLE_TICKET_ITEM = new ItemSingleTicket();
+    public static final Item VARIABLE_TICKET_ITEM = new ItemVariableTicket();
+    public static final Item TRANSIT_CARD_ITEM = new ItemTransitCard();
 
     public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
     public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
@@ -183,6 +188,8 @@ public class Trdm implements ModInitializer {
 
         // C2S：刷子右键选完站台 → 写回集控装置；门楣外观 / 大站名牌选项同理
         TrdmControlNetwork.registerServer();
+        // 票务交易：买票 / 买卡 / 充值 / 补车费
+        TicketNetwork.registerServer();
         // 服务端全局 tick：手动开门保持着的时候，每 tick 把门压回开启（列车逻辑改不动它）
         PsdManualHold.registerServerTick();
         // 旧存档的门楣 SIDE_EXTENDED 还是「整排连起来」的旧值；区块加载时按门/玻璃分组重算一次
@@ -261,7 +268,10 @@ public class Trdm implements ModInitializer {
                 }
             }
         });
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> PENDING_HEADER_FIXES.clear());
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            PENDING_HEADER_FIXES.clear();
+            ServerFareRuntime.reset();
+        });
     }
 
     private record HeaderKey(ServerLevel level, BlockPos pos) {

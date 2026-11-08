@@ -47,6 +47,8 @@ public class TrdmClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // 票务交易结果接收
+        top.xiaotang27.trdm.client.TicketClientNetwork.register();
         // 门扇：TRD 自己的渲染器（RenderTrdmPSDDoor）
 
         // /trdm config → 通用设置界面（客户端命令，装了 ModMenu 时也会多一个入口）
