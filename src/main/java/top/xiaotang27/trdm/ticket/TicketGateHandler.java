@@ -22,6 +22,9 @@ import top.xiaotang27.trdm.server.ServerFareRuntime;
  */
 public final class TicketGateHandler {
 
+    /** 低于这个余额（分）就在进出站提示后面加一句“余额较低”。 */
+    private static final long LOW_BALANCE_CENTS = 1000L;
+
     private TicketGateHandler() {
     }
 
@@ -43,7 +46,7 @@ public final class TicketGateHandler {
         } else if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
             result = transitCard(level, player, station, held, entrance);
         } else if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
-            message(player, "gui.trdm.ticket.gate.pass_todo");
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
             result = TicketSystem.EnumTicketBarrierOpen.CLOSED;
         } else {
             message(player, "gui.trdm.ticket.gate.no_ticket");
@@ -71,12 +74,12 @@ public final class TicketGateHandler {
                                                                   Station station, ItemStack ticket,
                                                                   boolean entrance) {
         if (!TicketData.hasData(ticket) || !TicketData.TYPE_SINGLE.equals(TicketData.type(ticket))) {
-            message(player, "gui.trdm.ticket.gate.bad_ticket");
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
         if (entrance) {
             if (TicketData.state(ticket) == TicketData.State.ENTERED) {
-                message(player, "gui.trdm.ticket.gate.already_entered");
+                message(player, "gui.trdm.ticket.gate.invalid_ticket");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
             TicketData.enter(ticket, station, ServerFareRuntime.dimensionId(level));
@@ -84,20 +87,16 @@ public final class TicketGateHandler {
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
         }
         if (TicketData.state(ticket) != TicketData.State.ENTERED || !TicketData.hasEntry(ticket)) {
-            message(player, "gui.trdm.ticket.gate.no_entry");
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
         if (!TicketData.entryDimension(ticket).equals(ServerFareRuntime.dimensionId(level))) {
-            message(player, "gui.trdm.ticket.gate.cross_dimension");
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
         final long fare = fareTo(level, TicketData.entryStation(ticket), station.id);
-        if (fare < 0L) {
-            message(player, "gui.trdm.ticket.gate.no_fare");
-            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
-        }
-        if (TicketData.faceValue(ticket) < fare) {
-            message(player, "gui.trdm.ticket.gate.underpaid");
+        if (fare < 0L || TicketData.faceValue(ticket) < fare) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
         ticket.shrink(1);
@@ -110,14 +109,20 @@ public final class TicketGateHandler {
                                                                   boolean entrance) {
         // 空白交通卡（例如从创造模式物品栏拿的）也能用：先按 0 余额初始化。
         TicketData.ensureCard(card, station, ServerFareRuntime.dimensionId(level));
+        final long minimumFare = ServerFareRuntime.config().minimumFareCents();
         if (entrance) {
             if (TicketData.state(card) == TicketData.State.ENTERED) {
                 message(player, "gui.trdm.ticket.gate.already_entered");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
+            final long balance = TicketData.balance(card);
+            if (balance < minimumFare) {
+                message(player, "gui.trdm.ticket.gate.entry_no_balance");
+                return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+            }
             TicketData.enter(card, station, ServerFareRuntime.dimensionId(level));
-            message(player, "gui.trdm.ticket.gate.entry_card", stationName(station),
-                    FareMoney.yuan(TicketData.balance(card)));
+            message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.entry_card",
+                    stationName(station), FareMoney.yuan(balance)), balance));
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
         }
         if (TicketData.state(card) != TicketData.State.ENTERED || !TicketData.hasEntry(card)) {
@@ -135,13 +140,14 @@ public final class TicketGateHandler {
         }
         final long balance = TicketData.balance(card);
         if (balance < fare) {
-            message(player, "gui.trdm.ticket.gate.low_balance");
+            message(player, "gui.trdm.ticket.gate.exit_no_balance");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
-        TicketData.setBalance(card, balance - fare);
+        final long remaining = balance - fare;
+        TicketData.setBalance(card, remaining);
         TicketData.markExit(card, station, ServerFareRuntime.dimensionId(level), fare);
-        message(player, "gui.trdm.ticket.gate.exit_card", stationName(station),
-                FareMoney.yuan(fare), FareMoney.yuan(TicketData.balance(card)));
+        message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.exit_card",
+                stationName(station), FareMoney.yuan(fare), FareMoney.yuan(remaining)), remaining));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }
 
@@ -156,6 +162,17 @@ public final class TicketGateHandler {
             return -1L;
         }
         return quote.totalCents();
+    }
+
+    private static Component withLowBalance(Component message, long balance) {
+        if (balance >= LOW_BALANCE_CENTS) {
+            return message;
+        }
+        return message.copy().append(Component.translatable("gui.trdm.ticket.gate.low_balance_suffix"));
+    }
+
+    private static void message(Player player, Component component) {
+        player.displayClientMessage(component, true);
     }
 
     private static void message(Player player, String key, Object... args) {

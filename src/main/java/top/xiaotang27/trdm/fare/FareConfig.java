@@ -82,6 +82,33 @@ public final class FareConfig {
         return max;
     }
 
+    /**
+     * 全网最低票价（分）：所有启用规则里可能出现的最低票价。
+     * <p>
+     * 入闸时用它判断“余额是否至少够坐一次车”；没有规则时按 MTR 原版起步价 2 元。
+     */
+    public long minimumFareCents() {
+        long min = Long.MAX_VALUE;
+        for (final FareRule rule : rules) {
+            if (!rule.enabled || rule.isVanilla()) {
+                continue;
+            }
+            long fare = switch (rule.kind) {
+                case FLAT -> rule.flatFareCents;
+                case INTERVAL_TABLE, DISTANCE_TABLE -> {
+                    long lowest = Long.MAX_VALUE;
+                    for (final FareRule.Tier tier : rule.tiers) {
+                        lowest = Math.min(lowest, tier.fareCents());
+                    }
+                    yield lowest == Long.MAX_VALUE ? 0L : lowest;
+                }
+                case MTR_VANILLA -> FareEngine.VANILLA_BASE_CENTS;
+            };
+            min = Math.min(min, Math.max(0L, fare));
+        }
+        return min == Long.MAX_VALUE ? FareEngine.VANILLA_BASE_CENTS : min;
+    }
+
     public void touch() {
         revision++;
     }

@@ -1,6 +1,6 @@
 # TangsRail Decoration
 
-Extend the railway facilities for [Minecraft Transit Railway 3.x](https://github.com/jonafanho/Minecraft-Transit-Railway).
+Extend the railway facilities for [Minecraft Transit Railway 3.x](https://github.com/jonafanho/Minecraft-Transit-Railway), and so much more.
 
 > Contain AI-generated script and art contents.
 
