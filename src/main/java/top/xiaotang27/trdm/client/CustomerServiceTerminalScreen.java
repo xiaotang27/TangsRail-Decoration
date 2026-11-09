@@ -11,6 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.fare.FareMoney;
+import top.xiaotang27.trdm.ticket.PassValidity;
 import top.xiaotang27.trdm.ticket.TicketData;
 
 import java.util.ArrayList;
@@ -264,7 +265,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                             hovered ? TicketUi.ROW_HOVER : TicketUi.ROW);
                     text(guiGraphics, Component.literal(row.name()), TicketUi.PANEL_X + 22F, top + 6F,
                             FONT_ROW, TicketUi.TEXT_DARK);
-                    if (recordMode == RECORD_EXIT) {
+                    if (showsStationFares()) {
                         textRight(guiGraphics, Component.literal(FareMoney.yuan(row.fareCents())),
                                 TicketUi.PANEL_X + TicketUi.PANEL_W - 22F, top + 6F,
                                 FONT_ROW, TicketUi.TEXT_DARK);
@@ -511,6 +512,14 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
 
     private void openFarePreview() {
         final ItemStack held = heldItem();
+        if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
+            if (!TicketData.isPass(held)) {
+                showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
+            } else {
+                showMessage(Component.translatable("gui.trdm.ticket.fare.nothing_due"));
+            }
+            return;
+        }
         if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
             showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
             return;
@@ -565,8 +574,13 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
 
     private void openRecordType() {
         final ItemStack held = heldItem();
-        if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
+        if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)
+                && !held.is(Trdm.VARIABLE_TICKET_ITEM)) {
             showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
+            return;
+        }
+        if (held.is(Trdm.VARIABLE_TICKET_ITEM) && !TicketData.isPass(held)) {
+            showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
             return;
         }
         view = VIEW_RECORD_TYPE;
@@ -580,7 +594,20 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                     showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
                     return true;
                 }
-            } else if (!held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            } else if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
+                // 交通卡可以直接补入站记录
+            } else if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
+                if (!TicketData.isPass(held)) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
+                    return true;
+                }
+                if (TicketData.passActive(held)
+                        && (PassValidity.expired(TicketData.passUntil(held), System.currentTimeMillis())
+                        || !passOwnedByPlayer(held))) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
+                    return true;
+                }
+            } else {
                 showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
                 return true;
             }
@@ -593,20 +620,43 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         }
         if (hit(mx, my, 510F, 170F, 200F, 160F)) {
             final ItemStack held = heldItem();
-            if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
+            if (held.is(Trdm.SINGLE_TICKET_ITEM) || held.is(Trdm.TRANSIT_CARD_ITEM)) {
+                if (!TicketData.hasData(held) || TicketData.state(held) != TicketData.State.ENTERED
+                        || !TicketData.hasEntry(held)) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
+                    return true;
+                }
+                final boolean continuous = held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.journeyContinuing(held);
+                final String entryDimension = continuous
+                        ? TicketData.journeyEntryDimension(held) : TicketData.entryDimension(held);
+                if (!entryDimension.equals(FareRuntime.dimensionId())) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
+                    return true;
+                }
+            } else if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
+                if (!TicketData.isPass(held)) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
+                    return true;
+                }
+                if (!TicketData.passActive(held)) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
+                    return true;
+                }
+                if (PassValidity.expired(TicketData.passUntil(held), System.currentTimeMillis())
+                        || !passOwnedByPlayer(held)) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
+                    return true;
+                }
+                if (TicketData.state(held) != TicketData.State.ENTERED || !TicketData.hasEntry(held)) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
+                    return true;
+                }
+                if (!TicketData.entryDimension(held).equals(FareRuntime.dimensionId())) {
+                    showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
+                    return true;
+                }
+            } else {
                 showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
-                return true;
-            }
-            if (!TicketData.hasData(held) || TicketData.state(held) != TicketData.State.ENTERED
-                    || !TicketData.hasEntry(held)) {
-                showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
-                return true;
-            }
-            final boolean continuous = held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.journeyContinuing(held);
-            final String entryDimension = continuous
-                    ? TicketData.journeyEntryDimension(held) : TicketData.entryDimension(held);
-            if (!entryDimension.equals(FareRuntime.dimensionId())) {
-                showMessage(Component.translatable("gui.trdm.ticket.error.cross_dimension"));
                 return true;
             }
             openStationPicker(RECORD_EXIT);
@@ -621,7 +671,22 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         stationQuery = "";
         stationScroll = 0F;
         final ItemStack held = heldItem();
-        repriceStationGroups(mode == RECORD_EXIT ? recordOrigin(held) : 0L, mode == RECORD_EXIT);
+        final boolean fares = mode == RECORD_EXIT && !isPassItem(held);
+        repriceStationGroups(fares ? recordOrigin(held) : 0L, fares);
+    }
+
+    private boolean showsStationFares() {
+        return recordMode == RECORD_EXIT && !isPassItem(heldItem());
+    }
+
+    private static boolean isPassItem(ItemStack stack) {
+        return stack.is(Trdm.VARIABLE_TICKET_ITEM) && TicketData.isPass(stack);
+    }
+
+    private static boolean passOwnedByPlayer(ItemStack stack) {
+        final String owner = TicketData.passOwner(stack);
+        final net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
+        return owner.isEmpty() || (player != null && owner.equals(player.getUUID().toString()));
     }
 
     /** 连续计费时从原始入闸站算票价，否则从本次入闸站算。 */
@@ -699,6 +764,22 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
 
     private void showExitRecordPreview(StationRow row) {
         final ItemStack held = heldItem();
+        if (isPassItem(held)) {
+            infoAction = ACTION_RECORD_EXIT;
+            infoStationId = row.id();
+            infoTitle = Component.translatable("gui.trdm.terminal.exit_record").getString();
+            infoLines.clear();
+            infoLines.add(Component.translatable("gui.trdm.terminal.entry",
+                    TicketData.entryName(held)).getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.exit_station", row.name()).getString());
+            infoLines.add(Component.translatable("gui.trdm.terminal.total_line",
+                    FareMoney.text(0L)).getString());
+            infoAmountCents = 0L;
+            infoNeedsPayment = false;
+            infoFromRecord = true;
+            view = VIEW_INFO;
+            return;
+        }
         if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)) {
             showMessage(Component.translatable("gui.trdm.ticket.error.no_item"));
             return;

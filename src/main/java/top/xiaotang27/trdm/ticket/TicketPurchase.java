@@ -267,6 +267,37 @@ public final class TicketPurchase {
             TicketSync.sync(player);
             return new Result(true, "gui.trdm.terminal.record_entry_success", 0L);
         }
+        if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
+            if (!TicketData.isPass(held)) {
+                return error("gui.trdm.ticket.error.invalid_ticket");
+            }
+            final long now = System.currentTimeMillis();
+            if (TicketData.passActive(held)) {
+                if (PassValidity.expired(TicketData.passUntil(held), now)) {
+                    return error("gui.trdm.ticket.error.invalid_ticket");
+                }
+                final String owner = TicketData.passOwner(held);
+                if (owner.isEmpty()) {
+                    TicketData.bindPassOwner(held, player.getUUID(), player.getGameProfile().getName());
+                } else if (!owner.equals(player.getUUID().toString())) {
+                    return error("gui.trdm.ticket.error.invalid_ticket");
+                }
+                if (TicketData.state(held) == TicketData.State.ENTERED) {
+                    return error("gui.trdm.ticket.error.already_entry");
+                }
+            } else {
+                final PassCatalog.Definition definition = PassCatalog.byId(TicketData.passDefinition(held));
+                if (definition == null) {
+                    return error("gui.trdm.ticket.error.invalid_ticket");
+                }
+                final long[] window = PassValidity.window(definition.days(), now);
+                TicketData.activatePass(held, player.getUUID(), player.getGameProfile().getName(),
+                        window[0], window[1]);
+            }
+            TicketData.enter(held, station, dimension);
+            TicketSync.sync(player);
+            return new Result(true, "gui.trdm.terminal.record_entry_success", 0L);
+        }
         return error("gui.trdm.ticket.error.no_item");
     }
 
@@ -287,7 +318,37 @@ public final class TicketPurchase {
         if (held.is(Trdm.TRANSIT_CARD_ITEM)) {
             return recordExitCard(level, player, station, held);
         }
+        if (held.is(Trdm.VARIABLE_TICKET_ITEM)) {
+            return recordExitPass(level, player, held);
+        }
         return error("gui.trdm.ticket.error.no_item");
+    }
+
+    private static Result recordExitPass(ServerLevel level, ServerPlayer player, ItemStack pass) {
+        if (!TicketData.isPass(pass)) {
+            return error("gui.trdm.ticket.error.invalid_ticket");
+        }
+        if (!TicketData.passActive(pass)) {
+            return error("gui.trdm.ticket.error.no_entry");
+        }
+        if (PassValidity.expired(TicketData.passUntil(pass), System.currentTimeMillis())) {
+            return error("gui.trdm.ticket.error.invalid_ticket");
+        }
+        final String owner = TicketData.passOwner(pass);
+        if (owner.isEmpty()) {
+            TicketData.bindPassOwner(pass, player.getUUID(), player.getGameProfile().getName());
+        } else if (!owner.equals(player.getUUID().toString())) {
+            return error("gui.trdm.ticket.error.invalid_ticket");
+        }
+        if (TicketData.state(pass) != TicketData.State.ENTERED || !TicketData.hasEntry(pass)) {
+            return error("gui.trdm.ticket.error.no_entry");
+        }
+        if (!TicketData.entryDimension(pass).equals(ServerFareRuntime.dimensionId(level))) {
+            return error("gui.trdm.ticket.error.cross_dimension");
+        }
+        TicketData.setPassExited(pass);
+        TicketSync.sync(player);
+        return new Result(true, "gui.trdm.terminal.record_exit_success", 0L);
     }
 
     private static Result recordExitSingle(ServerLevel level, ServerPlayer player, Station station,
