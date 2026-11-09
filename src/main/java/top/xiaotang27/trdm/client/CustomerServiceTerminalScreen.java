@@ -168,6 +168,71 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         TicketUi.card(this, guiGraphics, 620F, 150F, 200F, 180F, ICON_MACHINE, 0xFF9A5A12,
                 Component.translatable("gui.trdm.terminal.sales"),
                 Component.translatable("gui.trdm.terminal.sales.sub"), mx, my);
+        renderHomeNotices(guiGraphics, mx, my);
+    }
+
+    /** 主页业务按钮下方的待处理提示：未结算车程、低余额。 */
+    private void renderHomeNotices(GuiGraphics guiGraphics, float mx, float my) {
+        final ItemStack held = heldItem();
+        final boolean pending = hasPendingJourney(held);
+        final boolean low = hasLowBalance(held);
+        if (!pending && !low) {
+            return;
+        }
+        final float x = 140F;
+        final float y = 340F;
+        final float w = 680F;
+        final int rows = (pending ? 1 : 0) + (low ? 1 : 0);
+        final float h = 30F + rows * 36F;
+        rect(guiGraphics, x, y, w, h, TicketUi.BORDER);
+        rect(guiGraphics, x + 1F, y + 1F, w - 2F, h - 2F, 0xFFF7F7F7);
+        rect(guiGraphics, x + 1F, y + 1F, w - 2F, 22F, TicketUi.ROW_HEADER);
+        text(guiGraphics, Component.translatable("gui.trdm.terminal.notice_title"),
+                x + 10F, y + 8F, FONT_ROW, TicketUi.TEXT_DARK);
+
+        float rowY = y + 28F;
+        if (pending) {
+            rect(guiGraphics, x + 1F, rowY - 2F, 3F, 32F, 0xFFC77A00);
+            text(guiGraphics, Component.translatable("gui.trdm.terminal.notice_pending"),
+                    x + 10F, rowY, FONT_ROW, TicketUi.TEXT_DARK);
+            final String entryName = TicketData.entryName(held);
+            if (!entryName.isEmpty()) {
+                text(guiGraphics, Component.translatable("gui.trdm.terminal.notice_entry", entryName),
+                        x + 10F, rowY + 14F, FONT_SUB, TicketUi.TEXT_MUTED);
+            }
+            final float bx = x + w - 108F;
+            TicketUi.button(this, guiGraphics, bx, rowY - 3F, 96F, 24F,
+                    Component.translatable("gui.trdm.terminal.notice_handle"),
+                    hit(mx, my, bx, rowY - 3F, 96F, 24F), FONT_ROW);
+            rowY += 36F;
+        }
+        if (low) {
+            rect(guiGraphics, x + 1F, rowY - 2F, 3F, 32F, 0xFFC0392B);
+            text(guiGraphics, Component.translatable("gui.trdm.terminal.notice_low_balance"),
+                    x + 10F, rowY, FONT_ROW, TicketUi.TEXT_DARK);
+            text(guiGraphics, Component.translatable("gui.trdm.terminal.notice_balance",
+                            FareMoney.text(TicketData.balance(held))),
+                    x + 10F, rowY + 14F, FONT_SUB, TicketUi.TEXT_MUTED);
+            final float bx = x + w - 108F;
+            TicketUi.button(this, guiGraphics, bx, rowY - 3F, 96F, 24F,
+                    Component.translatable("gui.trdm.terminal.notice_recharge"),
+                    hit(mx, my, bx, rowY - 3F, 96F, 24F), FONT_ROW);
+        }
+    }
+
+    private static boolean hasPendingJourney(ItemStack held) {
+        if (!TicketData.hasData(held)) {
+            return false;
+        }
+        if (!held.is(Trdm.SINGLE_TICKET_ITEM) && !held.is(Trdm.TRANSIT_CARD_ITEM)
+                && !held.is(Trdm.VARIABLE_TICKET_ITEM)) {
+            return false;
+        }
+        return TicketData.state(held) == TicketData.State.ENTERED && TicketData.hasEntry(held);
+    }
+
+    private static boolean hasLowBalance(ItemStack held) {
+        return held.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.balance(held) < 1000L;
     }
 
     private void renderRepair(GuiGraphics guiGraphics, float mx, float my) {
@@ -463,6 +528,26 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     }
 
     private boolean clickHome(float mx, float my) {
+        final ItemStack held = heldItem();
+        final boolean pending = hasPendingJourney(held);
+        final boolean low = hasLowBalance(held);
+        float rowY = 368F;
+        if (pending) {
+            final float bx = 140F + 680F - 108F;
+            if (hit(mx, my, bx, rowY - 3F, 96F, 24F)) {
+                openRecordType();
+                return true;
+            }
+            rowY += 36F;
+        }
+        if (low) {
+            final float bx = 140F + 680F - 108F;
+            if (hit(mx, my, bx, rowY - 3F, 96F, 24F)) {
+                view = VIEW_RECHARGE;
+                amountInput = "";
+                return true;
+            }
+        }
         if (hit(mx, my, 140F, 150F, 200F, 180F)) {
             view = VIEW_REPAIR;
             return true;
