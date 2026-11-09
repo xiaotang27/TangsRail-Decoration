@@ -214,19 +214,19 @@ public final class TicketPurchase {
         if (station == null) {
             return error("gui.trdm.ticket.error.no_station");
         }
-        final PassCatalog.Definition definition = PassCatalog.byId(definitionId);
-        if (definition == null) {
+        final PassRule rule = PassRules.byId(ServerFareRuntime.config().passRules, definitionId);
+        if (rule == null) {
             return error("gui.trdm.ticket.error.unknown_pass");
         }
         final int count = Math.max(1, Math.min(64, quantity));
-        final long cost = (long) definition.priceEmeralds() * count;
+        final long cost = (long) rule.priceEmeralds * count;
         if (!takeEmeralds(player, cost)) {
             return new Result(false, "gui.trdm.ticket.error.no_emerald", cost);
         }
         final String dimension = ServerFareRuntime.dimensionId(level);
         for (int index = 0; index < count; index++) {
             final ItemStack pass = new ItemStack(Trdm.VARIABLE_TICKET_ITEM);
-            TicketData.issuePass(pass, definition.id(), definition.days(), station, dimension);
+            TicketData.issuePass(pass, rule.id, rule.days, rule.name, station, dimension);
             give(player, pass);
         }
         TicketSync.sync(player);
@@ -286,11 +286,11 @@ public final class TicketPurchase {
                     return error("gui.trdm.ticket.error.already_entry");
                 }
             } else {
-                final PassCatalog.Definition definition = PassCatalog.byId(TicketData.passDefinition(held));
-                if (definition == null) {
+                final int days = TicketData.passDays(held);
+                if (days <= 0) {
                     return error("gui.trdm.ticket.error.invalid_ticket");
                 }
-                final long[] window = PassValidity.window(definition.days(), now);
+                final long[] window = PassValidity.window(days, now);
                 TicketData.activatePass(held, player.getUUID(), player.getGameProfile().getName(),
                         window[0], window[1]);
             }

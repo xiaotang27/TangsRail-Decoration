@@ -284,13 +284,21 @@ final class TicketConfigPage {
         host.section(guiGraphics, "gui.trdm.ticket.rules", RULES_SECTION_Y);
         if (lines.isEmpty()) {
             host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.no_line_data"),
-                    TrdmScreenBase.CONTENT_RIGHT, RULES_SECTION_Y + 5F,
+                    TrdmScreenBase.CONTENT_RIGHT - 120F, RULES_SECTION_Y + 5F,
                     TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_WARN);
         } else {
             host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
-                    TrdmScreenBase.CONTENT_RIGHT, RULES_SECTION_Y + 5F,
+                    TrdmScreenBase.CONTENT_RIGHT - 120F, RULES_SECTION_Y + 5F,
                     TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         }
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F,
+                50F, 18F, Component.translatable("gui.trdm.ticket.add_rule_short"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F),
+                TrdmScreenBase.FONT_SUB);
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F,
+                50F, 18F, Component.translatable("gui.trdm.ticket.add_script_short"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F, 50F, 18F),
+                TrdmScreenBase.FONT_SUB);
 
         renderRuleRow(guiGraphics, -1, 0, mx, my);
         for (int index = 0; index < rules.size(); index++) {
@@ -299,8 +307,12 @@ final class TicketConfigPage {
 
         host.section(guiGraphics, "gui.trdm.ticket.templates", TEMPLATES_SECTION_Y);
         host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
-                TrdmScreenBase.CONTENT_RIGHT, TEMPLATES_SECTION_Y + 5F,
+                TrdmScreenBase.CONTENT_RIGHT - 84F, TEMPLATES_SECTION_Y + 5F,
                 TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F,
+                80F, 18F, Component.translatable("gui.trdm.ticket.pass_settings"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F),
+                TrdmScreenBase.FONT_SUB);
         for (int index = 0; index < templates.size(); index++) {
             renderTemplateRow(guiGraphics, index, mx, my);
         }
@@ -444,6 +456,10 @@ final class TicketConfigPage {
         host.section(guiGraphics, "gui.trdm.ticket.rule_content", DETAIL_CONTENT_SECTION_Y);
         renderRuleSummary(guiGraphics, rule);
         renderEditButton(guiGraphics, mx, my);
+        final float deleteX = TrdmScreenBase.CONTENT_RIGHT - 250F;
+        host.buttonText(guiGraphics, deleteX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
+                Component.translatable("gui.trdm.ticket.delete_rule"), false,
+                host.hit(mx, my, deleteX, DETAIL_EDIT_BUTTON_Y, 120F, 24F), TrdmScreenBase.FONT_ROW);
     }
 
     /** 规则详情：类型、票价档位、最高票价。 */
@@ -744,11 +760,7 @@ final class TicketConfigPage {
             return;
         }
         if (rules.get(detailRuleIndex).kind == FareRule.Kind.SCRIPT) {
-            final Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player != null) {
-                minecraft.player.displayClientMessage(
-                        Component.translatable("gui.trdm.ticket.script_editor_todo"), false);
-            }
+            Minecraft.getInstance().setScreen(new FareScriptScreen(host, rules.get(detailRuleIndex)));
             return;
         }
         draft = rules.get(detailRuleIndex).copy();
@@ -766,6 +778,59 @@ final class TicketConfigPage {
         resetEditorFields();
         editorMessage = "";
         view = VIEW_RULE_EDIT;
+    }
+
+    private void addFareRule() {
+        final FareRule rule = new FareRule(uniqueRuleId(),
+                Component.translatable("gui.trdm.ticket.new_rule_default").getString(), FareRule.Kind.FLAT);
+        rule.flatFareCents = 200L;
+        rule.maxFareCents = 400L;
+        config.rules.add(rule);
+        FareRuntime.get().save();
+        detailRuleIndex = config.rules.size() - 1;
+        view = VIEW_RULE;
+    }
+
+    private void addScriptRule() {
+        final FareRule rule = new FareRule(uniqueRuleId(),
+                Component.translatable("gui.trdm.ticket.new_rule_default").getString(), FareRule.Kind.SCRIPT);
+        rule.script = top.xiaotang27.trdm.fare.script.Scripts.flat(2.0);
+        config.rules.add(rule);
+        FareRuntime.get().save();
+        detailRuleIndex = config.rules.size() - 1;
+        view = VIEW_RULE;
+    }
+
+    private String uniqueRuleId() {
+        int index = 1;
+        while (findRule("rule_" + index) != null) {
+            index++;
+        }
+        return "rule_" + index;
+    }
+
+    private FareRule findRule(String id) {
+        for (final FareRule rule : config.rules) {
+            if (rule.id.equals(id)) {
+                return rule;
+            }
+        }
+        return null;
+    }
+
+    private void deleteRule() {
+        if (detailRuleIndex < 0 || detailRuleIndex >= config.rules.size()) {
+            return;
+        }
+        final FareRule rule = config.rules.get(detailRuleIndex);
+        config.rules.remove(detailRuleIndex);
+        config.routeRules.values().removeIf(rule.id::equals);
+        FareRuntime.get().save();
+        detailRuleIndex = -1;
+        selectedKind = SELECT_SYSTEM;
+        selectedIndex = -1;
+        view = VIEW_MAIN;
+        rebuildOwners();
     }
 
     private void cancelEditor() {
@@ -1037,6 +1102,14 @@ final class TicketConfigPage {
     }
 
     private boolean clickMain(float mx, float my) {
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F)) {
+            addFareRule();
+            return true;
+        }
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F, 50F, 18F)) {
+            addScriptRule();
+            return true;
+        }
         final float toggleX = TrdmScreenBase.CONTENT_RIGHT - TrdmScreenBase.TOGGLE_W;
         if (host.hit(mx, my, toggleX, ENABLE_TOGGLE_Y, TrdmScreenBase.TOGGLE_W, TrdmScreenBase.TOGGLE_H)) {
             config.enabled = !config.enabled;
@@ -1049,6 +1122,10 @@ final class TicketConfigPage {
             return true;
         }
 
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F)) {
+            Minecraft.getInstance().setScreen(new PassRulesScreen(host));
+            return true;
+        }
         if (clickRuleRow(-1, 0, mx, my)) {
             return true;
         }
@@ -1123,6 +1200,11 @@ final class TicketConfigPage {
                             }
                         }
                     });
+            return true;
+        }
+        if (view == VIEW_RULE && host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 250F,
+                DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
+            deleteRule();
             return true;
         }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 120F, DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {

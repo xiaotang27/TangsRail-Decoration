@@ -1,7 +1,9 @@
 package top.xiaotang27.trdm.fare;
 
+import top.xiaotang27.trdm.ticket.PassRules;
+
 /**
- * 默认票务配置：三条基础规则，线路默认不绑定（未绑定 = MTR 原版公式）。
+ * 默认票务配置：三条基础规则 + 三种默认通票模板，线路默认不绑定（未绑定 = MTR 原版公式）。
  * <p>
  * 规则本身是通用模板，不含任何示例线路/车站；管理员在票务设置页把规则绑到真实线路上。
  */
@@ -36,6 +38,7 @@ public final class FareDefaults {
         config.rules.add(flat);
         config.rules.add(interval);
         config.rules.add(distance);
+        config.passRules.addAll(PassRules.defaults());
         return config;
     }
 }

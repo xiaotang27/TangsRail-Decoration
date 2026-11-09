@@ -10,6 +10,8 @@ import com.google.gson.JsonParser;
 import top.xiaotang27.trdm.fare.script.FareScript;
 import top.xiaotang27.trdm.fare.script.ScriptNode;
 import top.xiaotang27.trdm.fare.script.ScriptTier;
+import top.xiaotang27.trdm.ticket.PassRule;
+import top.xiaotang27.trdm.ticket.PassRules;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -85,6 +87,23 @@ public final class FareJson {
                 }
             }
         }
+        if (root.has("passes") && root.get("passes").isJsonArray()) {
+            for (final JsonElement element : root.getAsJsonArray("passes")) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                final JsonObject pass = element.getAsJsonObject();
+                final String id = string(pass, "id", "");
+                if (id.isBlank()) {
+                    continue;
+                }
+                config.passRules.add(new PassRule(id, string(pass, "name", id),
+                        integer(pass, "price", 10),
+                        Math.max(1, integer(pass, "days", 1))));
+            }
+        } else {
+            config.passRules.addAll(PassRules.defaults());
+        }
         return config;
     }
 
@@ -133,6 +152,17 @@ public final class FareJson {
             bindings.addProperty(entry.getKey(), entry.getValue());
         }
         root.add("routeRules", bindings);
+
+        final JsonArray passes = new JsonArray();
+        for (final PassRule pass : config.passRules) {
+            final JsonObject item = new JsonObject();
+            item.addProperty("id", pass.id);
+            item.addProperty("name", pass.name);
+            item.addProperty("price", pass.priceEmeralds);
+            item.addProperty("days", pass.days);
+            passes.add(item);
+        }
+        root.add("passes", passes);
         return GSON.toJson(root);
     }
 

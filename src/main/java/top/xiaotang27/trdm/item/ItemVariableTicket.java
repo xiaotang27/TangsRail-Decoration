@@ -20,6 +20,10 @@ public class ItemVariableTicket extends Item {
 
     @Override
     public Component getName(ItemStack stack) {
+        final String name = TicketData.passName(stack);
+        if (!name.isEmpty()) {
+            return Component.literal(name);
+        }
         final PassCatalog.Definition definition = PassCatalog.byId(TicketData.passDefinition(stack));
         return definition == null ? super.getName(stack) : Component.translatable(definition.nameKey());
     }

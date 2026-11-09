@@ -111,6 +111,26 @@ class FareJsonTest {
     }
 
     @Test
+    void passRulesRoundTrip() {
+        final FareConfig config = FareDefaults.config();
+        assertEquals(3, config.passRules.size());
+        config.passRules.add(new top.xiaotang27.trdm.ticket.PassRule("custom", "自定义通票", 7, 2));
+
+        final FareConfig parsed = FareJson.parse(FareJson.write(config));
+        assertEquals(4, parsed.passRules.size());
+        assertEquals("自定义通票", parsed.passRules.get(3).name);
+        assertEquals(7, parsed.passRules.get(3).priceEmeralds);
+        assertEquals(2, parsed.passRules.get(3).days);
+    }
+
+    @Test
+    void missingPassesFallBackToDefaults() {
+        final FareConfig config = FareJson.parse("{\"schemaVersion\":1,\"rules\":[]}");
+        assertEquals(3, config.passRules.size());
+        assertEquals("day1", config.passRules.get(0).id);
+    }
+
+    @Test
     void moneyFormatting() {
         assertEquals("2", FareMoney.text(200L));
         assertEquals("2.50", FareMoney.text(250L));

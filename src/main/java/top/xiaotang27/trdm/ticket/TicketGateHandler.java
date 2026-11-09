@@ -210,17 +210,20 @@ public final class TicketGateHandler {
                 message(player, "gui.trdm.ticket.gate.invalid_ticket");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
-            final PassCatalog.Definition definition = PassCatalog.byId(TicketData.passDefinition(pass));
-            if (definition == null) {
+            final int days = TicketData.passDays(pass);
+            if (days <= 0) {
                 message(player, "gui.trdm.ticket.gate.invalid_ticket");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
-            final long[] window = PassValidity.window(definition.days(), now);
+            final long[] window = PassValidity.window(days, now);
             TicketData.activatePass(pass, player.getUUID(), player.getGameProfile().getName(),
                     window[0], window[1]);
             TicketData.enter(pass, station, ServerFareRuntime.dimensionId(level));
+            final String storedName = TicketData.passName(pass);
+            final Component passName = !storedName.isEmpty()
+                    ? Component.literal(storedName) : passName(pass);
             message(player, "gui.trdm.ticket.gate.pass_activated",
-                    Component.translatable(definition.nameKey()), PassValidity.format(window[1]));
+                    passName, PassValidity.format(window[1]));
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
         }
         if (PassValidity.expired(TicketData.passUntil(pass), now)) {
@@ -252,8 +255,15 @@ public final class TicketGateHandler {
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
     }
 
-    /**
-     * 入站 → 出站票价。
+    /** 旧通票没有 pass_name 时按定义 ID 回退显示名。 */
+    private static Component passName(ItemStack pass) {
+        final PassCatalog.Definition definition = PassCatalog.byId(TicketData.passDefinition(pass));
+        return definition == null
+                ? Component.translatable("item.trdm.variable_ticket")
+                : Component.translatable(definition.nameKey());
+    }
+
+    /** 入站 → 出站票价。
      *
      * @return -1 表示不连通且没有配置最高票价，拒绝出站
      */

@@ -105,9 +105,10 @@ class TicketDataTest {
     @Test
     void passLifecycle() {
         final ItemStack pass = new ItemStack(Items.PAPER);
-        TicketData.issuePass(pass, "day3", 3, station, "minecraft:overworld");
+        TicketData.issuePass(pass, "day3", 3, "三日票", station, "minecraft:overworld");
         assertTrue(TicketData.isPass(pass));
         assertEquals("day3", TicketData.passDefinition(pass));
+        assertEquals("三日票", TicketData.passName(pass));
         assertEquals(3, TicketData.passDays(pass));
         assertFalse(TicketData.passActive(pass));
         assertEquals(TicketData.State.EMPTY, TicketData.state(pass));

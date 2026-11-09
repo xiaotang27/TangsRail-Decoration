@@ -71,6 +71,7 @@ public final class TicketData {
     private static final String KEY_EXIT_DIM = "exit_dim";
     private static final String KEY_EXIT_EXPIRES = "exit_expires";
     private static final String KEY_PASS_DEF = "pass_def";
+    private static final String KEY_PASS_NAME = "pass_name";
     private static final String KEY_PASS_DAYS = "pass_days";
     private static final String KEY_PASS_OWNER = "pass_owner";
     private static final String KEY_PASS_OWNER_NAME = "pass_owner_name";
@@ -121,13 +122,20 @@ public final class TicketData {
         commit(stack, root);
     }
 
-    /** 发售一张未激活通票。 */
+    /** 发售一张未激活通票（旧签名，名字留空时按定义 ID 回退）。 */
     public static void issuePass(ItemStack stack, String definitionId, int days,
+                                 Station sold, String soldDimension) {
+        issuePass(stack, definitionId, days, "", sold, soldDimension);
+    }
+
+    /** 发售一张未激活通票，名字写进 NBT，之后删模板也不影响已售出的票。 */
+    public static void issuePass(ItemStack stack, String definitionId, int days, String name,
                                  Station sold, String soldDimension) {
         final CompoundTag root = new CompoundTag();
         root.putString(KEY_SERIAL, UUID.randomUUID().toString());
         root.putString(KEY_TYPE, TYPE_PASS);
         root.putString(KEY_PASS_DEF, definitionId == null ? "" : definitionId);
+        root.putString(KEY_PASS_NAME, name == null ? "" : name);
         root.putInt(KEY_PASS_DAYS, Math.max(1, days));
         root.putBoolean(KEY_PASS_ACTIVE, false);
         root.putString(KEY_STATE, State.EMPTY.name());
@@ -366,6 +374,12 @@ public final class TicketData {
     public static String passDefinition(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? "" : root.getString(KEY_PASS_DEF);
+    }
+
+    /** 售出时写入的通票显示名；旧票可能为空，由调用方回退。 */
+    public static String passName(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? "" : root.getString(KEY_PASS_NAME);
     }
 
     public static int passDays(ItemStack stack) {

@@ -1,5 +1,7 @@
 package top.xiaotang27.trdm.fare;
 
+import top.xiaotang27.trdm.ticket.PassRule;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +46,8 @@ public final class FareConfig {
 
     public final List<FareRule> rules = new ArrayList<>();
     public final Map<String, String> routeRules = new LinkedHashMap<>();
+    /** 可配置的通票模板（名称/售价/天数）。 */
+    public final List<PassRule> passRules = new ArrayList<>();
 
     public static String bindingKey(String dimension, long routeId) {
         return (dimension == null || dimension.isBlank() ? DEFAULT_DIMENSION : dimension) + "|" + routeId;
@@ -136,5 +140,9 @@ public final class FareConfig {
         }
         routeRules.clear();
         routeRules.putAll(other.routeRules);
+        passRules.clear();
+        for (final PassRule pass : other.passRules) {
+            passRules.add(pass.copy());
+        }
     }
 }

@@ -8,7 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.fare.FareMoney;
-import top.xiaotang27.trdm.ticket.PassCatalog;
+import top.xiaotang27.trdm.ticket.PassRule;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -269,15 +269,20 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
     private void renderPasses(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.all_passes"),
                 LIST_X, 64F, FONT_ROW, TicketUi.TEXT_DARK);
-        for (int index = 0; index < PassCatalog.ALL.size(); index++) {
-            final PassCatalog.Definition pass = PassCatalog.ALL.get(index);
+        final java.util.List<PassRule> passes = FareRuntime.get().config().passRules;
+        for (int index = 0; index < passes.size(); index++) {
+            final PassRule pass = passes.get(index);
             final float top = 92F + index * 34F;
             rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, 32F,
                     hit(mx, my, LIST_X, top, LIST_W, 32F) ? TicketUi.ROW_HOVER : TicketUi.ROW);
-            text(guiGraphics, Component.translatable(pass.nameKey()), LIST_X + 4F, top + 10F,
+            text(guiGraphics, Component.literal(pass.name), LIST_X + 4F, top + 10F,
                     FONT_ROW, TicketUi.TEXT_DARK);
-            textRight(guiGraphics, Component.literal(FareMoney.yuan(pass.priceEmeralds() * 100L)),
+            textRight(guiGraphics, Component.literal(FareMoney.yuan(pass.priceEmeralds * 100L)),
                     LIST_X + LIST_W - 4F, top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
+        }
+        if (passes.isEmpty()) {
+            text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.no_passes"),
+                    LIST_X + 4F, 96F, FONT_ROW, TicketUi.TEXT_MUTED);
         }
         hintDark(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, 244F);
     }
@@ -488,12 +493,13 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
             }
             return false;
         }
-        for (int index = 0; index < PassCatalog.ALL.size(); index++) {
+        final java.util.List<PassRule> passes = FareRuntime.get().config().passRules;
+        for (int index = 0; index < passes.size(); index++) {
             if (hit(mx, my, LIST_X, 92F + index * 34F, LIST_W, 32F)) {
-                final PassCatalog.Definition pass = PassCatalog.ALL.get(index);
-                transactionPassId = pass.id();
-                transactionTitle = Component.translatable(pass.nameKey()).getString();
-                unitPriceCents = pass.priceEmeralds() * 100L;
+                final PassRule pass = passes.get(index);
+                transactionPassId = pass.id;
+                transactionTitle = pass.name;
+                unitPriceCents = pass.priceEmeralds * 100L;
                 quantity = 1;
                 transactionOpen = true;
                 return true;
