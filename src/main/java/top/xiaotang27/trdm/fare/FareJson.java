@@ -239,6 +239,7 @@ public final class FareJson {
                         string(nodeObject, "id", ""), string(nodeObject, "type", ""));
                 node.next = string(nodeObject, "next", null);
                 node.otherwise = string(nodeObject, "otherwise", null);
+                node.after = string(nodeObject, "after", null);
                 node.x = integer(nodeObject, "x", 0);
                 node.y = integer(nodeObject, "y", 0);
                 if (nodeObject.has("inputs") && nodeObject.get("inputs").isJsonObject()) {
@@ -284,6 +285,9 @@ public final class FareJson {
             }
             if (node.otherwise != null) {
                 nodeObject.addProperty("otherwise", node.otherwise);
+            }
+            if (node.after != null) {
+                nodeObject.addProperty("after", node.after);
             }
             nodeObject.addProperty("x", node.x);
             nodeObject.addProperty("y", node.y);

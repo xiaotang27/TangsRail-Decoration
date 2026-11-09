@@ -113,6 +113,71 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void ifElseContinuesAfterCBlock() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "if";
+        final ScriptNode branch = new ScriptNode("if", "if");
+        branch.inputs.put("condition", "cmp");
+        branch.next = "set_two";
+        branch.otherwise = "set_three";
+        branch.after = "add_one";
+        final ScriptNode compare = new ScriptNode("cmp", "compare");
+        compare.fields.put("op", "<=");
+        compare.inputs.put("a", "iv");
+        compare.inputs.put("b", "two");
+        final ScriptNode intervals = new ScriptNode("iv", "context_intervals");
+        final ScriptNode two = new ScriptNode("two", "number");
+        two.fields.put("value", "2");
+        final ScriptNode three = new ScriptNode("three", "number");
+        three.fields.put("value", "3");
+        final ScriptNode one = new ScriptNode("one", "number");
+        one.fields.put("value", "1");
+        final ScriptNode setTwo = new ScriptNode("set_two", "set_fare");
+        setTwo.inputs.put("value", "two");
+        final ScriptNode setThree = new ScriptNode("set_three", "set_fare");
+        setThree.inputs.put("value", "three");
+        final ScriptNode addOne = new ScriptNode("add_one", "add_fare");
+        addOne.inputs.put("value", "one");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, branch, compare, intervals, two, three, one,
+                setTwo, setThree, addOne));
+
+        assertEquals(3.0, eval(script, 2, 0, 0, 0), 1e-9);
+        assertEquals(4.0, eval(script, 3, 0, 0, 0), 1e-9);
+    }
+
+    @Test
+    void ifWithEmptyElseStillContinues() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "if";
+        final ScriptNode branch = new ScriptNode("if", "if");
+        branch.inputs.put("condition", "cmp");
+        branch.next = "set_two";
+        branch.after = "add_one";
+        final ScriptNode compare = new ScriptNode("cmp", "compare");
+        compare.fields.put("op", ">");
+        compare.inputs.put("a", "iv");
+        compare.inputs.put("b", "two");
+        final ScriptNode intervals = new ScriptNode("iv", "context_intervals");
+        final ScriptNode two = new ScriptNode("two", "number");
+        two.fields.put("value", "2");
+        final ScriptNode one = new ScriptNode("one", "number");
+        one.fields.put("value", "1");
+        final ScriptNode setTwo = new ScriptNode("set_two", "set_fare");
+        setTwo.inputs.put("value", "two");
+        final ScriptNode addOne = new ScriptNode("add_one", "add_fare");
+        addOne.inputs.put("value", "one");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, branch, compare, intervals, two, one,
+                setTwo, addOne));
+
+        assertEquals(1.0, eval(script, 1, 0, 0, 0), 1e-9);
+        assertEquals(3.0, eval(script, 20, 0, 0, 0), 1e-9);
+    }
+
+    @Test
     void invalidScriptsReportErrors() {
         final ScriptCompiler.Result empty = ScriptCompiler.compile(new FareScript());
         assertNotNull(empty.errors());

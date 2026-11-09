@@ -16,10 +16,18 @@ public final class ScriptNode {
 
     public String id;
     public String type;
-    /** 语句块的下一个语句；值块忽略。 */
+    /**
+     * 普通语句块的下一个语句。
+     * if 块里表示“那么”分支的第一条语句；值块忽略。
+     */
     public String next;
-    /** if 的否则分支。 */
+    /** if 的否则分支第一条语句。 */
     public String otherwise;
+    /**
+     * if 整个 C 形块之后的语句。
+     * 普通语句块不使用（它们的后继在 {@link #next}）。
+     */
+    public String after;
     public int x;
     public int y;
     /** 槽位名 → 值块节点 ID。 */
@@ -41,6 +49,7 @@ public final class ScriptNode {
         final ScriptNode copy = new ScriptNode(id, type);
         copy.next = next;
         copy.otherwise = otherwise;
+        copy.after = after;
         copy.x = x;
         copy.y = y;
         copy.inputs.putAll(inputs);

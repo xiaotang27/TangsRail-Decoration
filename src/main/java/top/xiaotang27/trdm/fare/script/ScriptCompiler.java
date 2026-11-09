@@ -153,6 +153,16 @@ public final class ScriptCompiler {
                     validateStatement(otherwise);
                 }
             }
+            if ("if".equals(node.type) && node.after != null && !node.after.isBlank()) {
+                final ScriptNode after = nodes.get(node.after);
+                if (after == null) {
+                    errors.add("if 之后的语句不存在: " + node.id + " -> " + node.after);
+                } else if (!STATEMENTS.contains(after.type)) {
+                    errors.add("after 必须指向语句块: " + node.id + " -> " + node.after);
+                } else {
+                    validateStatement(after);
+                }
+            }
             visitingStatements.remove(node.id);
             visitedStatements.add(node.id);
         }
@@ -388,7 +398,7 @@ public final class ScriptCompiler {
                     case "if" -> {
                         final boolean condition = bool(node.inputs.get("condition"), context);
                         execute(condition ? node.next : node.otherwise, state, context, depth + 1);
-                        return;
+                        cursor = node.after;
                     }
                     default -> throw new ScriptException("未知的语句块: " + node.type);
                 }

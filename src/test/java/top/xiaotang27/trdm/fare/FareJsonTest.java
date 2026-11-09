@@ -113,6 +113,37 @@ class FareJsonTest {
     }
 
     @Test
+    void scriptIfAfterRoundTrip() {
+        final top.xiaotang27.trdm.fare.script.FareScript script =
+                new top.xiaotang27.trdm.fare.script.FareScript();
+        final top.xiaotang27.trdm.fare.script.ScriptNode hat =
+                new top.xiaotang27.trdm.fare.script.ScriptNode("hat", "on_fare");
+        hat.next = "if";
+        final top.xiaotang27.trdm.fare.script.ScriptNode branch =
+                new top.xiaotang27.trdm.fare.script.ScriptNode("if", "if");
+        branch.inputs.put("condition", "cmp");
+        branch.next = "a";
+        branch.otherwise = "b";
+        branch.after = "c";
+        script.hat = "hat";
+        script.nodes.addAll(java.util.List.of(hat, branch,
+                new top.xiaotang27.trdm.fare.script.ScriptNode("cmp", "compare"),
+                new top.xiaotang27.trdm.fare.script.ScriptNode("a", "set_fare"),
+                new top.xiaotang27.trdm.fare.script.ScriptNode("b", "set_fare"),
+                new top.xiaotang27.trdm.fare.script.ScriptNode("c", "add_fare")));
+
+        final FareConfig config = new FareConfig();
+        final FareRule rule = new FareRule("script", "积木", FareRule.Kind.SCRIPT);
+        rule.script = script;
+        config.rules.add(rule);
+
+        final FareRule parsed = FareJson.parse(FareJson.write(config)).rules.get(0);
+        assertEquals("a", parsed.script.node("if").next);
+        assertEquals("b", parsed.script.node("if").otherwise);
+        assertEquals("c", parsed.script.node("if").after);
+    }
+
+    @Test
     void passRulesRoundTrip() {
         final FareConfig config = FareDefaults.config();
         assertEquals(3, config.passRules.size());
