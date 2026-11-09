@@ -141,6 +141,10 @@ public final class FareScriptScreen extends Screen {
     private double dragY;
     private double dragWorldOffsetX;
     private double dragWorldOffsetY;
+    private int snapPortIndex = -1;
+    private boolean snapPortBefore;
+    private boolean snapPortValid;
+    private boolean overTrash;
     private String tierScrollNode;
     private int tierScroll;
     private float paletteScroll;
@@ -330,6 +334,49 @@ public final class FareScriptScreen extends Screen {
                 && my >= chipTop && my <= chipTop + chipH;
     }
 
+    private record Port(int index, boolean before) {
+    }
+
+    private Port nearestPort(double mx, double my, String exclude) {
+        final List<ScriptNode> chain = chain();
+        double best = 28;
+        Port result = null;
+        for (int index = 0; index < chain.size(); index++) {
+            final ScriptNode node = chain.get(index);
+            if (node.id.equals(exclude)) {
+                continue;
+            }
+            final int left = blockLeft(index);
+            final int top = blockTop(index);
+            final double cx = left + blockW / 2.0;
+            final double bottom = top + blockH;
+            final double topY = top;
+            final double dBottom = Math.hypot(mx - cx, my - bottom);
+            if (dBottom < best) {
+                best = dBottom;
+                result = new Port(index, false);
+            }
+            final double dTop = Math.hypot(mx - cx, my - topY);
+            if (dTop < best) {
+                best = dTop;
+                result = new Port(index, true);
+            }
+        }
+        return result;
+    }
+
+    private int trashX() {
+        return canvasRight - 96;
+    }
+
+    private int trashY() {
+        return canvasBottom - 42;
+    }
+
+    private boolean inTrash(double mx, double my) {
+        return mx >= trashX() && mx <= trashX() + 88 && my >= trashY() && my <= trashY() + 32;
+    }
+
     // ===== 渲染 =====
 
     @Override
@@ -441,6 +488,21 @@ public final class FareScriptScreen extends Screen {
         if (chain.isEmpty()) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_empty").getString(),
                     canvasLeft + 20, canvasTop + 20, TEXT_MUTED);
+        }
+        if (dragStatementId != null || dragStatementType != null) {
+            final int tx = trashX();
+            final int ty = trashY();
+            fill(guiGraphics, tx, ty, 88, 32, overTrash ? 0xFFC0392B : 0xFFE8E8E8);
+            fill(guiGraphics, tx, ty, 88, 2, 0xFF9A9A9A);
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.trash").getString(),
+                    tx + 12, ty + 11, overTrash ? 0xFFFFFFFF : TEXT_MUTED);
+            if (snapPortValid) {
+                final int px = blockLeft(snapPortIndex) + blockW / 2;
+                final int py = snapPortBefore ? blockTop(snapPortIndex)
+                        : blockTop(snapPortIndex) + blockH;
+                fill(guiGraphics, px - 7, py - 7, 14, 14, 0xFFFF8A00);
+                fill(guiGraphics, px - 4, py - 4, 8, 8, CANVAS_BG);
+            }
         }
         guiGraphics.disableScissor();
 
@@ -671,16 +733,24 @@ public final class FareScriptScreen extends Screen {
             return super.mouseReleased(mouseX, mouseY, button);
         }
         if (dragStatementType != null) {
-            if (inCanvas(mouseX, mouseY)) {
-                insertStatementAt(dragStatementType, mouseX, mouseY);
+            if (!overTrash && inCanvas(mouseX, mouseY)) {
+                if (snapPortValid) {
+                    insertStatementConnected(dragStatementType, snapPortIndex, snapPortBefore);
+                } else {
+                    insertStatementAt(dragStatementType, mouseX, mouseY);
+                }
             }
             dragStatementType = null;
+            snapPortValid = false;
+            overTrash = false;
             popupVisible = selectedStatement != null;
             rebuild();
             return true;
         }
         if (dragValueType != null) {
             popupVisible = true;
+            snapPortValid = false;
+            overTrash = false;
             final int target = statementAt(mouseX, mouseY);
             if (target >= 0) {
                 attachNewValue(chain().get(target), dragValueType);
@@ -691,7 +761,14 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (dragStatementId != null) {
+            if (overTrash) {
+                removeStatementById(dragStatementId);
+            } else if (snapPortValid) {
+                reorderToPort(dragStatementId, snapPortIndex, snapPortBefore);
+            }
             dragStatementId = null;
+            snapPortValid = false;
+            overTrash = false;
             popupVisible = selectedStatement != null;
             rebuild();
             return true;
@@ -746,16 +823,33 @@ public final class FareScriptScreen extends Screen {
                 node.y = (int) Math.round((worldY - dragWorldOffsetY
                         - (10 + index * (BLOCK_H + BLOCK_GAP))) / 5) * 5;
             }
+            updateSnap(mouseX, mouseY, dragStatementId);
             this.dragX = mouseX;
             this.dragY = mouseY;
             return true;
         }
-        if (dragStatementType != null || dragValueType != null || dragValueId != null) {
+        if (dragStatementType != null) {
+            updateSnap(mouseX, mouseY, null);
+            this.dragX = mouseX;
+            this.dragY = mouseY;
+            return true;
+        }
+        if (dragValueType != null || dragValueId != null) {
+            snapPortValid = false;
+            overTrash = false;
             this.dragX = mouseX;
             this.dragY = mouseY;
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    private void updateSnap(double mouseX, double mouseY, String exclude) {
+        overTrash = inTrash(mouseX, mouseY);
+        final Port port = overTrash ? null : nearestPort(mouseX, mouseY, exclude);
+        snapPortValid = port != null;
+        snapPortIndex = port == null ? -1 : port.index();
+        snapPortBefore = port != null && port.before();
     }
 
     @Override
@@ -832,6 +926,95 @@ public final class FareScriptScreen extends Screen {
         popupVisible = true;
         error = "";
         rebuild();
+    }
+
+    private void insertStatementConnected(String type, int portIndex, boolean before) {
+        final List<ScriptNode> chain = chain();
+        if (chain.isEmpty() || portIndex < 0 || portIndex >= chain.size()) {
+            return;
+        }
+        if (chain.size() >= 8) {
+            error = Component.translatable("gui.trdm.script.limit_statements").getString();
+            return;
+        }
+        final ScriptNode port = chain.get(portIndex);
+        final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "s"), type);
+        if (valueStatement(type)) {
+            node.inputs.put("value", newValue(type).id);
+        }
+        if ("round_fare".equals(type)) {
+            node.fields.put("mode", "HALF");
+            node.fields.put("unit", "0.1");
+        }
+        script.nodes.add(node);
+        final List<String> ids = new ArrayList<>();
+        for (final ScriptNode existing : chain) {
+            ids.add(existing.id);
+        }
+        final int target = before ? portIndex : portIndex + 1;
+        ids.add(Math.max(0, Math.min(target, ids.size())), node.id);
+        relink(ids);
+        node.x = port.x;
+        node.y = port.y;
+        selectedStatement = node.id;
+        selectedValue = node.inputs.get("value");
+        popupVisible = true;
+        error = "";
+        rebuild();
+    }
+
+    private void reorderToPort(String id, int portIndex, boolean before) {
+        final List<ScriptNode> chain = chain();
+        final ScriptNode dragged = script.node(id);
+        if (dragged == null || portIndex < 0 || portIndex >= chain.size()) {
+            return;
+        }
+        final ScriptNode port = chain.get(portIndex);
+        if (port == dragged) {
+            return;
+        }
+        final List<String> ids = new ArrayList<>();
+        for (final ScriptNode node : chain) {
+            if (!node.id.equals(id)) {
+                ids.add(node.id);
+            }
+        }
+        final int oldIndex = chain.indexOf(dragged);
+        int target = before ? portIndex : portIndex + 1;
+        if (oldIndex >= 0 && oldIndex < target) {
+            target--;
+        }
+        target = Math.max(0, Math.min(target, ids.size()));
+        ids.add(target, id);
+        relink(ids);
+        final List<ScriptNode> updated = chain();
+        if (updated.contains(port) && updated.contains(dragged)) {
+            dragged.x = port.x;
+            dragged.y = port.y;
+        }
+        selectedStatement = id;
+        selectedValue = null;
+        popupVisible = true;
+        error = "";
+    }
+
+    private void removeStatementById(String id) {
+        final ScriptNode node = script.node(id);
+        if (node == null) {
+            return;
+        }
+        final List<String> ids = new ArrayList<>();
+        for (final ScriptNode existing : chain()) {
+            if (!existing.id.equals(id)) {
+                ids.add(existing.id);
+            }
+        }
+        relink(ids);
+        script.nodes.remove(node);
+        selectedStatement = ids.isEmpty() ? null : ids.get(ids.size() - 1);
+        selectedValue = null;
+        popupVisible = selectedStatement != null;
+        error = "";
     }
 
     private void relink(List<String> ids) {
