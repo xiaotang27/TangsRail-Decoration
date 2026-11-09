@@ -37,7 +37,7 @@ public final class FareScriptScreen extends Screen {
     private static final int PALETTE_HEADER = 18;
     private static final int CANVAS_LEFT = 174;
     private static final int CANVAS_TOP = 48;
-    private static final int INSPECTOR_H = 124;
+    private static final int POPUP_W = 280;
 
     private static final int CANVAS_BG = 0xFFF7F7F7;
     private static final int PANEL_BG = 0xFFF2F2F2;
@@ -104,7 +104,11 @@ public final class FareScriptScreen extends Screen {
     private int canvasRight;
     private int canvasBottom;
     private int blockW;
-    private int inspectorY;
+    private boolean popupVisible;
+    private int popupX;
+    private int popupY;
+    private int popupW;
+    private int popupH;
     private float canvasScroll;
 
     private String selectedStatement;
@@ -130,6 +134,7 @@ public final class FareScriptScreen extends Screen {
         if (!chain().isEmpty()) {
             this.selectedStatement = chain().get(0).id;
         }
+        this.popupVisible = this.selectedStatement != null;
     }
 
     @Override
@@ -137,18 +142,57 @@ public final class FareScriptScreen extends Screen {
         this.canvasLeft = CANVAS_LEFT;
         this.canvasTop = CANVAS_TOP;
         this.canvasRight = this.width - 16;
-        this.inspectorY = this.height - INSPECTOR_H - 36;
-        this.canvasBottom = this.inspectorY - 10;
+        this.canvasBottom = this.height - 44;
         this.blockW = Math.min(330, Math.max(180, this.canvasRight - this.canvasLeft - 46));
+        computePopup();
 
+        final boolean narrow = this.width < 600;
+        final int saveX = narrow ? this.width - 220 : this.width / 2 - 106;
+        final int backX = narrow ? this.width - 110 : this.width / 2 + 6;
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.editor.save"),
                         button -> save())
-                .bounds(this.width / 2 - 106, this.height - 28, 100, 20).build());
+                .bounds(saveX, this.height - 28, 100, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.back"),
                         button -> onClose())
-                .bounds(this.width / 2 + 6, this.height - 28, 100, 20).build());
+                .bounds(backX, this.height - 28, 100, 20).build());
 
-        addInspectorWidgets();
+        if (popupVisible) {
+            addPopupWidgets();
+        }
+    }
+
+    private void computePopup() {
+        if (!popupVisible || selectedStatement == null) {
+            popupVisible = false;
+            popupW = 0;
+            popupH = 0;
+            return;
+        }
+        final ScriptNode statement = selectedStatementNode();
+        if (statement == null) {
+            popupVisible = false;
+            return;
+        }
+        final ScriptNode value = effectiveValue();
+        final boolean table = value != null
+                && ("table_intervals".equals(value.type) || "table_meters".equals(value.type));
+        popupW = POPUP_W;
+        popupH = table ? 142 : 96;
+        final int index = chain().indexOf(statement);
+        final int top = index >= 0 ? blockTop(index) : canvasTop + 10;
+        int px = canvasLeft + 16 + blockW + 10;
+        int py = top - 6;
+        if (px + popupW > this.width - 8) {
+            final int left = canvasLeft + 16 - popupW - 10;
+            if (left >= 8) {
+                px = left;
+            } else {
+                px = Math.max(8, Math.min(canvasLeft + 16, this.width - popupW - 8));
+                py = top + BLOCK_H + 6;
+            }
+        }
+        popupX = px;
+        popupY = clamp(py, 44, Math.max(44, this.height - popupH - 40));
     }
 
     // ===== 画布布局 =====
@@ -229,6 +273,11 @@ public final class FareScriptScreen extends Screen {
         return mx >= canvasLeft && mx < canvasRight && my >= canvasTop && my < canvasBottom;
     }
 
+    private boolean insidePopup(double mx, double my) {
+        return popupVisible && mx >= popupX && mx < popupX + popupW
+                && my >= popupY && my < popupY + popupH;
+    }
+
     private int statementAt(double mx, double my) {        final List<ScriptNode> chain = chain();
         for (int index = 0; index < chain.size(); index++) {
             final int top = blockTop(index);
@@ -267,11 +316,13 @@ public final class FareScriptScreen extends Screen {
         drawString(guiGraphics, Component.translatable("gui.trdm.script.title").getString(), 16, 15, 0xFFFFFF);
         drawPalette(guiGraphics, mouseX, mouseY);
         drawCanvas(guiGraphics, mouseX, mouseY);
-        drawInspector(guiGraphics);
-        drawInspectorLabels(guiGraphics);
-        drawTierScrollbar(guiGraphics);
+        if (popupVisible) {
+            drawPopup(guiGraphics);
+            drawPopupLabels(guiGraphics);
+            drawTierScrollbar(guiGraphics);
+        }
         if (!error.isEmpty()) {
-            drawString(guiGraphics, error, 16, this.height - 44, 0xFFC0392B);
+            drawString(guiGraphics, error, 200, 15, 0xFFFFD0D0);
         }
         if (dragStatementType != null || dragValueType != null || dragStatementId != null
                 || dragValueId != null) {
@@ -411,46 +462,49 @@ public final class FareScriptScreen extends Screen {
         }
     }
 
-    private void drawInspector(GuiGraphics guiGraphics) {
-        fill(guiGraphics, canvasLeft - 1, inspectorY - 1, canvasRight - canvasLeft + 2, INSPECTOR_H + 2,
-                PANEL_BORDER);
-        fill(guiGraphics, canvasLeft, inspectorY, canvasRight - canvasLeft, INSPECTOR_H, PANEL_BG);
-    }
-
-    private void drawInspectorLabels(GuiGraphics guiGraphics) {
+    private void drawPopup(GuiGraphics guiGraphics) {
+        fill(guiGraphics, popupX + 4, popupY + 4, popupW, popupH, 0x40000000);
+        fill(guiGraphics, popupX - 1, popupY - 1, popupW + 2, popupH + 2, PANEL_BORDER);
+        fill(guiGraphics, popupX, popupY, popupW, popupH, 0xFFFFFDF8);
         final ScriptNode statement = selectedStatementNode();
         final ScriptNode value = effectiveValue();
+        final String title;
         if (selectedValue != null && value != null) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_value",
-                    Component.translatable("gui.trdm.script.block." + value.type)).getString(),
-                    canvasLeft + 10, inspectorY + 8, TEXT_DARK);
+            title = Component.translatable("gui.trdm.script.selected_value",
+                    blockLabel(value.type)).getString();
         } else if (statement != null) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_statement",
-                    Component.translatable("gui.trdm.script.block." + statement.type)).getString(),
-                    canvasLeft + 10, inspectorY + 8, TEXT_DARK);
-        } else if (value != null) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_value",
-                    Component.translatable("gui.trdm.script.block." + value.type)).getString(),
-                    canvasLeft + 10, inspectorY + 8, TEXT_DARK);
+            title = value == null
+                    ? Component.translatable("gui.trdm.script.selected_statement",
+                    blockLabel(statement.type)).getString()
+                    : blockLabel(statement.type) + " · " + blockLabel(value.type);
         } else {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.inspector_hint").getString(),
-                    canvasLeft + 10, inspectorY + 8, TEXT_MUTED);
+            title = Component.translatable("gui.trdm.script.title").getString();
         }
-        if (value != null && "number".equals(value.type)) {
+        drawString(guiGraphics, title, popupX + 10, popupY + 8, TEXT_DARK);
+        if (statement != null && value != null
+                && ("table_intervals".equals(value.type) || "table_meters".equals(value.type))
+                && value.tiers.size() > TIER_VISIBLE) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_scroll_hint").getString(),
+                    popupX + popupW - 88, popupY + 8, TEXT_MUTED);
+        }
+    }
+
+    private void drawPopupLabels(GuiGraphics guiGraphics) {
+        final ScriptNode value = effectiveValue();
+        if (value == null) {
+            return;
+        }
+        if ("number".equals(value.type)) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_yuan").getString(),
-                    canvasLeft + 10, inspectorY + 28, TEXT_MUTED);
+                    popupX + 10, popupY + 28, TEXT_MUTED);
         }
-        if (value != null && ("table_intervals".equals(value.type) || "table_meters".equals(value.type))) {
+        if ("table_intervals".equals(value.type) || "table_meters".equals(value.type)) {
             final boolean meters = "table_meters".equals(value.type);
             drawString(guiGraphics, Component.translatable(meters
                             ? "gui.trdm.script.tier_meter_up_to" : "gui.trdm.script.tier_interval_up_to").getString(),
-                    canvasLeft + 68, inspectorY + 28, TEXT_MUTED);
+                    popupX + 10, popupY + 28, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_fare_yuan").getString(),
-                    canvasLeft + 134, inspectorY + 28, TEXT_MUTED);
-            if (value.tiers.size() > TIER_VISIBLE) {
-                drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_scroll_hint").getString(),
-                        canvasRight - 88, inspectorY + 8, TEXT_MUTED);
-            }
+                    popupX + 80, popupY + 28, TEXT_MUTED);
         }
     }
 
@@ -459,8 +513,8 @@ public final class FareScriptScreen extends Screen {
         if (table == null || table.tiers.size() <= TIER_VISIBLE) {
             return;
         }
-        final int x = canvasRight - 8;
-        final int top = inspectorY + 42;
+        final int x = popupX + popupW - 8;
+        final int top = popupY + 50;
         final int height = TIER_VISIBLE * 20;
         fill(guiGraphics, x, top, 4, height, 0xFFD0D0D0);
         final int max = table.tiers.size() - TIER_VISIBLE;
@@ -506,6 +560,9 @@ public final class FareScriptScreen extends Screen {
         if (button != 0) {
             return false;
         }
+        if (insidePopup(mouseX, mouseY)) {
+            return true;
+        }
         final PaletteEntry paletteEntry = paletteEntryAt(mouseX, mouseY);
         if (paletteEntry != null && !paletteEntry.header()) {
             if (paletteEntry.statement()) {
@@ -513,8 +570,10 @@ public final class FareScriptScreen extends Screen {
             } else {
                 dragValueType = paletteEntry.type();
             }
+            popupVisible = false;
             dragX = mouseX;
             dragY = mouseY;
+            rebuild();
             return true;
         }
         final int index = statementAt(mouseX, mouseY);
@@ -528,6 +587,7 @@ public final class FareScriptScreen extends Screen {
                     dragValueId = valueId;
                     dragValueSource = node.id;
                 }
+                popupVisible = false;
                 dragX = mouseX;
                 dragY = mouseY;
                 rebuild();
@@ -537,6 +597,7 @@ public final class FareScriptScreen extends Screen {
             selectedValue = null;
             dragStatementId = node.id;
             dragOffsetY = Math.round((float) mouseY) - blockTop(index);
+            popupVisible = false;
             dragX = mouseX;
             dragY = mouseY;
             rebuild();
@@ -544,6 +605,7 @@ public final class FareScriptScreen extends Screen {
         }
         selectedStatement = null;
         selectedValue = null;
+        popupVisible = false;
         rebuild();
         return true;
     }
@@ -554,6 +616,7 @@ public final class FareScriptScreen extends Screen {
             return super.mouseReleased(mouseX, mouseY, button);
         }
         if (dragStatementType != null) {
+            popupVisible = selectedStatement != null;
             if (inCanvas(mouseX, mouseY)) {
                 insertStatement(dragStatementType, dropIndex(mouseY));
             }
@@ -561,6 +624,7 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (dragValueType != null) {
+            popupVisible = true;
             final int target = statementAt(mouseX, mouseY);
             if (target >= 0) {
                 attachNewValue(chain().get(target), dragValueType);
@@ -569,6 +633,7 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (dragStatementId != null) {
+            popupVisible = true;
             if (inCanvas(mouseX, mouseY)) {
                 reorderStatement(dragStatementId, dropIndex(mouseY));
             }
@@ -594,6 +659,12 @@ public final class FareScriptScreen extends Screen {
             }
             dragValueId = null;
             dragValueSource = null;
+            popupVisible = selectedStatement != null;
+            rebuild();
+            return true;
+        }
+        if (selectedStatement != null && !popupVisible) {
+            popupVisible = true;
             rebuild();
             return true;
         }
@@ -614,14 +685,21 @@ public final class FareScriptScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         final ScriptNode table = effectiveTable();
-        if (table != null && table.tiers.size() > TIER_VISIBLE
-                && mouseX >= canvasLeft && mouseX < canvasRight
-                && mouseY >= inspectorY && mouseY < inspectorY + INSPECTOR_H) {
+        if (table != null && table.tiers.size() > TIER_VISIBLE && popupVisible
+                && mouseX >= popupX && mouseX < popupX + popupW
+                && mouseY >= popupY && mouseY < popupY + popupH) {
             final int max = table.tiers.size() - TIER_VISIBLE;
             final int direction = delta > 0 ? -1 : 1;
             tierScroll = clamp(tierScroll + direction, 0, max);
             rebuild();
             return true;
+        }
+        if (insidePopup(mouseX, mouseY)) {
+            return true;
+        }
+        if (popupVisible) {
+            popupVisible = false;
+            rebuild();
         }
         if (mouseX >= canvasLeft && mouseX < canvasRight
                 && mouseY >= canvasTop && mouseY < canvasBottom && maxScroll() > 0) {
@@ -657,6 +735,7 @@ public final class FareScriptScreen extends Screen {
         relink(ids);
         selectedStatement = node.id;
         selectedValue = node.inputs.get("value");
+        popupVisible = true;
         error = "";
         rebuild();
     }
@@ -725,6 +804,7 @@ public final class FareScriptScreen extends Screen {
         statement.inputs.put("value", value.id);
         selectedStatement = statement.id;
         selectedValue = value.id;
+        popupVisible = true;
         error = "";
         rebuild();
     }
@@ -825,22 +905,22 @@ public final class FareScriptScreen extends Screen {
         minecraft.setScreen(parent);
     }
 
-    // ===== 参数面板 =====
+    // ===== 参数浮窗 =====
 
-    private void addInspectorWidgets() {
+    private void addPopupWidgets() {
         final ScriptNode statement = selectedStatementNode();
         final ScriptNode value = effectiveValue();
         final ScriptNode target = value != null ? value : statement;
         if (target == null) {
             return;
         }
-        final int x = canvasLeft + 8;
-        final int y = inspectorY + 8;
+        final int x = popupX + 10;
+        final int y = popupY + 8;
         final boolean table = value != null
                 && ("table_intervals".equals(value.type) || "table_meters".equals(value.type));
 
         if (value != null && "number".equals(value.type)) {
-            final EditBox box = editBox(x + 120, y + 20, 90, 18,
+            final EditBox box = editBox(x + 60, y + 22, 90, 18,
                     Component.translatable("gui.trdm.script.unit"));
             box.setValue(value.fields.getOrDefault("value", "0"));
             box.setResponder(text -> value.fields.put("value", text));
@@ -857,27 +937,27 @@ public final class FareScriptScreen extends Screen {
                                 target.fields.put("mode", nextMode(target.fields.getOrDefault("mode", "HALF")));
                                 rebuild();
                             })
-                    .bounds(x + 120, y + 20, 70, 18).build());
-            final EditBox unit = editBox(x + 200, y + 20, 70, 18,
+                    .bounds(x + 60, y + 22, 70, 18).build());
+            final EditBox unit = editBox(x + 136, y + 22, 70, 18,
                     Component.translatable("gui.trdm.script.unit"));
             unit.setValue(target.fields.getOrDefault("unit", "0.1"));
             unit.setResponder(text -> target.fields.put("unit", text));
             addRenderableWidget(unit);
         }
-        final int buttonY = table ? y + 96 : y + 66;
+        final int buttonY = table ? y + 110 : y + 56;
         if (value != null || (statement != null && valueStatement(statement.type))) {
             addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.change_value"),
                             button -> cycleValueType())
-                    .bounds(x, buttonY, 100, 18).build());
+                    .bounds(x, buttonY, 84, 18).build());
         }
         if (statement != null) {
             addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.change_type"),
                             button -> cycleStatementType())
-                    .bounds(x + 108, buttonY, 100, 18).build());
+                    .bounds(x + 90, buttonY, 84, 18).build());
         }
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.delete"),
                         button -> deleteSelected())
-                .bounds(x + 216, buttonY, 70, 18).build());
+                .bounds(x + 180, buttonY, 64, 18).build());
     }
 
     private void addTierWidgets(ScriptNode table, int x, int y) {
@@ -888,8 +968,8 @@ public final class FareScriptScreen extends Screen {
             final int index = tierScroll + display;
             final int row = index;
             final ScriptTier tier = table.tiers.get(index);
-            final int rowY = y + 34 + display * 20;
-            final EditBox upTo = editBox(x + 60, rowY, 60, 18,
+            final int rowY = y + 42 + display * 20;
+            final EditBox upTo = editBox(x, rowY, 64, 18,
                     Component.translatable("gui.trdm.script.tier_up_to"));
             upTo.setValue(tier.upTo() == null ? "" : trimNumber(tier.upTo()));
             upTo.setResponder(text -> {
@@ -902,7 +982,7 @@ public final class FareScriptScreen extends Screen {
                 }
             });
             addRenderableWidget(upTo);
-            final EditBox fare = editBox(x + 126, rowY, 60, 18,
+            final EditBox fare = editBox(x + 70, rowY, 64, 18,
                     Component.translatable("gui.trdm.script.tier_fare"));
             fare.setValue(trimNumber(tier.fareYuan()));
             fare.setResponder(text -> {
@@ -920,7 +1000,7 @@ public final class FareScriptScreen extends Screen {
                                 Math.max(0, table.tiers.size() - TIER_VISIBLE));
                         error = "";
                         rebuild();
-                    }).bounds(x + 192, rowY, 18, 18).build());
+                    }).bounds(x + 140, rowY, 18, 18).build());
         }
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.add_row"),
                         button -> {
@@ -946,7 +1026,7 @@ public final class FareScriptScreen extends Screen {
                             error = "";
                             rebuild();
                         })
-                .bounds(x + 220, y + 34, 80, 18).build());
+                .bounds(x + 164, y + 42, 80, 18).build());
     }
 
     private boolean hasUnsupported() {
