@@ -79,13 +79,26 @@ public final class FareScriptScreen extends Screen {
         return y;
     }
 
-    private static PaletteEntry paletteEntryAt(double mx, double my) {
-        if (mx < PALETTE_X || mx >= PALETTE_X + PALETTE_W) {
+    private static int paletteTotalHeight() {
+        return paletteY(PALETTE.size()) - PALETTE_TOP;
+    }
+
+    private int paletteViewHeight() {
+        return Math.max(0, this.height - PALETTE_TOP - 28);
+    }
+
+    private float paletteMaxScroll() {
+        return Math.max(0, paletteTotalHeight() - paletteViewHeight());
+    }
+
+    private PaletteEntry paletteEntryAt(double mx, double my) {
+        if (mx < PALETTE_X || mx >= PALETTE_X + PALETTE_W
+                || my < PALETTE_TOP || my >= PALETTE_TOP + paletteViewHeight()) {
             return null;
         }
         for (int index = 0; index < PALETTE.size(); index++) {
             final PaletteEntry entry = PALETTE.get(index);
-            final int y = paletteY(index);
+            final float y = paletteY(index) - paletteScroll;
             final int h = entry.header() ? PALETTE_HEADER : 21;
             if (my >= y && my < y + h) {
                 return entry;
@@ -123,6 +136,9 @@ public final class FareScriptScreen extends Screen {
     private int dragOffsetY;
     private String tierScrollNode;
     private int tierScroll;
+    private float paletteScroll;
+    private int snapIndex = -1;
+    private boolean snapValid;
 
     private static final int TIER_VISIBLE = 3;
 
@@ -144,6 +160,7 @@ public final class FareScriptScreen extends Screen {
         this.canvasRight = this.width - 16;
         this.canvasBottom = this.height - 44;
         this.blockW = Math.min(330, Math.max(180, this.canvasRight - this.canvasLeft - 46));
+        this.paletteScroll = Math.max(0, Math.min(paletteMaxScroll(), paletteScroll));
         computePopup();
 
         final boolean narrow = this.width < 600;
@@ -337,9 +354,16 @@ public final class FareScriptScreen extends Screen {
         fill(guiGraphics, PALETTE_X, top, PALETTE_W, panelH, PANEL_BORDER);
         fill(guiGraphics, PALETTE_X + 1, top + 1, PALETTE_W - 2, panelH - 2, PANEL_BG);
 
+        final int viewH = paletteViewHeight();
+        guiGraphics.enableScissor(PALETTE_X + 1, PALETTE_TOP, PALETTE_X + PALETTE_W - 1,
+                PALETTE_TOP + viewH);
         for (int index = 0; index < PALETTE.size(); index++) {
             final PaletteEntry entry = PALETTE.get(index);
-            final int y = paletteY(index);
+            final int y = Math.round(paletteY(index) - paletteScroll);
+            final int entryH = entry.header() ? PALETTE_HEADER - 2 : 21;
+            if (y + entryH < PALETTE_TOP || y > PALETTE_TOP + viewH) {
+                continue;
+            }
             if (entry.header()) {
                 fill(guiGraphics, PALETTE_X + 1, y, PALETTE_W - 2, PALETTE_HEADER - 2, entry.color());
                 drawString(guiGraphics, Component.translatable(entry.labelKey()).getString(),
@@ -351,6 +375,16 @@ public final class FareScriptScreen extends Screen {
                         entry.color(), Component.translatable(entry.labelKey()).getString(), hover);
             }
         }
+        guiGraphics.disableScissor();
+
+        if (paletteMaxScroll() > 0) {
+            final int x = PALETTE_X + PALETTE_W - 7;
+            fill(guiGraphics, x, PALETTE_TOP, 4, viewH, 0xFFD0D0D0);
+            final float thumbH = Math.max(18F, viewH * (float) viewH / paletteTotalHeight());
+            final float thumbY = PALETTE_TOP + (viewH - thumbH) * paletteScroll / paletteMaxScroll();
+            fill(guiGraphics, x, Math.round(thumbY), 4, Math.round(thumbH), 0xFF8A8A8A);
+        }
+
         drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_hint").getString(),
                 PALETTE_X + 8, this.height - 20, TEXT_MUTED);
     }
@@ -378,9 +412,17 @@ public final class FareScriptScreen extends Screen {
         final List<ScriptNode> chain = chain();
         final int valueTarget = dragValueType != null || dragValueId != null
                 ? statementAt(mouseX, mouseY) : -1;
+        final boolean statementDrag = dragStatementId != null || dragStatementType != null;
+        final int snapped = statementDrag && snapValid ? snapIndex : -1;
         for (int index = 0; index < chain.size(); index++) {
             final ScriptNode node = chain.get(index);
-            final int top = blockTop(index);
+            if (statementDrag && node.id.equals(dragStatementId)) {
+                continue;
+            }
+            int top = blockTop(index);
+            if (statementDrag && snapped >= 0 && index >= snapped) {
+                top += BLOCK_H + BLOCK_GAP;
+            }
             if (top + BLOCK_H < canvasTop || top > canvasBottom) {
                 continue;
             }
@@ -389,7 +431,14 @@ public final class FareScriptScreen extends Screen {
             drawStatement(guiGraphics, node, top, node.id.equals(selectedStatement), hovered,
                     index == valueTarget);
             if (index + 1 < chain.size()) {
-                final int nextTop = blockTop(index + 1);
+                final ScriptNode next = chain.get(index + 1);
+                if (statementDrag && next.id.equals(dragStatementId)) {
+                    continue;
+                }
+                int nextTop = blockTop(index + 1);
+                if (statementDrag && snapped >= 0 && index + 1 >= snapped) {
+                    nextTop += BLOCK_H + BLOCK_GAP;
+                }
                 fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 1, top + BLOCK_H,
                         2, Math.max(0, nextTop - top - BLOCK_H), 0xFF8A8A8A);
                 fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 4,
@@ -400,13 +449,17 @@ public final class FareScriptScreen extends Screen {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_empty").getString(),
                     canvasLeft + 20, canvasTop + 20, TEXT_MUTED);
         }
-        if (dragStatementId != null || dragStatementType != null) {
-            final int target = dropIndex(mouseY);
-            final int lineY = clamp(blockTop(target) - 6, canvasTop + 2, canvasBottom - 2);
-            fill(guiGraphics, canvasLeft + 10, lineY, blockW + 12, 3, 0xFFFF8A00);
-            final int ghostTop = clamp(blockTop(target) - BLOCK_H / 2, canvasTop + 2,
-                    canvasBottom - BLOCK_H - 2);
-            fill(guiGraphics, canvasLeft + 16, ghostTop, blockW, BLOCK_H, 0x28FF8A00);
+        if (statementDrag && snapped >= 0) {
+            final ScriptNode dragged = script.node(dragStatementId);
+            final String ghostType = dragStatementType != null
+                    ? dragStatementType : dragged == null ? null : dragged.type;
+            if (ghostType != null) {
+                final int ghostTop = snapped < chain.size() ? blockTop(snapped) : blockTop(chain.size());
+                if (ghostTop + BLOCK_H >= canvasTop && ghostTop <= canvasBottom) {
+                    drawGhostBlock(guiGraphics, canvasLeft + 16,
+                            clamp(ghostTop, canvasTop - 6, canvasBottom - BLOCK_H + 6), ghostType);
+                }
+            }
         }
         guiGraphics.disableScissor();
 
@@ -417,6 +470,16 @@ public final class FareScriptScreen extends Screen {
             fill(guiGraphics, canvasRight - 7, canvasTop, 4, canvasBottom - canvasTop, 0xFFD0D0D0);
             fill(guiGraphics, canvasRight - 7, Math.round(thumbY), 4, Math.round(thumbH), 0xFF8A8A8A);
         }
+    }
+
+    private void drawGhostBlock(GuiGraphics guiGraphics, int x, int top, String type) {
+        final int color = colorFor(type);
+        fill(guiGraphics, x - 1, top - 1, blockW + 2, BLOCK_H + 2, 0xFFFF8A00);
+        fill(guiGraphics, x, top, blockW, BLOCK_H, (color & 0x00FFFFFF) | 0x66000000);
+        fill(guiGraphics, x, top, blockW, 3, 0x60FFFFFF);
+        drawString(guiGraphics, blockLabel(type), x + 10, top + 8, 0xFFFFFF);
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.snap_hint").getString(),
+                x + 10, top + 30, 0xFFFFE0A0);
     }
 
     private void drawStatement(GuiGraphics guiGraphics, ScriptNode node, int top, boolean selected,
@@ -571,6 +634,8 @@ public final class FareScriptScreen extends Screen {
                 dragValueType = paletteEntry.type();
             }
             popupVisible = false;
+            snapValid = false;
+            snapIndex = -1;
             dragX = mouseX;
             dragY = mouseY;
             rebuild();
@@ -588,6 +653,8 @@ public final class FareScriptScreen extends Screen {
                     dragValueSource = node.id;
                 }
                 popupVisible = false;
+                snapValid = false;
+                snapIndex = -1;
                 dragX = mouseX;
                 dragY = mouseY;
                 rebuild();
@@ -598,6 +665,8 @@ public final class FareScriptScreen extends Screen {
             dragStatementId = node.id;
             dragOffsetY = Math.round((float) mouseY) - blockTop(index);
             popupVisible = false;
+            snapValid = false;
+            snapIndex = -1;
             dragX = mouseX;
             dragY = mouseY;
             rebuild();
@@ -606,6 +675,8 @@ public final class FareScriptScreen extends Screen {
         selectedStatement = null;
         selectedValue = null;
         popupVisible = false;
+        snapValid = false;
+        snapIndex = -1;
         rebuild();
         return true;
     }
@@ -616,11 +687,14 @@ public final class FareScriptScreen extends Screen {
             return super.mouseReleased(mouseX, mouseY, button);
         }
         if (dragStatementType != null) {
-            popupVisible = selectedStatement != null;
-            if (inCanvas(mouseX, mouseY)) {
-                insertStatement(dragStatementType, dropIndex(mouseY));
+            if (snapValid) {
+                insertStatement(dragStatementType, snapIndex);
             }
             dragStatementType = null;
+            snapValid = false;
+            snapIndex = -1;
+            popupVisible = selectedStatement != null;
+            rebuild();
             return true;
         }
         if (dragValueType != null) {
@@ -630,14 +704,20 @@ public final class FareScriptScreen extends Screen {
                 attachNewValue(chain().get(target), dragValueType);
             }
             dragValueType = null;
+            popupVisible = selectedStatement != null;
+            rebuild();
             return true;
         }
         if (dragStatementId != null) {
             popupVisible = true;
-            if (inCanvas(mouseX, mouseY)) {
-                reorderStatement(dragStatementId, dropIndex(mouseY));
+            if (snapValid) {
+                reorderStatement(dragStatementId, snapIndex);
             }
             dragStatementId = null;
+            snapValid = false;
+            snapIndex = -1;
+            popupVisible = selectedStatement != null;
+            rebuild();
             return true;
         }
         if (dragValueId != null) {
@@ -677,6 +757,10 @@ public final class FareScriptScreen extends Screen {
                 || dragValueId != null) {
             this.dragX = mouseX;
             this.dragY = mouseY;
+            if (dragStatementType != null || dragStatementId != null) {
+                snapValid = inCanvas(mouseX, mouseY);
+                snapIndex = snapValid ? dropIndex(mouseY) : -1;
+            }
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -695,6 +779,13 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (insidePopup(mouseX, mouseY)) {
+            return true;
+        }
+        if (mouseX >= PALETTE_X && mouseX < PALETTE_X + PALETTE_W
+                && mouseY >= PALETTE_TOP && mouseY < PALETTE_TOP + paletteViewHeight()
+                && paletteMaxScroll() > 0) {
+            paletteScroll = Math.max(0, Math.min(paletteMaxScroll(),
+                    paletteScroll - (float) delta * 20F));
             return true;
         }
         if (popupVisible) {

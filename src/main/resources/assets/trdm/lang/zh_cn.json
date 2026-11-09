@@ -153,6 +153,7 @@
   "gui.trdm.script.category.tables": "阶梯表",
   "gui.trdm.script.palette_hint": "把积木拖到右侧画布",
   "gui.trdm.script.canvas_empty": "从左侧拖入语句积木",
+  "gui.trdm.script.snap_hint": "松手插入",
   "gui.trdm.script.value_chip": "值：%s",
   "gui.trdm.script.change_value": "换值类型",
   "gui.trdm.script.change_type": "换语句类型",
