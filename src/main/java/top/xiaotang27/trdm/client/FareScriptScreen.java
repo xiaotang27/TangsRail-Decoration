@@ -59,6 +59,10 @@ public final class FareScriptScreen extends Screen {
     private double dragX;
     private double dragY;
     private int dragOffsetY;
+    private String tierScrollNode;
+    private int tierScroll;
+
+    private static final int TIER_VISIBLE = 3;
 
     public FareScriptScreen(Screen parent, FareRule rule) {
         super(Component.translatable("gui.trdm.script.title"));
@@ -131,6 +135,27 @@ public final class FareScriptScreen extends Screen {
         return null;
     }
 
+    private ScriptNode effectiveTable() {
+        final ScriptNode value = effectiveValue();
+        if (value == null) {
+            return null;
+        }
+        return "table_intervals".equals(value.type) || "table_meters".equals(value.type) ? value : null;
+    }
+
+    private void syncTierScroll(ScriptNode table) {
+        if (table == null) {
+            tierScrollNode = null;
+            tierScroll = 0;
+            return;
+        }
+        if (!table.id.equals(tierScrollNode)) {
+            tierScrollNode = table.id;
+            tierScroll = 0;
+        }
+        tierScroll = clamp(tierScroll, 0, Math.max(0, table.tiers.size() - TIER_VISIBLE));
+    }
+
     private int blockTop(int index) {
         return Math.round(canvasTop + 10 + index * (BLOCK_H + BLOCK_GAP) - canvasScroll);
     }
@@ -186,6 +211,7 @@ public final class FareScriptScreen extends Screen {
         drawCanvas(guiGraphics, mouseX, mouseY);
         drawInspector(guiGraphics);
         drawInspectorLabels(guiGraphics);
+        drawTierScrollbar(guiGraphics);
         if (!error.isEmpty()) {
             drawString(guiGraphics, error, 16, this.height - 44, 0xFF5555);
         }
@@ -320,9 +346,36 @@ public final class FareScriptScreen extends Screen {
                     canvasLeft + 10, inspectorY + 8, 0xA0A0A0);
         }
         if (value != null && "number".equals(value.type)) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.unit").getString(),
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.value_yuan").getString(),
                     canvasLeft + 10, inspectorY + 28, 0xA0A0A0);
         }
+        if (value != null && ("table_intervals".equals(value.type) || "table_meters".equals(value.type))) {
+            final boolean meters = "table_meters".equals(value.type);
+            drawString(guiGraphics, Component.translatable(meters
+                            ? "gui.trdm.script.tier_meter_up_to" : "gui.trdm.script.tier_interval_up_to").getString(),
+                    canvasLeft + 68, inspectorY + 28, 0xA0A0A0);
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_fare_yuan").getString(),
+                    canvasLeft + 134, inspectorY + 28, 0xA0A0A0);
+            if (value.tiers.size() > TIER_VISIBLE) {
+                drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_scroll_hint").getString(),
+                        canvasRight - 88, inspectorY + 8, 0xA0A0A0);
+            }
+        }
+    }
+
+    private void drawTierScrollbar(GuiGraphics guiGraphics) {
+        final ScriptNode table = effectiveTable();
+        if (table == null || table.tiers.size() <= TIER_VISIBLE) {
+            return;
+        }
+        final int x = canvasRight - 8;
+        final int top = inspectorY + 42;
+        final int height = TIER_VISIBLE * 20;
+        fill(guiGraphics, x, top, 4, height, 0x40FFFFFF);
+        final int max = table.tiers.size() - TIER_VISIBLE;
+        final int thumb = Math.max(16, height * TIER_VISIBLE / table.tiers.size());
+        final int thumbY = top + (height - thumb) * tierScroll / Math.max(1, max);
+        fill(guiGraphics, x, thumbY, 4, thumb, 0xC8FFFFFF);
     }
 
     private void drawGhost(GuiGraphics guiGraphics) {
@@ -472,6 +525,16 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        final ScriptNode table = effectiveTable();
+        if (table != null && table.tiers.size() > TIER_VISIBLE
+                && mouseX >= canvasLeft && mouseX < canvasRight
+                && mouseY >= inspectorY && mouseY < inspectorY + INSPECTOR_H) {
+            final int max = table.tiers.size() - TIER_VISIBLE;
+            final int direction = delta > 0 ? -1 : 1;
+            tierScroll = clamp(tierScroll + direction, 0, max);
+            rebuild();
+            return true;
+        }
         if (mouseX >= canvasLeft && mouseX < canvasRight
                 && mouseY >= canvasTop && mouseY < canvasBottom && maxScroll() > 0) {
             canvasScroll = Math.max(0, Math.min(maxScroll(),
@@ -696,6 +759,7 @@ public final class FareScriptScreen extends Screen {
             addRenderableWidget(box);
         }
         if (table) {
+            syncTierScroll(value);
             addTierWidgets(value, x, y);
         }
         if ("round_fare".equals(target.type) && value == null) {
@@ -729,11 +793,14 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void addTierWidgets(ScriptNode table, int x, int y) {
-        final int rows = Math.min(table.tiers.size(), 3);
-        for (int index = 0; index < rows; index++) {
+        final int maxScroll = Math.max(0, table.tiers.size() - TIER_VISIBLE);
+        tierScroll = clamp(tierScroll, 0, maxScroll);
+        final int rows = Math.min(TIER_VISIBLE, table.tiers.size() - tierScroll);
+        for (int display = 0; display < rows; display++) {
+            final int index = tierScroll + display;
             final int row = index;
             final ScriptTier tier = table.tiers.get(index);
-            final int rowY = y + 22 + index * 20;
+            final int rowY = y + 34 + display * 20;
             final EditBox upTo = new EditBox(this.font, x + 60, rowY, 60, 18,
                     Component.translatable("gui.trdm.script.tier_up_to"));
             upTo.setValue(tier.upTo() == null ? "" : trimNumber(tier.upTo()));
@@ -761,6 +828,8 @@ public final class FareScriptScreen extends Screen {
             addRenderableWidget(fare);
             addRenderableWidget(Button.builder(Component.literal("×"), button -> {
                         table.tiers.remove(row);
+                        tierScroll = clamp(tierScroll, 0,
+                                Math.max(0, table.tiers.size() - TIER_VISIBLE));
                         error = "";
                         rebuild();
                     }).bounds(x + 192, rowY, 18, 18).build());
@@ -784,10 +853,12 @@ public final class FareScriptScreen extends Screen {
                                 insert--;
                             }
                             table.tiers.add(insert, new ScriptTier(next, 0.0));
+                            tierScroll = clamp(Math.max(tierScroll, insert - TIER_VISIBLE + 1), 0,
+                                    Math.max(0, table.tiers.size() - TIER_VISIBLE));
                             error = "";
                             rebuild();
                         })
-                .bounds(x + 220, y + 22, 80, 18).build());
+                .bounds(x + 220, y + 34, 80, 18).build());
     }
 
     private boolean hasUnsupported() {
