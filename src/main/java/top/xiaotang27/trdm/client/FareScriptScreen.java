@@ -117,12 +117,18 @@ public final class FareScriptScreen extends Screen {
     private int canvasRight;
     private int canvasBottom;
     private int blockW;
+    private int blockH;
+    private float zoom = 1.0F;
+    private float panX;
+    private float panY;
+    private boolean panning;
+    private double panLastX;
+    private double panLastY;
     private boolean popupVisible;
     private int popupX;
     private int popupY;
     private int popupW;
     private int popupH;
-    private float canvasScroll;
 
     private String selectedStatement;
     private String selectedValue;
@@ -133,12 +139,11 @@ public final class FareScriptScreen extends Screen {
     private String dragValueType;
     private double dragX;
     private double dragY;
-    private int dragOffsetY;
+    private double dragWorldOffsetX;
+    private double dragWorldOffsetY;
     private String tierScrollNode;
     private int tierScroll;
     private float paletteScroll;
-    private int snapIndex = -1;
-    private boolean snapValid;
 
     private static final int TIER_VISIBLE = 3;
 
@@ -159,7 +164,7 @@ public final class FareScriptScreen extends Screen {
         this.canvasTop = CANVAS_TOP;
         this.canvasRight = this.width - 16;
         this.canvasBottom = this.height - 44;
-        this.blockW = Math.min(330, Math.max(180, this.canvasRight - this.canvasLeft - 46));
+        layoutBlocks();
         this.paletteScroll = Math.max(0, Math.min(paletteMaxScroll(), paletteScroll));
         computePopup();
 
@@ -196,16 +201,17 @@ public final class FareScriptScreen extends Screen {
         popupW = POPUP_W;
         popupH = table ? 142 : 96;
         final int index = chain().indexOf(statement);
+        final int left = index >= 0 ? blockLeft(index) : canvasLeft + 16;
         final int top = index >= 0 ? blockTop(index) : canvasTop + 10;
-        int px = canvasLeft + 16 + blockW + 10;
+        int px = left + blockW + 10;
         int py = top - 6;
         if (px + popupW > this.width - 8) {
-            final int left = canvasLeft + 16 - popupW - 10;
-            if (left >= 8) {
-                px = left;
+            final int leftOption = left - popupW - 10;
+            if (leftOption >= 8) {
+                px = leftOption;
             } else {
-                px = Math.max(8, Math.min(canvasLeft + 16, this.width - popupW - 8));
-                py = top + BLOCK_H + 6;
+                px = Math.max(8, Math.min(left, this.width - popupW - 8));
+                py = top + blockH + 6;
             }
         }
         popupX = px;
@@ -274,16 +280,24 @@ public final class FareScriptScreen extends Screen {
         tierScroll = clamp(tierScroll, 0, Math.max(0, table.tiers.size() - TIER_VISIBLE));
     }
 
+    private void layoutBlocks() {
+        blockW = Math.max(180, Math.min(Math.round(330 * zoom), canvasRight - canvasLeft - 20));
+        blockH = Math.max(36, Math.round(BLOCK_H * zoom));
+    }
+
+    private int blockLeft(int index) {
+        final List<ScriptNode> chain = chain();
+        final ScriptNode node = index >= 0 && index < chain.size() ? chain.get(index) : null;
+        final float worldX = 16F + (node == null ? 0F : node.x);
+        return Math.round(canvasLeft + panX + worldX * zoom);
+    }
+
     private int blockTop(int index) {
-        return Math.round(canvasTop + 10 + index * (BLOCK_H + BLOCK_GAP) - canvasScroll);
-    }
-
-    private int chainHeight() {
-        return chain().size() * (BLOCK_H + BLOCK_GAP) + 20;
-    }
-
-    private int maxScroll() {
-        return Math.max(0, chainHeight() - (canvasBottom - canvasTop - 10));
+        final List<ScriptNode> chain = chain();
+        final ScriptNode node = index >= 0 && index < chain.size() ? chain.get(index) : null;
+        final float worldY = 10F + index * (BLOCK_H + BLOCK_GAP)
+                + (node == null ? 0F : node.y);
+        return Math.round(canvasTop + panY + worldY * zoom);
     }
 
     private boolean inCanvas(double mx, double my) {
@@ -295,11 +309,12 @@ public final class FareScriptScreen extends Screen {
                 && my >= popupY && my < popupY + popupH;
     }
 
-    private int statementAt(double mx, double my) {        final List<ScriptNode> chain = chain();
+    private int statementAt(double mx, double my) {
+        final List<ScriptNode> chain = chain();
         for (int index = 0; index < chain.size(); index++) {
             final int top = blockTop(index);
-            if (mx >= canvasLeft + 16 && mx <= canvasLeft + 16 + blockW
-                    && my >= top && my <= top + BLOCK_H) {
+            final int left = blockLeft(index);
+            if (mx >= left && mx <= left + blockW && my >= top && my <= top + blockH) {
                 return index;
             }
         }
@@ -308,20 +323,11 @@ public final class FareScriptScreen extends Screen {
 
     private boolean inValueChip(int index, double mx, double my) {
         final int top = blockTop(index);
-        final int chipTop = top + 30;
-        return mx >= canvasLeft + 24 && mx <= canvasLeft + 16 + blockW - 8
-                && my >= chipTop && my <= chipTop + 20;
-    }
-
-    private int dropIndex(double my) {
-        final List<ScriptNode> chain = chain();
-        for (int index = 0; index < chain.size(); index++) {
-            final int top = blockTop(index);
-            if (my < top + (BLOCK_H + BLOCK_GAP) / 2) {
-                return index;
-            }
-        }
-        return chain.size();
+        final int left = blockLeft(index);
+        final int chipTop = top + Math.round(30 * zoom);
+        final int chipH = Math.round(20 * zoom);
+        return mx >= left + 10 && mx <= left + blockW - 10
+                && my >= chipTop && my <= chipTop + chipH;
     }
 
     // ===== 渲染 =====
@@ -404,94 +410,61 @@ public final class FareScriptScreen extends Screen {
                 canvasBottom - canvasTop, CANVAS_BG);
 
         guiGraphics.enableScissor(canvasLeft, canvasTop, canvasRight, canvasBottom);
-        for (int gx = canvasLeft + 8; gx < canvasRight; gx += 20) {
-            for (int gy = canvasTop + 8; gy < canvasBottom; gy += 20) {
+        final int spacing = Math.max(8, Math.round(20 * zoom));
+        final int offsetX = ((Math.round(panX) % spacing) + spacing) % spacing;
+        final int offsetY = ((Math.round(panY) % spacing) + spacing) % spacing;
+        for (int gx = canvasLeft + offsetX; gx < canvasRight; gx += spacing) {
+            for (int gy = canvasTop + offsetY; gy < canvasBottom; gy += spacing) {
                 fill(guiGraphics, gx, gy, 1, 1, 0xFFE0E0E0);
             }
         }
         final List<ScriptNode> chain = chain();
         final int valueTarget = dragValueType != null || dragValueId != null
                 ? statementAt(mouseX, mouseY) : -1;
-        final boolean statementDrag = dragStatementId != null || dragStatementType != null;
-        final int snapped = statementDrag && snapValid ? snapIndex : -1;
         for (int index = 0; index < chain.size(); index++) {
             final ScriptNode node = chain.get(index);
-            if (statementDrag && node.id.equals(dragStatementId)) {
+            final int top = blockTop(index);
+            final int left = blockLeft(index);
+            if (top + blockH < canvasTop || top > canvasBottom || left + blockW < canvasLeft
+                    || left > canvasRight) {
                 continue;
             }
-            int top = blockTop(index);
-            if (statementDrag && snapped >= 0 && index >= snapped) {
-                top += BLOCK_H + BLOCK_GAP;
-            }
-            if (top + BLOCK_H < canvasTop || top > canvasBottom) {
-                continue;
-            }
-            final boolean hovered = mouseX >= canvasLeft + 16 && mouseX <= canvasLeft + 16 + blockW
-                    && mouseY >= top && mouseY <= top + BLOCK_H;
-            drawStatement(guiGraphics, node, top, node.id.equals(selectedStatement), hovered,
-                    index == valueTarget);
+            final boolean hovered = mouseX >= left && mouseX <= left + blockW
+                    && mouseY >= top && mouseY <= top + blockH;
+            drawStatement(guiGraphics, node, index, top, node.id.equals(selectedStatement),
+                    hovered, index == valueTarget);
             if (index + 1 < chain.size()) {
-                final ScriptNode next = chain.get(index + 1);
-                if (statementDrag && next.id.equals(dragStatementId)) {
-                    continue;
-                }
-                int nextTop = blockTop(index + 1);
-                if (statementDrag && snapped >= 0 && index + 1 >= snapped) {
-                    nextTop += BLOCK_H + BLOCK_GAP;
-                }
-                fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 1, top + BLOCK_H,
-                        2, Math.max(0, nextTop - top - BLOCK_H), 0xFF8A8A8A);
-                fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 4,
-                        nextTop - 4, 8, 4, 0xFF8A8A8A);
+                drawConnector(guiGraphics, left + blockW / 2, top + blockH,
+                        blockLeft(index + 1) + blockW / 2, blockTop(index + 1));
             }
         }
         if (chain.isEmpty()) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_empty").getString(),
                     canvasLeft + 20, canvasTop + 20, TEXT_MUTED);
         }
-        if (statementDrag && snapped >= 0) {
-            final ScriptNode dragged = script.node(dragStatementId);
-            final String ghostType = dragStatementType != null
-                    ? dragStatementType : dragged == null ? null : dragged.type;
-            if (ghostType != null) {
-                final int ghostTop = snapped < chain.size() ? blockTop(snapped) : blockTop(chain.size());
-                if (ghostTop + BLOCK_H >= canvasTop && ghostTop <= canvasBottom) {
-                    drawGhostBlock(guiGraphics, canvasLeft + 16,
-                            clamp(ghostTop, canvasTop - 6, canvasBottom - BLOCK_H + 6), ghostType);
-                }
-            }
-        }
         guiGraphics.disableScissor();
 
-        if (maxScroll() > 0) {
-            final float thumbH = Math.max(18F,
-                    (canvasBottom - canvasTop) * (float) (canvasBottom - canvasTop) / chainHeight());
-            final float thumbY = canvasTop + (canvasBottom - canvasTop - thumbH) * canvasScroll / maxScroll();
-            fill(guiGraphics, canvasRight - 7, canvasTop, 4, canvasBottom - canvasTop, 0xFFD0D0D0);
-            fill(guiGraphics, canvasRight - 7, Math.round(thumbY), 4, Math.round(thumbH), 0xFF8A8A8A);
-        }
+        drawString(guiGraphics, "缩放 " + Math.round(zoom * 100) + "%",
+                canvasRight - 90, canvasTop + 6, TEXT_MUTED);
     }
 
-    private void drawGhostBlock(GuiGraphics guiGraphics, int x, int top, String type) {
-        final int color = colorFor(type);
-        fill(guiGraphics, x - 1, top - 1, blockW + 2, BLOCK_H + 2, 0xFFFF8A00);
-        fill(guiGraphics, x, top, blockW, BLOCK_H, (color & 0x00FFFFFF) | 0x66000000);
-        fill(guiGraphics, x, top, blockW, 3, 0x60FFFFFF);
-        drawString(guiGraphics, blockLabel(type), x + 10, top + 8, 0xFFFFFF);
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.snap_hint").getString(),
-                x + 10, top + 30, 0xFFFFE0A0);
+    private void drawConnector(GuiGraphics guiGraphics, int x1, int y1, int x2, int y2) {
+        fill(guiGraphics, x1 - 1, Math.min(y1, y2), 2, Math.abs(y2 - y1), 0xFF8A8A8A);
+        fill(guiGraphics, Math.min(x1, x2), y2 - 1, Math.abs(x2 - x1), 2, 0xFF8A8A8A);
+        fill(guiGraphics, x2 - 4, y2 - 2, 8, 4, 0xFF8A8A8A);
     }
 
-    private void drawStatement(GuiGraphics guiGraphics, ScriptNode node, int top, boolean selected,
-                               boolean hovered, boolean valueTarget) {
-        final int x = canvasLeft + 16;
+    private void drawStatement(GuiGraphics guiGraphics, ScriptNode node, int index, int top,
+                               boolean selected, boolean hovered, boolean valueTarget) {
+        final int x = blockLeft(index);
         final int color = colorFor(node.type);
-        drawBlockShape(guiGraphics, x, top, blockW, BLOCK_H, color, selected, hovered);
+        drawBlockShape(guiGraphics, x, top, blockW, blockH, color, selected, hovered);
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
         if (!valueStatement(node.type)) {
             if ("round_fare".equals(node.type)) {
                 drawString(guiGraphics, "取整  " + node.fields.getOrDefault("mode", "HALF")
-                        + " / " + node.fields.getOrDefault("unit", "0.1"), x + 10, top + 32, 0xE8E8E8);
+                        + " / " + node.fields.getOrDefault("unit", "0.1"),
+                        x + 10, top + Math.round(32 * zoom), 0xE8E8E8);
             }
             return;
         }
@@ -499,10 +472,14 @@ public final class FareScriptScreen extends Screen {
         final String chip = Component.translatable("gui.trdm.script.value_chip",
                 value == null ? Component.translatable("gui.trdm.script.none") : Component.literal(valueLabel(value)))
                 .getString();
-        fill(guiGraphics, x + 10, top + 30, blockW - 20, 20,
+        final int chipTop = top + Math.round(30 * zoom);
+        final int chipH = Math.max(12, Math.round(20 * zoom));
+        fill(guiGraphics, x + 10, chipTop, blockW - 20, chipH,
                 valueTarget ? 0xFFFFD45A : 0xFF202020);
-        fill(guiGraphics, x + 12, top + 32, 4, 16, colorFor(value == null ? "none" : value.type));
-        drawString(guiGraphics, chip, x + 20, top + 36, valueTarget ? 0xFF202020 : 0xE8E8E8);
+        fill(guiGraphics, x + 12, chipTop + 1, Math.max(3, Math.round(4 * zoom)), chipH - 2,
+                colorFor(value == null ? "none" : value.type));
+        drawString(guiGraphics, chip, x + 20, chipTop + Math.max(2, Math.round(4 * zoom)),
+                valueTarget ? 0xFF202020 : 0xE8E8E8);
     }
 
     /** 画带顶部凸起、底部凹槽、阴影的积木块。 */
@@ -620,6 +597,14 @@ public final class FareScriptScreen extends Screen {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if ((button == 1 || button == 2) && inCanvas(mouseX, mouseY)) {
+            panning = true;
+            panLastX = mouseX;
+            panLastY = mouseY;
+            popupVisible = false;
+            rebuild();
+            return true;
+        }
         if (button != 0) {
             return false;
         }
@@ -634,8 +619,6 @@ public final class FareScriptScreen extends Screen {
                 dragValueType = paletteEntry.type();
             }
             popupVisible = false;
-            snapValid = false;
-            snapIndex = -1;
             dragX = mouseX;
             dragY = mouseY;
             rebuild();
@@ -653,8 +636,6 @@ public final class FareScriptScreen extends Screen {
                     dragValueSource = node.id;
                 }
                 popupVisible = false;
-                snapValid = false;
-                snapIndex = -1;
                 dragX = mouseX;
                 dragY = mouseY;
                 rebuild();
@@ -663,10 +644,11 @@ public final class FareScriptScreen extends Screen {
             selectedStatement = node.id;
             selectedValue = null;
             dragStatementId = node.id;
-            dragOffsetY = Math.round((float) mouseY) - blockTop(index);
+            final double worldX = (mouseX - canvasLeft - panX) / zoom;
+            final double worldY = (mouseY - canvasTop - panY) / zoom;
+            dragWorldOffsetX = worldX - (16 + node.x);
+            dragWorldOffsetY = worldY - (10 + index * (BLOCK_H + BLOCK_GAP) + node.y);
             popupVisible = false;
-            snapValid = false;
-            snapIndex = -1;
             dragX = mouseX;
             dragY = mouseY;
             rebuild();
@@ -675,24 +657,24 @@ public final class FareScriptScreen extends Screen {
         selectedStatement = null;
         selectedValue = null;
         popupVisible = false;
-        snapValid = false;
-        snapIndex = -1;
         rebuild();
         return true;
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (panning) {
+            panning = false;
+            return true;
+        }
         if (button != 0) {
             return super.mouseReleased(mouseX, mouseY, button);
         }
         if (dragStatementType != null) {
-            if (snapValid) {
-                insertStatement(dragStatementType, snapIndex);
+            if (inCanvas(mouseX, mouseY)) {
+                insertStatementAt(dragStatementType, mouseX, mouseY);
             }
             dragStatementType = null;
-            snapValid = false;
-            snapIndex = -1;
             popupVisible = selectedStatement != null;
             rebuild();
             return true;
@@ -709,13 +691,7 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (dragStatementId != null) {
-            popupVisible = true;
-            if (snapValid) {
-                reorderStatement(dragStatementId, snapIndex);
-            }
             dragStatementId = null;
-            snapValid = false;
-            snapIndex = -1;
             popupVisible = selectedStatement != null;
             rebuild();
             return true;
@@ -753,14 +729,30 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (dragStatementType != null || dragValueType != null || dragStatementId != null
-                || dragValueId != null) {
+        if (panning) {
+            panX += (float) (mouseX - panLastX);
+            panY += (float) (mouseY - panLastY);
+            panLastX = mouseX;
+            panLastY = mouseY;
+            return true;
+        }
+        if (dragStatementId != null) {
+            final ScriptNode node = script.node(dragStatementId);
+            final int index = chain().indexOf(node);
+            if (node != null && index >= 0) {
+                final double worldX = (mouseX - canvasLeft - panX) / zoom;
+                final double worldY = (mouseY - canvasTop - panY) / zoom;
+                node.x = (int) Math.round((worldX - dragWorldOffsetX - 16) / 5) * 5;
+                node.y = (int) Math.round((worldY - dragWorldOffsetY
+                        - (10 + index * (BLOCK_H + BLOCK_GAP))) / 5) * 5;
+            }
             this.dragX = mouseX;
             this.dragY = mouseY;
-            if (dragStatementType != null || dragStatementId != null) {
-                snapValid = inCanvas(mouseX, mouseY);
-                snapIndex = snapValid ? dropIndex(mouseY) : -1;
-            }
+            return true;
+        }
+        if (dragStatementType != null || dragValueType != null || dragValueId != null) {
+            this.dragX = mouseX;
+            this.dragY = mouseY;
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -792,10 +784,15 @@ public final class FareScriptScreen extends Screen {
             popupVisible = false;
             rebuild();
         }
-        if (mouseX >= canvasLeft && mouseX < canvasRight
-                && mouseY >= canvasTop && mouseY < canvasBottom && maxScroll() > 0) {
-            canvasScroll = Math.max(0, Math.min(maxScroll(),
-                    canvasScroll - (float) delta * 24F));
+        if (inCanvas(mouseX, mouseY)) {
+            final double oldZoom = zoom;
+            final double factor = delta > 0 ? 1.1 : 1.0 / 1.1;
+            zoom = (float) Math.max(0.75, Math.min(1.5, zoom * factor));
+            final double worldX = (mouseX - canvasLeft - panX) / oldZoom;
+            final double worldY = (mouseY - canvasTop - panY) / oldZoom;
+            panX = (float) (mouseX - canvasLeft - worldX * zoom);
+            panY = (float) (mouseY - canvasTop - worldY * zoom);
+            layoutBlocks();
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
@@ -803,13 +800,17 @@ public final class FareScriptScreen extends Screen {
 
     // ===== 编辑操作 =====
 
-    private void insertStatement(String type, int index) {
+    private void insertStatementAt(String type, double mouseX, double mouseY) {
         final List<ScriptNode> chain = chain();
         if (chain.size() >= 8) {
             error = Component.translatable("gui.trdm.script.limit_statements").getString();
             return;
         }
+        final int index = chain.size();
         final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "s"), type);
+        node.x = (int) Math.round(((mouseX - canvasLeft - panX) / zoom - 16) / 5) * 5;
+        node.y = (int) Math.round(((mouseY - canvasTop - panY) / zoom
+                - (10 + index * (BLOCK_H + BLOCK_GAP))) / 5) * 5;
         if (valueStatement(type)) {
             node.inputs.put("value", newValue(type).id);
         }
@@ -818,36 +819,17 @@ public final class FareScriptScreen extends Screen {
             node.fields.put("unit", "0.1");
         }
         script.nodes.add(node);
-        final List<String> ids = new ArrayList<>();
-        for (final ScriptNode existing : chain) {
-            ids.add(existing.id);
+        final ScriptNode hat = script.node(script.hat);
+        if (hat != null) {
+            if (chain.isEmpty()) {
+                hat.next = node.id;
+            } else {
+                chain.get(chain.size() - 1).next = node.id;
+            }
         }
-        ids.add(Math.max(0, Math.min(index, ids.size())), node.id);
-        relink(ids);
         selectedStatement = node.id;
         selectedValue = node.inputs.get("value");
         popupVisible = true;
-        error = "";
-        rebuild();
-    }
-
-    private void reorderStatement(String id, int index) {
-        final List<String> ids = new ArrayList<>();
-        for (final ScriptNode node : chain()) {
-            ids.add(node.id);
-        }
-        final int oldIndex = ids.indexOf(id);
-        if (oldIndex < 0) {
-            return;
-        }
-        ids.remove(oldIndex);
-        int target = Math.max(0, Math.min(index, ids.size()));
-        if (oldIndex < index) {
-            target = Math.max(0, target - 1);
-        }
-        ids.add(target, id);
-        relink(ids);
-        selectedStatement = id;
         error = "";
         rebuild();
     }
@@ -1209,6 +1191,5 @@ public final class FareScriptScreen extends Screen {
     private void rebuild() {
         this.clearWidgets();
         this.init(this.minecraft, this.width, this.height);
-        this.canvasScroll = Math.min(this.canvasScroll, maxScroll());
     }
 }
