@@ -1,5 +1,6 @@
 package top.xiaotang27.trdm.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -12,7 +13,9 @@ import top.xiaotang27.trdm.fare.script.ScriptNode;
 import top.xiaotang27.trdm.fare.script.ScriptTier;
 import top.xiaotang27.trdm.fare.script.Scripts;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 
 /**
@@ -130,6 +133,11 @@ public final class FareScriptScreen extends Screen {
     private int popupW;
     private int popupH;
 
+    private final Deque<FareScript> undoStack = new ArrayDeque<>();
+    private final Deque<FareScript> redoStack = new ArrayDeque<>();
+    private boolean restoring;
+    private boolean dragUndoPushed;
+
     private String selectedStatement;
     private String selectedValue;
     private String dragStatementId;
@@ -181,6 +189,12 @@ public final class FareScriptScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.back"),
                         button -> onClose())
                 .bounds(backX, this.height - 28, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.undo"),
+                        button -> undo())
+                .bounds(this.width - 184, 6, 84, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.redo"),
+                        button -> redo())
+                .bounds(this.width - 94, 6, 84, 20).build());
 
         if (popupVisible) {
             addPopupWidgets();
@@ -706,6 +720,7 @@ public final class FareScriptScreen extends Screen {
             selectedStatement = node.id;
             selectedValue = null;
             dragStatementId = node.id;
+            dragUndoPushed = false;
             final double worldX = (mouseX - canvasLeft - panX) / zoom;
             final double worldY = (mouseY - canvasTop - panY) / zoom;
             dragWorldOffsetX = worldX - (16 + node.x);
@@ -767,6 +782,7 @@ public final class FareScriptScreen extends Screen {
                 reorderToPort(dragStatementId, snapPortIndex, snapPortBefore);
             }
             dragStatementId = null;
+            dragUndoPushed = false;
             snapPortValid = false;
             overTrash = false;
             popupVisible = selectedStatement != null;
@@ -814,6 +830,10 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (dragStatementId != null) {
+            if (!dragUndoPushed) {
+                pushUndo();
+                dragUndoPushed = true;
+            }
             final ScriptNode node = script.node(dragStatementId);
             final int index = chain().indexOf(node);
             if (node != null && index >= 0) {
@@ -895,6 +915,7 @@ public final class FareScriptScreen extends Screen {
     // ===== 编辑操作 =====
 
     private void insertStatementAt(String type, double mouseX, double mouseY) {
+        pushUndo();
         final List<ScriptNode> chain = chain();
         if (chain.size() >= 8) {
             error = Component.translatable("gui.trdm.script.limit_statements").getString();
@@ -929,6 +950,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void insertStatementConnected(String type, int portIndex, boolean before) {
+        pushUndo();
         final List<ScriptNode> chain = chain();
         if (chain.isEmpty() || portIndex < 0 || portIndex >= chain.size()) {
             return;
@@ -964,6 +986,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void reorderToPort(String id, int portIndex, boolean before) {
+        pushUndo();
         final List<ScriptNode> chain = chain();
         final ScriptNode dragged = script.node(id);
         if (dragged == null || portIndex < 0 || portIndex >= chain.size()) {
@@ -999,6 +1022,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void removeStatementById(String id) {
+        pushUndo();
         final ScriptNode node = script.node(id);
         if (node == null) {
             return;
@@ -1053,6 +1077,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void attachNewValue(ScriptNode statement, String type) {
+        pushUndo();
         if (statement == null || !valueStatement(statement.type)) {
             return;
         }
@@ -1066,6 +1091,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void cycleValueType() {
+        pushUndo();
         final ScriptNode statement = selectedStatementNode();
         if (statement == null) {
             return;
@@ -1092,6 +1118,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void cycleStatementType() {
+        pushUndo();
         final ScriptNode node = selectedStatementNode();
         if (node == null) {
             return;
@@ -1112,6 +1139,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void deleteSelected() {
+        pushUndo();
         if (selectedValue != null) {
             final ScriptNode value = selectedValueNode();
             if (value != null) {
@@ -1159,6 +1187,49 @@ public final class FareScriptScreen extends Screen {
         target.script = script.copy();
         FareRuntime.get().save();
         minecraft.setScreen(parent);
+    }
+
+    private void pushUndo() {
+        if (restoring) {
+            return;
+        }
+        undoStack.push(script.copy());
+        while (undoStack.size() > 50) {
+            undoStack.removeLast();
+        }
+        redoStack.clear();
+    }
+
+    private void undo() {
+        if (undoStack.isEmpty()) {
+            return;
+        }
+        redoStack.push(script.copy());
+        applySnapshot(undoStack.pop());
+    }
+
+    private void redo() {
+        if (redoStack.isEmpty()) {
+            return;
+        }
+        undoStack.push(script.copy());
+        applySnapshot(redoStack.pop());
+    }
+
+    private void applySnapshot(FareScript snapshot) {
+        restoring = true;
+        script.nodes.clear();
+        for (final ScriptNode node : snapshot.nodes) {
+            script.nodes.add(node.copy());
+        }
+        script.hat = snapshot.hat;
+        script.schemaVersion = snapshot.schemaVersion;
+        selectedStatement = null;
+        selectedValue = null;
+        popupVisible = false;
+        error = "";
+        restoring = false;
+        rebuild();
     }
 
     // ===== 参数浮窗 =====
@@ -1251,6 +1322,7 @@ public final class FareScriptScreen extends Screen {
             });
             addRenderableWidget(fare);
             addRenderableWidget(Button.builder(Component.literal("×"), button -> {
+                        pushUndo();
                         table.tiers.remove(row);
                         tierScroll = clamp(tierScroll, 0,
                                 Math.max(0, table.tiers.size() - TIER_VISIBLE));
@@ -1276,6 +1348,7 @@ public final class FareScriptScreen extends Screen {
                             if (insert > 0 && table.tiers.get(insert - 1).upTo() == null) {
                                 insert--;
                             }
+                            pushUndo();
                             table.tiers.add(insert, new ScriptTier(next, 0.0));
                             tierScroll = clamp(Math.max(tierScroll, insert - TIER_VISIBLE + 1), 0,
                                     Math.max(0, table.tiers.size() - TIER_VISIBLE));
@@ -1362,6 +1435,21 @@ public final class FareScriptScreen extends Screen {
 
     private void drawString(GuiGraphics guiGraphics, String text, int x, int y, int color) {
         guiGraphics.drawString(this.font, text, x, y, color, false);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (Screen.hasControlDown()) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_Z) {
+                undo();
+                return true;
+            }
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_Y) {
+                redo();
+                return true;
+            }
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

@@ -155,6 +155,8 @@
   "gui.trdm.script.canvas_empty": "从左侧拖入语句积木",
   "gui.trdm.script.snap_hint": "松手插入",
   "gui.trdm.script.trash": "拖到这里删除",
+  "gui.trdm.script.undo": "撤销",
+  "gui.trdm.script.redo": "重做",
   "gui.trdm.script.value_chip": "值：%s",
   "gui.trdm.script.change_value": "换值类型",
   "gui.trdm.script.change_type": "换语句类型",

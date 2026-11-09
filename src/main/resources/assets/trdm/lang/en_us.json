@@ -187,6 +187,8 @@
   "gui.trdm.script.canvas_empty": "Drag a statement block from the left",
   "gui.trdm.script.snap_hint": "Release to place",
   "gui.trdm.script.trash": "Drag here to delete",
+  "gui.trdm.script.undo": "Undo",
+  "gui.trdm.script.redo": "Redo",
   "gui.trdm.script.value_chip": "Value: %s",
   "gui.trdm.script.change_value": "Change value",
   "gui.trdm.script.change_type": "Change type",
