@@ -29,12 +29,70 @@ public final class FareScriptScreen extends Screen {
             "context_zone_diff", "table_intervals", "table_meters"};
 
     private static final int BLOCK_H = 58;
-    private static final int BLOCK_GAP = 14;
-    private static final int PALETTE_W = 142;
-    private static final int PALETTE_ROW = 21;
-    private static final int CANVAS_LEFT = 172;
-    private static final int CANVAS_TOP = 50;
+    private static final int BLOCK_GAP = 8;
+    private static final int PALETTE_X = 8;
+    private static final int PALETTE_W = 154;
+    private static final int PALETTE_TOP = 52;
+    private static final int PALETTE_ROW = 25;
+    private static final int PALETTE_HEADER = 18;
+    private static final int CANVAS_LEFT = 174;
+    private static final int CANVAS_TOP = 48;
     private static final int INSPECTOR_H = 124;
+
+    private static final int CANVAS_BG = 0xFFF7F7F7;
+    private static final int PANEL_BG = 0xFFF2F2F2;
+    private static final int PANEL_BORDER = 0xFF9A9A9A;
+    private static final int TEXT_DARK = 0xFF202020;
+    private static final int TEXT_MUTED = 0xFF6A6A6A;
+
+    private record PaletteEntry(String labelKey, String type, boolean statement, boolean header, int color) {
+    }
+
+    private static final List<PaletteEntry> PALETTE = buildPalette();
+
+    private static List<PaletteEntry> buildPalette() {
+        final List<PaletteEntry> list = new ArrayList<>();
+        list.add(new PaletteEntry("gui.trdm.script.category.fare", null, false, true, 0xFF2F7D4F));
+        for (final String type : List.of("set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, true, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.round", null, false, true, 0xFF2D6E82));
+        list.add(new PaletteEntry("gui.trdm.script.block.round_fare", "round_fare", true, false,
+                colorFor("round_fare")));
+        list.add(new PaletteEntry("gui.trdm.script.category.values", null, false, true, 0xFF8A5A2B));
+        for (final String type : List.of("number", "context_intervals", "context_meters",
+                "context_stations", "context_zone_diff")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.tables", null, false, true, 0xFF6B4A8A));
+        for (final String type : List.of("table_intervals", "table_meters")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        return list;
+    }
+
+    private static int paletteY(int index) {
+        int y = PALETTE_TOP;
+        for (int i = 0; i < index && i < PALETTE.size(); i++) {
+            y += PALETTE.get(i).header() ? PALETTE_HEADER : PALETTE_ROW;
+        }
+        return y;
+    }
+
+    private static PaletteEntry paletteEntryAt(double mx, double my) {
+        if (mx < PALETTE_X || mx >= PALETTE_X + PALETTE_W) {
+            return null;
+        }
+        for (int index = 0; index < PALETTE.size(); index++) {
+            final PaletteEntry entry = PALETTE.get(index);
+            final int y = paletteY(index);
+            final int h = entry.header() ? PALETTE_HEADER : 21;
+            if (my >= y && my < y + h) {
+                return entry;
+            }
+        }
+        return null;
+    }
 
     private final Screen parent;
     private final FareRule rule;
@@ -64,8 +122,7 @@ public final class FareScriptScreen extends Screen {
 
     private static final int TIER_VISIBLE = 3;
 
-    public FareScriptScreen(Screen parent, FareRule rule) {
-        super(Component.translatable("gui.trdm.script.title"));
+    public FareScriptScreen(Screen parent, FareRule rule) {        super(Component.translatable("gui.trdm.script.title"));
         this.parent = parent;
         this.rule = rule;
         this.script = rule.script == null ? Scripts.empty() : rule.script.copy();
@@ -206,14 +263,15 @@ public final class FareScriptScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics);
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.title").getString(), 16, 16, 0xFFFFFF);
+        fill(guiGraphics, 0, 0, this.width, 40, 0xFF5B4B8A);
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.title").getString(), 16, 15, 0xFFFFFF);
         drawPalette(guiGraphics, mouseX, mouseY);
         drawCanvas(guiGraphics, mouseX, mouseY);
         drawInspector(guiGraphics);
         drawInspectorLabels(guiGraphics);
         drawTierScrollbar(guiGraphics);
         if (!error.isEmpty()) {
-            drawString(guiGraphics, error, 16, this.height - 44, 0xFF5555);
+            drawString(guiGraphics, error, 16, this.height - 44, 0xFFC0392B);
         }
         if (dragStatementType != null || dragValueType != null || dragStatementId != null
                 || dragValueId != null) {
@@ -223,52 +281,62 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void drawPalette(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        int y = 52;
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.statements").getString(),
-                16, y - 14, 0xA0A0A0);
-        for (final String type : STATEMENT_TYPES) {
-            final boolean hover = mouseX >= 16 && mouseX < 16 + PALETTE_W
-                    && mouseY >= y && mouseY < y + 19;
-            drawPaletteBlock(guiGraphics, 16, y, PALETTE_W, 19, colorFor(type), blockLabel(type), hover);
-            y += PALETTE_ROW;
-        }
+        final int top = 46;
+        final int panelH = this.height - top - 8;
+        fill(guiGraphics, PALETTE_X, top, PALETTE_W, panelH, PANEL_BORDER);
+        fill(guiGraphics, PALETTE_X + 1, top + 1, PALETTE_W - 2, panelH - 2, PANEL_BG);
 
-        y += 18;
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.values").getString(),
-                16, y - 14, 0xA0A0A0);
-        for (final String type : VALUE_TYPES) {
-            final boolean hover = mouseX >= 16 && mouseX < 16 + PALETTE_W
-                    && mouseY >= y && mouseY < y + 19;
-            drawPaletteBlock(guiGraphics, 16, y, PALETTE_W, 19, colorFor(type), blockLabel(type), hover);
-            y += PALETTE_ROW;
+        for (int index = 0; index < PALETTE.size(); index++) {
+            final PaletteEntry entry = PALETTE.get(index);
+            final int y = paletteY(index);
+            if (entry.header()) {
+                fill(guiGraphics, PALETTE_X + 1, y, PALETTE_W - 2, PALETTE_HEADER - 2, entry.color());
+                drawString(guiGraphics, Component.translatable(entry.labelKey()).getString(),
+                        PALETTE_X + 8, y + 4, 0xFFFFFF);
+            } else {
+                final boolean hover = mouseX >= PALETTE_X + 6 && mouseX < PALETTE_X + PALETTE_W - 6
+                        && mouseY >= y && mouseY < y + 21;
+                drawPaletteBlock(guiGraphics, PALETTE_X + 6, y, PALETTE_W - 12, 21,
+                        entry.color(), Component.translatable(entry.labelKey()).getString(), hover);
+            }
         }
         drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_hint").getString(),
-                16, Math.min(y + 8, this.height - 40), 0x808080);
+                PALETTE_X + 8, this.height - 20, TEXT_MUTED);
     }
 
     private void drawPaletteBlock(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
                                   String label, boolean hover) {
-        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF1E1E1E);
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF2A2A2A);
         fill(guiGraphics, x, y, w, h, hover ? brighten(color) : color);
-        fill(guiGraphics, x, y, w, 2, 0x40FFFFFF);
-        drawString(guiGraphics, label, x + 6, y + 5, 0xFFFFFF);
+        fill(guiGraphics, x, y, w, 2, 0x45FFFFFF);
+        drawString(guiGraphics, label, x + 6, y + 6, 0xFFFFFF);
     }
 
     private void drawCanvas(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         fill(guiGraphics, canvasLeft - 1, canvasTop - 1, canvasRight - canvasLeft + 2,
-                canvasBottom - canvasTop + 2, 0xFF5A5A5A);
+                canvasBottom - canvasTop + 2, PANEL_BORDER);
         fill(guiGraphics, canvasLeft, canvasTop, canvasRight - canvasLeft,
-                canvasBottom - canvasTop, 0x40000000);
+                canvasBottom - canvasTop, CANVAS_BG);
 
         guiGraphics.enableScissor(canvasLeft, canvasTop, canvasRight, canvasBottom);
+        for (int gx = canvasLeft + 8; gx < canvasRight; gx += 20) {
+            for (int gy = canvasTop + 8; gy < canvasBottom; gy += 20) {
+                fill(guiGraphics, gx, gy, 1, 1, 0xFFE0E0E0);
+            }
+        }
         final List<ScriptNode> chain = chain();
+        final int valueTarget = dragValueType != null || dragValueId != null
+                ? statementAt(mouseX, mouseY) : -1;
         for (int index = 0; index < chain.size(); index++) {
             final ScriptNode node = chain.get(index);
             final int top = blockTop(index);
             if (top + BLOCK_H < canvasTop || top > canvasBottom) {
                 continue;
             }
-            drawStatement(guiGraphics, node, top, node.id.equals(selectedStatement));
+            final boolean hovered = mouseX >= canvasLeft + 16 && mouseX <= canvasLeft + 16 + blockW
+                    && mouseY >= top && mouseY <= top + BLOCK_H;
+            drawStatement(guiGraphics, node, top, node.id.equals(selectedStatement), hovered,
+                    index == valueTarget);
             if (index + 1 < chain.size()) {
                 final int nextTop = blockTop(index + 1);
                 fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 1, top + BLOCK_H,
@@ -279,12 +347,15 @@ public final class FareScriptScreen extends Screen {
         }
         if (chain.isEmpty()) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_empty").getString(),
-                    canvasLeft + 20, canvasTop + 20, 0xA0A0A0);
+                    canvasLeft + 20, canvasTop + 20, TEXT_MUTED);
         }
-        if (dragStatementId != null) {
+        if (dragStatementId != null || dragStatementType != null) {
             final int target = dropIndex(mouseY);
-            final int lineY = clamp(blockTop(target) - 4, canvasTop + 2, canvasBottom - 2);
-            fill(guiGraphics, canvasLeft + 10, lineY, blockW + 12, 3, 0xFFFFD45A);
+            final int lineY = clamp(blockTop(target) - 6, canvasTop + 2, canvasBottom - 2);
+            fill(guiGraphics, canvasLeft + 10, lineY, blockW + 12, 3, 0xFFFF8A00);
+            final int ghostTop = clamp(blockTop(target) - BLOCK_H / 2, canvasTop + 2,
+                    canvasBottom - BLOCK_H - 2);
+            fill(guiGraphics, canvasLeft + 16, ghostTop, blockW, BLOCK_H, 0x28FF8A00);
         }
         guiGraphics.disableScissor();
 
@@ -292,22 +363,21 @@ public final class FareScriptScreen extends Screen {
             final float thumbH = Math.max(18F,
                     (canvasBottom - canvasTop) * (float) (canvasBottom - canvasTop) / chainHeight());
             final float thumbY = canvasTop + (canvasBottom - canvasTop - thumbH) * canvasScroll / maxScroll();
-            fill(guiGraphics, canvasRight - 5, canvasTop, 4, canvasBottom - canvasTop, 0x40FFFFFF);
-            fill(guiGraphics, canvasRight - 5, Math.round(thumbY), 4, Math.round(thumbH), 0xCCC8C8C8);
+            fill(guiGraphics, canvasRight - 7, canvasTop, 4, canvasBottom - canvasTop, 0xFFD0D0D0);
+            fill(guiGraphics, canvasRight - 7, Math.round(thumbY), 4, Math.round(thumbH), 0xFF8A8A8A);
         }
     }
 
-    private void drawStatement(GuiGraphics guiGraphics, ScriptNode node, int top, boolean selected) {
+    private void drawStatement(GuiGraphics guiGraphics, ScriptNode node, int top, boolean selected,
+                               boolean hovered, boolean valueTarget) {
         final int x = canvasLeft + 16;
         final int color = colorFor(node.type);
-        fill(guiGraphics, x - 2, top - 2, blockW + 4, BLOCK_H + 4, selected ? 0xFFFFD45A : 0xFF202020);
-        fill(guiGraphics, x, top, blockW, BLOCK_H, color);
-        fill(guiGraphics, x, top, blockW, 4, 0x45FFFFFF);
+        drawBlockShape(guiGraphics, x, top, blockW, BLOCK_H, color, selected, hovered);
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
         if (!valueStatement(node.type)) {
             if ("round_fare".equals(node.type)) {
                 drawString(guiGraphics, "取整  " + node.fields.getOrDefault("mode", "HALF")
-                        + " / " + node.fields.getOrDefault("unit", "0.1"), x + 10, top + 32, 0xE0E0E0);
+                        + " / " + node.fields.getOrDefault("unit", "0.1"), x + 10, top + 32, 0xE8E8E8);
             }
             return;
         }
@@ -315,15 +385,36 @@ public final class FareScriptScreen extends Screen {
         final String chip = Component.translatable("gui.trdm.script.value_chip",
                 value == null ? Component.translatable("gui.trdm.script.none") : Component.literal(valueLabel(value)))
                 .getString();
-        fill(guiGraphics, x + 10, top + 30, blockW - 20, 20, 0xFF1E1E1E);
+        fill(guiGraphics, x + 10, top + 30, blockW - 20, 20,
+                valueTarget ? 0xFFFFD45A : 0xFF202020);
         fill(guiGraphics, x + 12, top + 32, 4, 16, colorFor(value == null ? "none" : value.type));
-        drawString(guiGraphics, chip, x + 20, top + 36, 0xE8E8E8);
+        drawString(guiGraphics, chip, x + 20, top + 36, valueTarget ? 0xFF202020 : 0xE8E8E8);
+    }
+
+    /** 画带顶部凸起、底部凹槽、阴影的积木块。 */
+    private void drawBlockShape(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
+                                boolean selected, boolean hovered) {
+        fill(guiGraphics, x + 3, y + 4, w, h, 0x28000000);
+        fill(guiGraphics, x + 11, y - 5, 22, 6, 0xFF2A2A2A);
+        fill(guiGraphics, x + 12, y - 4, 20, 4, color);
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF2A2A2A);
+        fill(guiGraphics, x, y, w, h, hovered ? brighten(color) : color);
+        fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
+        fill(guiGraphics, x, y + h - 3, w, 3, 0x30000000);
+        fill(guiGraphics, x + 12, y + h - 5, 20, 5, CANVAS_BG);
+        fill(guiGraphics, x + 12, y + h - 5, 20, 1, 0xFF2A2A2A);
+        if (selected) {
+            fill(guiGraphics, x - 2, y - 2, w + 4, 2, 0xFFFFD45A);
+            fill(guiGraphics, x - 2, y + h, w + 4, 2, 0xFFFFD45A);
+            fill(guiGraphics, x - 2, y - 2, 2, h + 4, 0xFFFFD45A);
+            fill(guiGraphics, x + w, y - 2, 2, h + 4, 0xFFFFD45A);
+        }
     }
 
     private void drawInspector(GuiGraphics guiGraphics) {
         fill(guiGraphics, canvasLeft - 1, inspectorY - 1, canvasRight - canvasLeft + 2, INSPECTOR_H + 2,
-                0xFF5A5A5A);
-        fill(guiGraphics, canvasLeft, inspectorY, canvasRight - canvasLeft, INSPECTOR_H, 0x50000000);
+                PANEL_BORDER);
+        fill(guiGraphics, canvasLeft, inspectorY, canvasRight - canvasLeft, INSPECTOR_H, PANEL_BG);
     }
 
     private void drawInspectorLabels(GuiGraphics guiGraphics) {
@@ -332,33 +423,33 @@ public final class FareScriptScreen extends Screen {
         if (selectedValue != null && value != null) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_value",
                     Component.translatable("gui.trdm.script.block." + value.type)).getString(),
-                    canvasLeft + 10, inspectorY + 8, 0xFFFFFF);
+                    canvasLeft + 10, inspectorY + 8, TEXT_DARK);
         } else if (statement != null) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_statement",
                     Component.translatable("gui.trdm.script.block." + statement.type)).getString(),
-                    canvasLeft + 10, inspectorY + 8, 0xFFFFFF);
+                    canvasLeft + 10, inspectorY + 8, TEXT_DARK);
         } else if (value != null) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_value",
                     Component.translatable("gui.trdm.script.block." + value.type)).getString(),
-                    canvasLeft + 10, inspectorY + 8, 0xFFFFFF);
+                    canvasLeft + 10, inspectorY + 8, TEXT_DARK);
         } else {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.inspector_hint").getString(),
-                    canvasLeft + 10, inspectorY + 8, 0xA0A0A0);
+                    canvasLeft + 10, inspectorY + 8, TEXT_MUTED);
         }
         if (value != null && "number".equals(value.type)) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_yuan").getString(),
-                    canvasLeft + 10, inspectorY + 28, 0xA0A0A0);
+                    canvasLeft + 10, inspectorY + 28, TEXT_MUTED);
         }
         if (value != null && ("table_intervals".equals(value.type) || "table_meters".equals(value.type))) {
             final boolean meters = "table_meters".equals(value.type);
             drawString(guiGraphics, Component.translatable(meters
                             ? "gui.trdm.script.tier_meter_up_to" : "gui.trdm.script.tier_interval_up_to").getString(),
-                    canvasLeft + 68, inspectorY + 28, 0xA0A0A0);
+                    canvasLeft + 68, inspectorY + 28, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_fare_yuan").getString(),
-                    canvasLeft + 134, inspectorY + 28, 0xA0A0A0);
+                    canvasLeft + 134, inspectorY + 28, TEXT_MUTED);
             if (value.tiers.size() > TIER_VISIBLE) {
                 drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_scroll_hint").getString(),
-                        canvasRight - 88, inspectorY + 8, 0xA0A0A0);
+                        canvasRight - 88, inspectorY + 8, TEXT_MUTED);
             }
         }
     }
@@ -371,11 +462,11 @@ public final class FareScriptScreen extends Screen {
         final int x = canvasRight - 8;
         final int top = inspectorY + 42;
         final int height = TIER_VISIBLE * 20;
-        fill(guiGraphics, x, top, 4, height, 0x40FFFFFF);
+        fill(guiGraphics, x, top, 4, height, 0xFFD0D0D0);
         final int max = table.tiers.size() - TIER_VISIBLE;
         final int thumb = Math.max(16, height * TIER_VISIBLE / table.tiers.size());
         final int thumbY = top + (height - thumb) * tierScroll / Math.max(1, max);
-        fill(guiGraphics, x, thumbY, 4, thumb, 0xC8FFFFFF);
+        fill(guiGraphics, x, thumbY, 4, thumb, 0xFF8A8A8A);
     }
 
     private void drawGhost(GuiGraphics guiGraphics) {
@@ -415,16 +506,13 @@ public final class FareScriptScreen extends Screen {
         if (button != 0) {
             return false;
         }
-        final int paletteStatement = paletteStatementAt(mouseX, mouseY);
-        if (paletteStatement >= 0) {
-            dragStatementType = STATEMENT_TYPES[paletteStatement];
-            dragX = mouseX;
-            dragY = mouseY;
-            return true;
-        }
-        final int paletteValue = paletteValueAt(mouseX, mouseY);
-        if (paletteValue >= 0) {
-            dragValueType = VALUE_TYPES[paletteValue];
+        final PaletteEntry paletteEntry = paletteEntryAt(mouseX, mouseY);
+        if (paletteEntry != null && !paletteEntry.header()) {
+            if (paletteEntry.statement()) {
+                dragStatementType = paletteEntry.type();
+            } else {
+                dragValueType = paletteEntry.type();
+            }
             dragX = mouseX;
             dragY = mouseY;
             return true;
@@ -752,7 +840,7 @@ public final class FareScriptScreen extends Screen {
                 && ("table_intervals".equals(value.type) || "table_meters".equals(value.type));
 
         if (value != null && "number".equals(value.type)) {
-            final EditBox box = new EditBox(this.font, x + 120, y + 20, 90, 18,
+            final EditBox box = editBox(x + 120, y + 20, 90, 18,
                     Component.translatable("gui.trdm.script.unit"));
             box.setValue(value.fields.getOrDefault("value", "0"));
             box.setResponder(text -> value.fields.put("value", text));
@@ -770,7 +858,7 @@ public final class FareScriptScreen extends Screen {
                                 rebuild();
                             })
                     .bounds(x + 120, y + 20, 70, 18).build());
-            final EditBox unit = new EditBox(this.font, x + 200, y + 20, 70, 18,
+            final EditBox unit = editBox(x + 200, y + 20, 70, 18,
                     Component.translatable("gui.trdm.script.unit"));
             unit.setValue(target.fields.getOrDefault("unit", "0.1"));
             unit.setResponder(text -> target.fields.put("unit", text));
@@ -801,7 +889,7 @@ public final class FareScriptScreen extends Screen {
             final int row = index;
             final ScriptTier tier = table.tiers.get(index);
             final int rowY = y + 34 + display * 20;
-            final EditBox upTo = new EditBox(this.font, x + 60, rowY, 60, 18,
+            final EditBox upTo = editBox(x + 60, rowY, 60, 18,
                     Component.translatable("gui.trdm.script.tier_up_to"));
             upTo.setValue(tier.upTo() == null ? "" : trimNumber(tier.upTo()));
             upTo.setResponder(text -> {
@@ -814,7 +902,7 @@ public final class FareScriptScreen extends Screen {
                 }
             });
             addRenderableWidget(upTo);
-            final EditBox fare = new EditBox(this.font, x + 126, rowY, 60, 18,
+            final EditBox fare = editBox(x + 126, rowY, 60, 18,
                     Component.translatable("gui.trdm.script.tier_fare"));
             fare.setValue(trimNumber(tier.fareYuan()));
             fare.setResponder(text -> {
@@ -872,28 +960,6 @@ public final class FareScriptScreen extends Screen {
 
     // ===== 命中与工具 =====
 
-    private int paletteStatementAt(double mx, double my) {
-        int y = 52;
-        for (int index = 0; index < STATEMENT_TYPES.length; index++) {
-            if (mx >= 16 && mx < 16 + PALETTE_W && my >= y && my < y + 19) {
-                return index;
-            }
-            y += PALETTE_ROW;
-        }
-        return -1;
-    }
-
-    private int paletteValueAt(double mx, double my) {
-        int y = 52 + STATEMENT_TYPES.length * PALETTE_ROW + 18;
-        for (int index = 0; index < VALUE_TYPES.length; index++) {
-            if (mx >= 16 && mx < 16 + PALETTE_W && my >= y && my < y + 19) {
-                return index;
-            }
-            y += PALETTE_ROW;
-        }
-        return -1;
-    }
-
     private static boolean valueStatement(String type) {
         return "set_fare".equals(type) || "add_fare".equals(type) || "multiply_fare".equals(type)
                 || "cap_fare".equals(type) || "floor_fare".equals(type);
@@ -950,6 +1016,12 @@ public final class FareScriptScreen extends Screen {
 
     private void fill(GuiGraphics guiGraphics, int x, int y, int w, int h, int color) {
         guiGraphics.fill(x, y, x + w, y + h, color);
+    }
+
+    private EditBox editBox(int x, int y, int w, int h, Component narration) {
+        final EditBox box = new EditBox(this.font, x, y, w, h, narration);
+        box.setTextColor(0xFFE8E8E8);
+        return box;
     }
 
     private void drawString(GuiGraphics guiGraphics, String text, int x, int y, int color) {
