@@ -20,7 +20,8 @@ class FareJsonTest {
         assertEquals(FareConfig.Mode.CUSTOM, parsed.mode);
         assertEquals(FareConfig.Metric.INTERVALS, parsed.metric);
         assertEquals(3, parsed.rules.size());
-        assertEquals(200L, parsed.rules.get(0).flatFareCents);
+        assertEquals(FareRule.Kind.SCRIPT, parsed.rules.get(0).kind);
+        assertNotNull(parsed.rules.get(0).script);
         assertEquals(400L, parsed.maxFareCapCents());
         assertEquals(3, parsed.rules.get(1).tiers.size());
         assertNull(parsed.rules.get(1).tiers.get(2).upTo());
@@ -46,6 +47,7 @@ class FareJsonTest {
         final FareConfig config = FareJson.parse(json);
         assertEquals(FareConfig.Metric.DISTANCE, config.metric);
         assertEquals(150L, config.transferDiscountCents);
+        assertEquals(FareRule.Kind.SCRIPT, config.rules.get(0).kind);
         assertEquals(990L, config.rules.get(0).maxFareCents);
         assertEquals(200L, config.rules.get(0).tiers.get(0).fareCents());
         assertNull(config.rules.get(0).tiers.get(1).upTo());

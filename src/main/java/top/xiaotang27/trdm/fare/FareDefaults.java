@@ -38,6 +38,9 @@ public final class FareDefaults {
         config.rules.add(flat);
         config.rules.add(interval);
         config.rules.add(distance);
+        for (final FareRule rule : config.rules) {
+            rule.migrateToScript();
+        }
         config.passRules.addAll(PassRules.defaults());
         return config;
     }

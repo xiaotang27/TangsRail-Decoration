@@ -1,5 +1,7 @@
 package top.xiaotang27.trdm.fare;
 
+import top.xiaotang27.trdm.fare.script.ScriptContext;
+import top.xiaotang27.trdm.fare.script.ScriptRuntime;
 import top.xiaotang27.trdm.ticket.PassRule;
 
 import java.util.ArrayList;
@@ -107,8 +109,19 @@ public final class FareConfig {
                     yield lowest == Long.MAX_VALUE ? 0L : lowest;
                 }
                 case MTR_VANILLA -> FareEngine.VANILLA_BASE_CENTS;
-                // 积木脚本可能出现 0 元，入闸门槛按 0 处理，避免错误拦截。
-                case SCRIPT -> 0L;
+                // 积木脚本按“零区间/零里程”试算一个最低票价；失败按原版起步价。
+                case SCRIPT -> {
+                    if (rule.script == null) {
+                        yield FareEngine.VANILLA_BASE_CENTS;
+                    }
+                    try {
+                        final double yuan = ScriptRuntime.evaluate(rule.script,
+                                new ScriptContext(0L, 0L, 0, 0));
+                        yield Math.max(0L, Math.round(yuan * 100.0));
+                    } catch (RuntimeException exception) {
+                        yield FareEngine.VANILLA_BASE_CENTS;
+                    }
+                }
             };
             min = Math.min(min, Math.max(0L, fare));
         }

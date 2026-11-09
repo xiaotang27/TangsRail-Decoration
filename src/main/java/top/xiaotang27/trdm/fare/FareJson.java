@@ -217,6 +217,9 @@ public final class FareJson {
         if (kind == FareRule.Kind.SCRIPT && object.has("script") && object.get("script").isJsonObject()) {
             rule.script = parseScript(object.getAsJsonObject("script"));
         }
+        if (kind != FareRule.Kind.MTR_VANILLA && kind != FareRule.Kind.SCRIPT) {
+            rule.migrateToScript();
+        }
         return rule;
     }
 

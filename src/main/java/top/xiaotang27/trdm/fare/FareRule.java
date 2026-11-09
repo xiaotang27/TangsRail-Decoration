@@ -2,7 +2,10 @@ package top.xiaotang27.trdm.fare;
 
 import top.xiaotang27.trdm.fare.script.FareScript;
 import top.xiaotang27.trdm.fare.script.ScriptContext;
+import top.xiaotang27.trdm.fare.script.ScriptNode;
 import top.xiaotang27.trdm.fare.script.ScriptRuntime;
+import top.xiaotang27.trdm.fare.script.ScriptTier;
+import top.xiaotang27.trdm.fare.script.Scripts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -123,5 +126,61 @@ public final class FareRule {
             }
         }
         return Math.max(0L, tiers.get(tiers.size() - 1).fareCents());
+    }
+
+    /**
+     * 把旧的“统一/区间/里程”预设转成等价的积木脚本。
+     * <p>MTR 原版和已经是积木的规则返回 {@code null}。
+     */
+    public FareScript toScript() {
+        if (kind == Kind.MTR_VANILLA) {
+            return null;
+        }
+        if (kind == Kind.SCRIPT) {
+            return script == null ? null : script.copy();
+        }
+        if ((kind == Kind.INTERVAL_TABLE || kind == Kind.DISTANCE_TABLE) && tiers.isEmpty()) {
+            return null;
+        }
+        final FareScript result = Scripts.empty();
+        final ScriptNode hat = result.node(result.hat);
+        if (hat == null) {
+            return null;
+        }
+        final ScriptNode set = new ScriptNode(Scripts.uniqueId(result, "s"), "set_fare");
+        hat.next = set.id;
+        result.nodes.add(set);
+
+        if (kind == Kind.FLAT) {
+            final ScriptNode number = new ScriptNode(Scripts.uniqueId(result, "v"), "number");
+            number.fields.put("value", Double.toString(Math.max(0L, flatFareCents) / 100.0));
+            set.inputs.put("value", number.id);
+            result.nodes.add(number);
+        } else {
+            final ScriptNode table = new ScriptNode(Scripts.uniqueId(result, "v"),
+                    kind == Kind.INTERVAL_TABLE ? "table_intervals" : "table_meters");
+            for (final Tier tier : tiers) {
+                table.tiers.add(new ScriptTier(
+                        tier.upTo() == null ? null : (double) tier.upTo(),
+                        Math.max(0L, tier.fareCents()) / 100.0));
+            }
+            set.inputs.put("value", table.id);
+            result.nodes.add(table);
+        }
+        return result;
+    }
+
+    /** 把旧预设原地升级成积木规则；已经是积木/原版返回 false。 */
+    public boolean migrateToScript() {
+        if (kind == Kind.MTR_VANILLA || kind == Kind.SCRIPT) {
+            return false;
+        }
+        final FareScript converted = toScript();
+        if (converted == null) {
+            return false;
+        }
+        script = converted;
+        kind = Kind.SCRIPT;
+        return true;
     }
 }

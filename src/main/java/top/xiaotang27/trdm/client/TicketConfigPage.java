@@ -782,6 +782,16 @@ final class TicketConfigPage {
             Minecraft.getInstance().setScreen(new FareScriptScreen(host, rules.get(detailRuleIndex)));
             return;
         }
+        final FareRule rule = rules.get(detailRuleIndex);
+        if (rule.kind != FareRule.Kind.MTR_VANILLA) {
+            if (rule.migrateToScript()) {
+                FareRuntime.get().save();
+            }
+            if (rule.kind == FareRule.Kind.SCRIPT) {
+                Minecraft.getInstance().setScreen(new FareScriptScreen(host, rule));
+                return;
+            }
+        }
         draft = rules.get(detailRuleIndex).copy();
         if (draft.kind == FareRule.Kind.MTR_VANILLA) {
             draft.kind = FareRule.Kind.FLAT;
@@ -801,8 +811,8 @@ final class TicketConfigPage {
 
     private void addFareRule() {
         final FareRule rule = new FareRule(uniqueRuleId(),
-                Component.translatable("gui.trdm.ticket.new_rule_default").getString(), FareRule.Kind.FLAT);
-        rule.flatFareCents = 200L;
+                Component.translatable("gui.trdm.ticket.new_rule_default").getString(), FareRule.Kind.SCRIPT);
+        rule.script = top.xiaotang27.trdm.fare.script.Scripts.flat(2.0);
         rule.maxFareCents = 400L;
         config.rules.add(rule);
         FareRuntime.get().save();
