@@ -1,6 +1,5 @@
 package top.xiaotang27.trdm.client;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -17,10 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 最小可用的积木规则编辑器（块列表，不是自由画布）。
- * <p>
- * 左侧是语句链，右侧是选中块的参数和值槽；值类型用按钮循环切换，
- * 阶梯表直接编辑行。保存前走 {@link ScriptCompiler} 校验。
+ * 积木规则的可视化编辑器（v1 画布）：
+ * 左侧是积木栏，中间是语句链画布，底部是选中块参数。
+ * 语句块可以上下拖动排序；值块可以拖到语句块的值槽里。
  */
 public final class FareScriptScreen extends Screen {
 
@@ -30,16 +28,37 @@ public final class FareScriptScreen extends Screen {
             "number", "context_intervals", "context_meters", "context_stations",
             "context_zone_diff", "table_intervals", "table_meters"};
 
+    private static final int BLOCK_H = 58;
+    private static final int BLOCK_GAP = 14;
+    private static final int PALETTE_W = 142;
+    private static final int PALETTE_ROW = 21;
+    private static final int CANVAS_LEFT = 172;
+    private static final int CANVAS_TOP = 50;
+    private static final int INSPECTOR_H = 124;
+
     private final Screen parent;
     private final FareRule rule;
     private final FareScript script;
-    private int selected;
     private String error = "";
-    private int leftX;
-    private int leftW;
-    private int rightX;
-    private int rightW;
-    private int rowsTop;
+
+    private int canvasLeft;
+    private int canvasTop;
+    private int canvasRight;
+    private int canvasBottom;
+    private int blockW;
+    private int inspectorY;
+    private float canvasScroll;
+
+    private String selectedStatement;
+    private String selectedValue;
+    private String dragStatementId;
+    private String dragValueId;
+    private String dragValueSource;
+    private String dragStatementType;
+    private String dragValueType;
+    private double dragX;
+    private double dragY;
+    private int dragOffsetY;
 
     public FareScriptScreen(Screen parent, FareRule rule) {
         super(Component.translatable("gui.trdm.script.title"));
@@ -47,85 +66,19 @@ public final class FareScriptScreen extends Screen {
         this.rule = rule;
         this.script = rule.script == null ? Scripts.empty() : rule.script.copy();
         Scripts.ensureHat(this.script);
-        this.selected = chain().isEmpty() ? -1 : 0;
+        if (!chain().isEmpty()) {
+            this.selectedStatement = chain().get(0).id;
+        }
     }
 
     @Override
     protected void init() {
-        this.leftX = 20;
-        this.leftW = Math.min(320, Math.max(220, this.width / 2 - 30));
-        this.rightX = this.leftX + this.leftW + 16;
-        this.rightW = Math.max(160, this.width - this.rightX - 20);
-        this.rowsTop = 58;
-
-        final List<ScriptNode> chain = chain();
-        final int shown = Math.min(chain.size(), 8);
-        for (int index = 0; index < shown; index++) {
-            final int row = index;
-            final ScriptNode node = chain.get(index);
-            final String prefix = index == selected ? "▶ " : "   ";
-            addRenderableWidget(Button.builder(
-                            Component.literal(prefix + (index + 1) + ". " + blockLabel(node)),
-                            button -> {
-                                selected = row;
-                                error = "";
-                                rebuild();
-                            })
-                    .bounds(leftX, rowsTop + index * 24, leftW, 20).build());
-        }
-        if (chain.size() > 8) {
-            addRenderableWidget(Button.builder(Component.literal("…"), button -> {
-            }).bounds(leftX, rowsTop + 8 * 24, leftW, 16).build()).active = false;
-        }
-
-        final int controlsY = rowsTop + Math.min(chain.size(), 8) * 24 + 6;
-        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.add_statement"),
-                        button -> addStatement())
-                .bounds(leftX, controlsY, leftW, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.up"),
-                        button -> move(-1))
-                .bounds(leftX, controlsY + 24, leftW / 3, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.down"),
-                        button -> move(1))
-                .bounds(leftX + leftW / 3, controlsY + 24, leftW / 3, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.delete"),
-                        button -> deleteStatement())
-                .bounds(leftX + leftW * 2 / 3, controlsY + 24, leftW / 3, 20).build());
-
-        if (selected >= 0 && selected < chain.size()) {
-            final ScriptNode node = chain.get(selected);
-            final int typeY = rowsTop + 24;
-            addRenderableWidget(Button.builder(
-                            Component.translatable("gui.trdm.script.block_type", blockLabel(node)),
-                            button -> cycleStatementType(node))
-                    .bounds(rightX, typeY, rightW, 20).build());
-            if (valueStatement(node.type)) {
-                final int valueY = typeY + 26;
-                final ScriptNode value = script.node(node.inputs.get("value"));
-                addRenderableWidget(Button.builder(
-                                Component.translatable("gui.trdm.script.value_type",
-                                        value == null ? Component.translatable("gui.trdm.script.none")
-                                                : Component.literal(valueLabel(value))),
-                                button -> cycleValueType(node, value))
-                        .bounds(rightX, valueY, rightW, 20).build());
-                if (value != null) {
-                    addValueWidgets(value, valueY + 26);
-                }
-            } else if ("round_fare".equals(node.type)) {
-                addRenderableWidget(Button.builder(
-                                Component.literal(node.fields.getOrDefault("mode", "HALF")),
-                                button -> {
-                                    node.fields.put("mode", nextMode(node.fields.getOrDefault("mode", "HALF")));
-                                    rebuild();
-                                })
-                        .bounds(rightX, typeY + 26, 80, 20).build());
-                final EditBox unit = new EditBox(this.font, rightX + 88, typeY + 26, 80, 20,
-                        Component.translatable("gui.trdm.script.unit"));
-                unit.setValue(node.fields.getOrDefault("unit", "0.1"));
-                unit.setResponder(text -> node.fields.put("unit", text));
-                addRenderableWidget(unit);
-            }
-        }
+        this.canvasLeft = CANVAS_LEFT;
+        this.canvasTop = CANVAS_TOP;
+        this.canvasRight = this.width - 16;
+        this.inspectorY = this.height - INSPECTOR_H - 36;
+        this.canvasBottom = this.inspectorY - 10;
+        this.blockW = Math.min(330, Math.max(180, this.canvasRight - this.canvasLeft - 46));
 
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.editor.save"),
                         button -> save())
@@ -133,241 +86,11 @@ public final class FareScriptScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.back"),
                         button -> onClose())
                 .bounds(this.width / 2 + 6, this.height - 28, 100, 20).build());
+
+        addInspectorWidgets();
     }
 
-    private void addValueWidgets(ScriptNode value, int y) {
-        if ("number".equals(value.type)) {
-            final EditBox box = new EditBox(this.font, rightX, y, 100, 20,
-                    Component.translatable("gui.trdm.script.unit"));
-            box.setValue(value.fields.getOrDefault("value", "0"));
-            box.setResponder(text -> value.fields.put("value", text));
-            addRenderableWidget(box);
-            return;
-        }
-        if ("table_intervals".equals(value.type) || "table_meters".equals(value.type)) {
-            final int shown = Math.min(value.tiers.size(), 6);
-            for (int index = 0; index < shown; index++) {
-                final int row = index;
-                final ScriptTier tier = value.tiers.get(index);
-                final int rowY = y + index * 24;
-                final EditBox upTo = new EditBox(this.font, rightX, rowY, 80, 20,
-                        Component.translatable("gui.trdm.script.tier_up_to"));
-                upTo.setValue(tier.upTo() == null ? "" : trimNumber(tier.upTo()));
-                upTo.setResponder(text -> setTierUpTo(value, row, text));
-                addRenderableWidget(upTo);
-                final EditBox fare = new EditBox(this.font, rightX + 86, rowY, 80, 20,
-                        Component.translatable("gui.trdm.script.tier_fare"));
-                fare.setValue(trimNumber(tier.fareYuan()));
-                fare.setResponder(text -> setTierFare(value, row, text));
-                addRenderableWidget(fare);
-                addRenderableWidget(Button.builder(Component.literal("×"), button -> {
-                            value.tiers.remove(row);
-                            error = "";
-                            rebuild();
-                        })
-                        .bounds(rightX + 172, rowY, 20, 20).build());
-            }
-            addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.add_row"),
-                            button -> addTier(value))
-                    .bounds(rightX, y + shown * 24, 120, 20).build());
-        }
-    }
-
-    private void setTierUpTo(ScriptNode value, int row, String text) {
-        try {
-            final ScriptTier current = value.tiers.get(row);
-            final Double upTo = text == null || text.isBlank() ? null : Double.parseDouble(text.trim());
-            value.tiers.set(row, new ScriptTier(upTo, current.fareYuan()));
-        } catch (NumberFormatException ignored) {
-            // 让玩家把数字打完
-        }
-    }
-
-    private void setTierFare(ScriptNode value, int row, String text) {
-        try {
-            final ScriptTier current = value.tiers.get(row);
-            value.tiers.set(row, new ScriptTier(current.upTo(), Double.parseDouble(text.trim())));
-        } catch (NumberFormatException ignored) {
-            // 让玩家把数字打完
-        }
-    }
-
-    private void addTier(ScriptNode value) {
-        if (value.tiers.size() >= 6) {
-            error = Component.translatable("gui.trdm.script.limit_tiers").getString();
-            rebuild();
-            return;
-        }
-        double next = 10.0;
-        if (!value.tiers.isEmpty()) {
-            final ScriptTier last = value.tiers.get(value.tiers.size() - 1);
-            if (last.upTo() != null) {
-                next = last.upTo() + 10.0;
-            }
-        }
-        int insert = value.tiers.size();
-        if (insert > 0 && value.tiers.get(insert - 1).upTo() == null) {
-            insert--;
-        }
-        value.tiers.add(insert, new ScriptTier(next, 0.0));
-        error = "";
-        rebuild();
-    }
-
-    private void addStatement() {
-        final List<ScriptNode> chain = chain();
-        if (chain.size() >= 8) {
-            error = Component.translatable("gui.trdm.script.limit_statements").getString();
-            rebuild();
-            return;
-        }
-        final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "s"), "set_fare");
-        final ScriptNode value = new ScriptNode(Scripts.uniqueId(script, "v"), "number");
-        value.fields.put("value", "2.0");
-        node.inputs.put("value", value.id);
-        script.nodes.add(node);
-        script.nodes.add(value);
-        if (chain.isEmpty()) {
-            script.node(script.hat).next = node.id;
-        } else {
-            chain.get(chain.size() - 1).next = node.id;
-        }
-        selected = chain.size();
-        error = "";
-        rebuild();
-    }
-
-    private void deleteStatement() {
-        final List<ScriptNode> chain = chain();
-        if (selected < 0 || selected >= chain.size()) {
-            return;
-        }
-        final ScriptNode node = chain.get(selected);
-        if (selected == 0) {
-            script.node(script.hat).next = node.next;
-        } else {
-            chain.get(selected - 1).next = node.next;
-        }
-        script.nodes.remove(node);
-        selected = Math.min(selected, chain.size() - 2);
-        if (selected < 0 && !chain.isEmpty()) {
-            selected = 0;
-        }
-        error = "";
-        rebuild();
-    }
-
-    private void move(int delta) {
-        final List<ScriptNode> chain = chain();
-        final int target = selected + delta;
-        if (selected < 0 || selected >= chain.size() || target < 0 || target >= chain.size()) {
-            return;
-        }
-        final List<String> ids = new ArrayList<>();
-        for (final ScriptNode node : chain) {
-            ids.add(node.id);
-        }
-        final String moved = ids.remove(selected);
-        ids.add(target, moved);
-        script.node(script.hat).next = ids.get(0);
-        for (int index = 0; index < ids.size(); index++) {
-            script.node(ids.get(index)).next = index + 1 < ids.size() ? ids.get(index + 1) : null;
-        }
-        selected = target;
-        error = "";
-        rebuild();
-    }
-
-    private void cycleStatementType(ScriptNode node) {
-        int index = 0;
-        for (int i = 0; i < STATEMENT_TYPES.length; i++) {
-            if (STATEMENT_TYPES[i].equals(node.type)) {
-                index = i;
-                break;
-            }
-        }
-        node.type = STATEMENT_TYPES[(index + 1) % STATEMENT_TYPES.length];
-        if (valueStatement(node.type) && script.node(node.inputs.get("value")) == null) {
-            final ScriptNode value = new ScriptNode(Scripts.uniqueId(script, "v"), "number");
-            value.fields.put("value", "2.0");
-            script.nodes.add(value);
-            node.inputs.put("value", value.id);
-        }
-        error = "";
-        rebuild();
-    }
-
-    private void cycleValueType(ScriptNode statement, ScriptNode current) {
-        int index = -1;
-        for (int i = 0; i < VALUE_TYPES.length; i++) {
-            if (current != null && VALUE_TYPES[i].equals(current.type)) {
-                index = i;
-                break;
-            }
-        }
-        final String type = VALUE_TYPES[(index + 1) % VALUE_TYPES.length];
-        final ScriptNode value = new ScriptNode(Scripts.uniqueId(script, "v"), type);
-        switch (type) {
-            case "number" -> value.fields.put("value", "2.0");
-            case "table_intervals" -> {
-                value.tiers.add(new ScriptTier(2.0, 2.0));
-                value.tiers.add(new ScriptTier(9.0, 3.0));
-                value.tiers.add(new ScriptTier(null, 4.0));
-            }
-            case "table_meters" -> {
-                value.tiers.add(new ScriptTier(1000.0, 2.0));
-                value.tiers.add(new ScriptTier(3000.0, 3.0));
-                value.tiers.add(new ScriptTier(null, 4.0));
-            }
-            default -> {
-            }
-        }
-        script.nodes.add(value);
-        statement.inputs.put("value", value.id);
-        error = "";
-        rebuild();
-    }
-
-    private void save() {
-        if (hasUnsupported()) {
-            error = Component.translatable("gui.trdm.script.unsupported").getString();
-            rebuild();
-            return;
-        }
-        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
-        if (result.compiled() == null) {
-            error = String.join("；", result.errors());
-            rebuild();
-            return;
-        }
-        // 服务端同步可能已经替换了配置里的规则对象，保存时按 ID 找当前对象。
-        final FareRule current = FareRuntime.get().config().ruleById(rule.id);
-        final FareRule target = current != null ? current : rule;
-        target.script = script.copy();
-        FareRuntime.get().save();
-        minecraft.setScreen(parent);
-    }
-
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(guiGraphics);
-        guiGraphics.drawString(this.font, Component.translatable("gui.trdm.script.title"), 20, 16, 0xFFFFFF, false);
-        guiGraphics.drawString(this.font, Component.translatable("gui.trdm.script.statements"),
-                leftX, rowsTop - 14, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, Component.translatable("gui.trdm.script.parameters"),
-                rightX, rowsTop - 14, 0xA0A0A0, false);
-        if (!error.isEmpty()) {
-            guiGraphics.drawString(this.font, error, 20, this.height - 44, 0xFF5555, false);
-        }
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public void onClose() {
-        if (minecraft != null) {
-            minecraft.setScreen(parent);
-        }
-    }
+    // ===== 画布布局 =====
 
     private List<ScriptNode> chain() {
         final List<ScriptNode> chain = new ArrayList<>();
@@ -387,6 +110,686 @@ public final class FareScriptScreen extends Screen {
         return chain;
     }
 
+    private ScriptNode selectedStatementNode() {
+        return script.node(selectedStatement);
+    }
+
+    private ScriptNode selectedValueNode() {
+        return script.node(selectedValue);
+    }
+
+    /** 当前参数面板实际编辑的值块：优先选中的值，否则是选中语句的值槽。 */
+    private ScriptNode effectiveValue() {
+        final ScriptNode value = selectedValueNode();
+        if (value != null) {
+            return value;
+        }
+        final ScriptNode statement = selectedStatementNode();
+        if (statement != null && valueStatement(statement.type)) {
+            return script.node(statement.inputs.get("value"));
+        }
+        return null;
+    }
+
+    private int blockTop(int index) {
+        return Math.round(canvasTop + 10 + index * (BLOCK_H + BLOCK_GAP) - canvasScroll);
+    }
+
+    private int chainHeight() {
+        return chain().size() * (BLOCK_H + BLOCK_GAP) + 20;
+    }
+
+    private int maxScroll() {
+        return Math.max(0, chainHeight() - (canvasBottom - canvasTop - 10));
+    }
+
+    private boolean inCanvas(double mx, double my) {
+        return mx >= canvasLeft && mx < canvasRight && my >= canvasTop && my < canvasBottom;
+    }
+
+    private int statementAt(double mx, double my) {        final List<ScriptNode> chain = chain();
+        for (int index = 0; index < chain.size(); index++) {
+            final int top = blockTop(index);
+            if (mx >= canvasLeft + 16 && mx <= canvasLeft + 16 + blockW
+                    && my >= top && my <= top + BLOCK_H) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean inValueChip(int index, double mx, double my) {
+        final int top = blockTop(index);
+        final int chipTop = top + 30;
+        return mx >= canvasLeft + 24 && mx <= canvasLeft + 16 + blockW - 8
+                && my >= chipTop && my <= chipTop + 20;
+    }
+
+    private int dropIndex(double my) {
+        final List<ScriptNode> chain = chain();
+        for (int index = 0; index < chain.size(); index++) {
+            final int top = blockTop(index);
+            if (my < top + (BLOCK_H + BLOCK_GAP) / 2) {
+                return index;
+            }
+        }
+        return chain.size();
+    }
+
+    // ===== 渲染 =====
+
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(guiGraphics);
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.title").getString(), 16, 16, 0xFFFFFF);
+        drawPalette(guiGraphics, mouseX, mouseY);
+        drawCanvas(guiGraphics, mouseX, mouseY);
+        drawInspector(guiGraphics);
+        drawInspectorLabels(guiGraphics);
+        if (!error.isEmpty()) {
+            drawString(guiGraphics, error, 16, this.height - 44, 0xFF5555);
+        }
+        if (dragStatementType != null || dragValueType != null || dragStatementId != null
+                || dragValueId != null) {
+            drawGhost(guiGraphics);
+        }
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
+    }
+
+    private void drawPalette(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        int y = 52;
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.statements").getString(),
+                16, y - 14, 0xA0A0A0);
+        for (final String type : STATEMENT_TYPES) {
+            final boolean hover = mouseX >= 16 && mouseX < 16 + PALETTE_W
+                    && mouseY >= y && mouseY < y + 19;
+            drawPaletteBlock(guiGraphics, 16, y, PALETTE_W, 19, colorFor(type), blockLabel(type), hover);
+            y += PALETTE_ROW;
+        }
+
+        y += 18;
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.values").getString(),
+                16, y - 14, 0xA0A0A0);
+        for (final String type : VALUE_TYPES) {
+            final boolean hover = mouseX >= 16 && mouseX < 16 + PALETTE_W
+                    && mouseY >= y && mouseY < y + 19;
+            drawPaletteBlock(guiGraphics, 16, y, PALETTE_W, 19, colorFor(type), blockLabel(type), hover);
+            y += PALETTE_ROW;
+        }
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_hint").getString(),
+                16, Math.min(y + 8, this.height - 40), 0x808080);
+    }
+
+    private void drawPaletteBlock(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
+                                  String label, boolean hover) {
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF1E1E1E);
+        fill(guiGraphics, x, y, w, h, hover ? brighten(color) : color);
+        fill(guiGraphics, x, y, w, 2, 0x40FFFFFF);
+        drawString(guiGraphics, label, x + 6, y + 5, 0xFFFFFF);
+    }
+
+    private void drawCanvas(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        fill(guiGraphics, canvasLeft - 1, canvasTop - 1, canvasRight - canvasLeft + 2,
+                canvasBottom - canvasTop + 2, 0xFF5A5A5A);
+        fill(guiGraphics, canvasLeft, canvasTop, canvasRight - canvasLeft,
+                canvasBottom - canvasTop, 0x40000000);
+
+        guiGraphics.enableScissor(canvasLeft, canvasTop, canvasRight, canvasBottom);
+        final List<ScriptNode> chain = chain();
+        for (int index = 0; index < chain.size(); index++) {
+            final ScriptNode node = chain.get(index);
+            final int top = blockTop(index);
+            if (top + BLOCK_H < canvasTop || top > canvasBottom) {
+                continue;
+            }
+            drawStatement(guiGraphics, node, top, node.id.equals(selectedStatement));
+            if (index + 1 < chain.size()) {
+                final int nextTop = blockTop(index + 1);
+                fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 1, top + BLOCK_H,
+                        2, Math.max(0, nextTop - top - BLOCK_H), 0xFF8A8A8A);
+                fill(guiGraphics, canvasLeft + 16 + blockW / 2 - 4,
+                        nextTop - 4, 8, 4, 0xFF8A8A8A);
+            }
+        }
+        if (chain.isEmpty()) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_empty").getString(),
+                    canvasLeft + 20, canvasTop + 20, 0xA0A0A0);
+        }
+        if (dragStatementId != null) {
+            final int target = dropIndex(mouseY);
+            final int lineY = clamp(blockTop(target) - 4, canvasTop + 2, canvasBottom - 2);
+            fill(guiGraphics, canvasLeft + 10, lineY, blockW + 12, 3, 0xFFFFD45A);
+        }
+        guiGraphics.disableScissor();
+
+        if (maxScroll() > 0) {
+            final float thumbH = Math.max(18F,
+                    (canvasBottom - canvasTop) * (float) (canvasBottom - canvasTop) / chainHeight());
+            final float thumbY = canvasTop + (canvasBottom - canvasTop - thumbH) * canvasScroll / maxScroll();
+            fill(guiGraphics, canvasRight - 5, canvasTop, 4, canvasBottom - canvasTop, 0x40FFFFFF);
+            fill(guiGraphics, canvasRight - 5, Math.round(thumbY), 4, Math.round(thumbH), 0xCCC8C8C8);
+        }
+    }
+
+    private void drawStatement(GuiGraphics guiGraphics, ScriptNode node, int top, boolean selected) {
+        final int x = canvasLeft + 16;
+        final int color = colorFor(node.type);
+        fill(guiGraphics, x - 2, top - 2, blockW + 4, BLOCK_H + 4, selected ? 0xFFFFD45A : 0xFF202020);
+        fill(guiGraphics, x, top, blockW, BLOCK_H, color);
+        fill(guiGraphics, x, top, blockW, 4, 0x45FFFFFF);
+        drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
+        if (!valueStatement(node.type)) {
+            if ("round_fare".equals(node.type)) {
+                drawString(guiGraphics, "取整  " + node.fields.getOrDefault("mode", "HALF")
+                        + " / " + node.fields.getOrDefault("unit", "0.1"), x + 10, top + 32, 0xE0E0E0);
+            }
+            return;
+        }
+        final ScriptNode value = script.node(node.inputs.get("value"));
+        final String chip = Component.translatable("gui.trdm.script.value_chip",
+                value == null ? Component.translatable("gui.trdm.script.none") : Component.literal(valueLabel(value)))
+                .getString();
+        fill(guiGraphics, x + 10, top + 30, blockW - 20, 20, 0xFF1E1E1E);
+        fill(guiGraphics, x + 12, top + 32, 4, 16, colorFor(value == null ? "none" : value.type));
+        drawString(guiGraphics, chip, x + 20, top + 36, 0xE8E8E8);
+    }
+
+    private void drawInspector(GuiGraphics guiGraphics) {
+        fill(guiGraphics, canvasLeft - 1, inspectorY - 1, canvasRight - canvasLeft + 2, INSPECTOR_H + 2,
+                0xFF5A5A5A);
+        fill(guiGraphics, canvasLeft, inspectorY, canvasRight - canvasLeft, INSPECTOR_H, 0x50000000);
+    }
+
+    private void drawInspectorLabels(GuiGraphics guiGraphics) {
+        final ScriptNode statement = selectedStatementNode();
+        final ScriptNode value = effectiveValue();
+        if (selectedValue != null && value != null) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_value",
+                    Component.translatable("gui.trdm.script.block." + value.type)).getString(),
+                    canvasLeft + 10, inspectorY + 8, 0xFFFFFF);
+        } else if (statement != null) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_statement",
+                    Component.translatable("gui.trdm.script.block." + statement.type)).getString(),
+                    canvasLeft + 10, inspectorY + 8, 0xFFFFFF);
+        } else if (value != null) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.selected_value",
+                    Component.translatable("gui.trdm.script.block." + value.type)).getString(),
+                    canvasLeft + 10, inspectorY + 8, 0xFFFFFF);
+        } else {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.inspector_hint").getString(),
+                    canvasLeft + 10, inspectorY + 8, 0xA0A0A0);
+        }
+        if (value != null && "number".equals(value.type)) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.unit").getString(),
+                    canvasLeft + 10, inspectorY + 28, 0xA0A0A0);
+        }
+    }
+
+    private void drawGhost(GuiGraphics guiGraphics) {
+        final String label;
+        final int color;
+        if (dragStatementType != null) {
+            label = blockLabel(dragStatementType);
+            color = colorFor(dragStatementType);
+        } else if (dragValueType != null) {
+            label = blockLabel(dragValueType);
+            color = colorFor(dragValueType);
+        } else if (dragStatementId != null) {
+            final ScriptNode node = script.node(dragStatementId);
+            label = node == null ? "?" : blockLabel(node.type);
+            color = node == null ? 0xFF555555 : colorFor(node.type);
+        } else {
+            final ScriptNode node = script.node(dragValueId);
+            label = node == null ? "?" : blockLabel(node.type);
+            color = node == null ? 0xFF555555 : colorFor(node.type);
+        }
+        final int w = 160;
+        final int h = 20;
+        final int x = Math.round((float) dragX + 8);
+        final int y = Math.round((float) dragY + 8);
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF101010);
+        fill(guiGraphics, x, y, w, h, (color & 0x00FFFFFF) | 0xCC000000);
+        drawString(guiGraphics, label, x + 6, y + 6, 0xFFFFFF);
+    }
+
+    // ===== 交互 =====
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (button != 0) {
+            return false;
+        }
+        final int paletteStatement = paletteStatementAt(mouseX, mouseY);
+        if (paletteStatement >= 0) {
+            dragStatementType = STATEMENT_TYPES[paletteStatement];
+            dragX = mouseX;
+            dragY = mouseY;
+            return true;
+        }
+        final int paletteValue = paletteValueAt(mouseX, mouseY);
+        if (paletteValue >= 0) {
+            dragValueType = VALUE_TYPES[paletteValue];
+            dragX = mouseX;
+            dragY = mouseY;
+            return true;
+        }
+        final int index = statementAt(mouseX, mouseY);
+        if (index >= 0) {
+            final ScriptNode node = chain().get(index);
+            if (valueStatement(node.type) && inValueChip(index, mouseX, mouseY)) {
+                final String valueId = node.inputs.get("value");
+                selectedStatement = node.id;
+                selectedValue = valueId;
+                if (valueId != null) {
+                    dragValueId = valueId;
+                    dragValueSource = node.id;
+                }
+                dragX = mouseX;
+                dragY = mouseY;
+                rebuild();
+                return true;
+            }
+            selectedStatement = node.id;
+            selectedValue = null;
+            dragStatementId = node.id;
+            dragOffsetY = Math.round((float) mouseY) - blockTop(index);
+            dragX = mouseX;
+            dragY = mouseY;
+            rebuild();
+            return true;
+        }
+        selectedStatement = null;
+        selectedValue = null;
+        rebuild();
+        return true;
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button != 0) {
+            return super.mouseReleased(mouseX, mouseY, button);
+        }
+        if (dragStatementType != null) {
+            if (inCanvas(mouseX, mouseY)) {
+                insertStatement(dragStatementType, dropIndex(mouseY));
+            }
+            dragStatementType = null;
+            return true;
+        }
+        if (dragValueType != null) {
+            final int target = statementAt(mouseX, mouseY);
+            if (target >= 0) {
+                attachNewValue(chain().get(target), dragValueType);
+            }
+            dragValueType = null;
+            return true;
+        }
+        if (dragStatementId != null) {
+            if (inCanvas(mouseX, mouseY)) {
+                reorderStatement(dragStatementId, dropIndex(mouseY));
+            }
+            dragStatementId = null;
+            return true;
+        }
+        if (dragValueId != null) {
+            final int target = statementAt(mouseX, mouseY);
+            if (target >= 0) {
+                final ScriptNode statement = chain().get(target);
+                if (valueStatement(statement.type)) {
+                    if (!dragValueId.equals(statement.inputs.get("value"))) {
+                        final ScriptNode source = script.node(dragValueSource);
+                        if (source != null && dragValueId.equals(source.inputs.get("value"))) {
+                            source.inputs.remove("value");
+                        }
+                    }
+                    statement.inputs.put("value", dragValueId);
+                    selectedStatement = statement.id;
+                    selectedValue = dragValueId;
+                    error = "";
+                }
+            }
+            dragValueId = null;
+            dragValueSource = null;
+            rebuild();
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (dragStatementType != null || dragValueType != null || dragStatementId != null
+                || dragValueId != null) {
+            this.dragX = mouseX;
+            this.dragY = mouseY;
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (mouseX >= canvasLeft && mouseX < canvasRight
+                && mouseY >= canvasTop && mouseY < canvasBottom && maxScroll() > 0) {
+            canvasScroll = Math.max(0, Math.min(maxScroll(),
+                    canvasScroll - (float) delta * 24F));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    // ===== 编辑操作 =====
+
+    private void insertStatement(String type, int index) {
+        final List<ScriptNode> chain = chain();
+        if (chain.size() >= 8) {
+            error = Component.translatable("gui.trdm.script.limit_statements").getString();
+            return;
+        }
+        final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "s"), type);
+        if (valueStatement(type)) {
+            node.inputs.put("value", newValue(type).id);
+        }
+        if ("round_fare".equals(type)) {
+            node.fields.put("mode", "HALF");
+            node.fields.put("unit", "0.1");
+        }
+        script.nodes.add(node);
+        final List<String> ids = new ArrayList<>();
+        for (final ScriptNode existing : chain) {
+            ids.add(existing.id);
+        }
+        ids.add(Math.max(0, Math.min(index, ids.size())), node.id);
+        relink(ids);
+        selectedStatement = node.id;
+        selectedValue = node.inputs.get("value");
+        error = "";
+        rebuild();
+    }
+
+    private void reorderStatement(String id, int index) {
+        final List<String> ids = new ArrayList<>();
+        for (final ScriptNode node : chain()) {
+            ids.add(node.id);
+        }
+        final int oldIndex = ids.indexOf(id);
+        if (oldIndex < 0) {
+            return;
+        }
+        ids.remove(oldIndex);
+        int target = Math.max(0, Math.min(index, ids.size()));
+        if (oldIndex < index) {
+            target = Math.max(0, target - 1);
+        }
+        ids.add(target, id);
+        relink(ids);
+        selectedStatement = id;
+        error = "";
+        rebuild();
+    }
+
+    private void relink(List<String> ids) {
+        final ScriptNode hat = script.node(script.hat);
+        if (hat == null) {
+            return;
+        }
+        hat.next = ids.isEmpty() ? null : ids.get(0);
+        for (int index = 0; index < ids.size(); index++) {
+            final ScriptNode node = script.node(ids.get(index));
+            if (node != null) {
+                node.next = index + 1 < ids.size() ? ids.get(index + 1) : null;
+            }
+        }
+    }
+
+    private ScriptNode newValue(String type) {
+        final ScriptNode value = new ScriptNode(Scripts.uniqueId(script, "v"), type);
+        switch (type) {
+            case "number" -> value.fields.put("value", "2.0");
+            case "table_intervals" -> {
+                value.tiers.add(new ScriptTier(2.0, 2.0));
+                value.tiers.add(new ScriptTier(9.0, 3.0));
+                value.tiers.add(new ScriptTier(null, 4.0));
+            }
+            case "table_meters" -> {
+                value.tiers.add(new ScriptTier(1000.0, 2.0));
+                value.tiers.add(new ScriptTier(3000.0, 3.0));
+                value.tiers.add(new ScriptTier(null, 4.0));
+            }
+            default -> {
+            }
+        }
+        script.nodes.add(value);
+        return value;
+    }
+
+    private void attachNewValue(ScriptNode statement, String type) {
+        if (statement == null || !valueStatement(statement.type)) {
+            return;
+        }
+        final ScriptNode value = newValue(type);
+        statement.inputs.put("value", value.id);
+        selectedStatement = statement.id;
+        selectedValue = value.id;
+        error = "";
+        rebuild();
+    }
+
+    private void cycleValueType() {
+        final ScriptNode statement = selectedStatementNode();
+        if (statement == null) {
+            return;
+        }
+        final ScriptNode value = effectiveValue();
+        if (value == null) {
+            attachNewValue(statement, "number");
+            return;
+        }
+        int index = 0;
+        for (int i = 0; i < VALUE_TYPES.length; i++) {
+            if (VALUE_TYPES[i].equals(value.type)) {
+                index = i;
+                break;
+            }
+        }
+        final String type = VALUE_TYPES[(index + 1) % VALUE_TYPES.length];
+        final ScriptNode replacement = newValue(type);
+        statement.inputs.put("value", replacement.id);
+        script.nodes.remove(value);
+        selectedValue = replacement.id;
+        error = "";
+        rebuild();
+    }
+
+    private void cycleStatementType() {
+        final ScriptNode node = selectedStatementNode();
+        if (node == null) {
+            return;
+        }
+        int index = 0;
+        for (int i = 0; i < STATEMENT_TYPES.length; i++) {
+            if (STATEMENT_TYPES[i].equals(node.type)) {
+                index = i;
+                break;
+            }
+        }
+        node.type = STATEMENT_TYPES[(index + 1) % STATEMENT_TYPES.length];
+        if (valueStatement(node.type) && script.node(node.inputs.get("value")) == null) {
+            node.inputs.put("value", newValue("number").id);
+        }
+        error = "";
+        rebuild();
+    }
+
+    private void deleteSelected() {
+        if (selectedValue != null) {
+            final ScriptNode value = selectedValueNode();
+            if (value != null) {
+                for (final ScriptNode node : script.nodes) {
+                    if (value.id.equals(node.inputs.get("value"))) {
+                        node.inputs.remove("value");
+                    }
+                }
+                script.nodes.remove(value);
+            }
+            selectedValue = null;
+            error = "";
+            rebuild();
+            return;
+        }
+        final ScriptNode statement = selectedStatementNode();
+        if (statement != null) {
+            final List<String> ids = new ArrayList<>();
+            for (final ScriptNode node : chain()) {
+                if (!node.id.equals(statement.id)) {
+                    ids.add(node.id);
+                }
+            }
+            relink(ids);
+            script.nodes.remove(statement);
+            selectedStatement = ids.isEmpty() ? null : ids.get(Math.max(0, ids.size() - 1));
+            selectedValue = null;
+            error = "";
+            rebuild();
+        }
+    }
+
+    private void save() {
+        if (hasUnsupported()) {
+            error = Component.translatable("gui.trdm.script.unsupported").getString();
+            return;
+        }
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        if (result.compiled() == null) {
+            error = String.join("；", result.errors());
+            return;
+        }
+        final FareRule current = FareRuntime.get().config().ruleById(rule.id);
+        final FareRule target = current != null ? current : rule;
+        target.script = script.copy();
+        FareRuntime.get().save();
+        minecraft.setScreen(parent);
+    }
+
+    // ===== 参数面板 =====
+
+    private void addInspectorWidgets() {
+        final ScriptNode statement = selectedStatementNode();
+        final ScriptNode value = effectiveValue();
+        final ScriptNode target = value != null ? value : statement;
+        if (target == null) {
+            return;
+        }
+        final int x = canvasLeft + 8;
+        final int y = inspectorY + 8;
+        final boolean table = value != null
+                && ("table_intervals".equals(value.type) || "table_meters".equals(value.type));
+
+        if (value != null && "number".equals(value.type)) {
+            final EditBox box = new EditBox(this.font, x + 120, y + 20, 90, 18,
+                    Component.translatable("gui.trdm.script.unit"));
+            box.setValue(value.fields.getOrDefault("value", "0"));
+            box.setResponder(text -> value.fields.put("value", text));
+            addRenderableWidget(box);
+        }
+        if (table) {
+            addTierWidgets(value, x, y);
+        }
+        if ("round_fare".equals(target.type) && value == null) {
+            addRenderableWidget(Button.builder(
+                            Component.literal(target.fields.getOrDefault("mode", "HALF")),
+                            button -> {
+                                target.fields.put("mode", nextMode(target.fields.getOrDefault("mode", "HALF")));
+                                rebuild();
+                            })
+                    .bounds(x + 120, y + 20, 70, 18).build());
+            final EditBox unit = new EditBox(this.font, x + 200, y + 20, 70, 18,
+                    Component.translatable("gui.trdm.script.unit"));
+            unit.setValue(target.fields.getOrDefault("unit", "0.1"));
+            unit.setResponder(text -> target.fields.put("unit", text));
+            addRenderableWidget(unit);
+        }
+        final int buttonY = table ? y + 96 : y + 66;
+        if (value != null || (statement != null && valueStatement(statement.type))) {
+            addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.change_value"),
+                            button -> cycleValueType())
+                    .bounds(x, buttonY, 100, 18).build());
+        }
+        if (statement != null) {
+            addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.change_type"),
+                            button -> cycleStatementType())
+                    .bounds(x + 108, buttonY, 100, 18).build());
+        }
+        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.delete"),
+                        button -> deleteSelected())
+                .bounds(x + 216, buttonY, 70, 18).build());
+    }
+
+    private void addTierWidgets(ScriptNode table, int x, int y) {
+        final int rows = Math.min(table.tiers.size(), 3);
+        for (int index = 0; index < rows; index++) {
+            final int row = index;
+            final ScriptTier tier = table.tiers.get(index);
+            final int rowY = y + 22 + index * 20;
+            final EditBox upTo = new EditBox(this.font, x + 60, rowY, 60, 18,
+                    Component.translatable("gui.trdm.script.tier_up_to"));
+            upTo.setValue(tier.upTo() == null ? "" : trimNumber(tier.upTo()));
+            upTo.setResponder(text -> {
+                try {
+                    final ScriptTier current = table.tiers.get(row);
+                    table.tiers.set(row, new ScriptTier(text.isBlank() ? null
+                            : Double.parseDouble(text.trim()), current.fareYuan()));
+                } catch (NumberFormatException ignored) {
+                    // 继续输入
+                }
+            });
+            addRenderableWidget(upTo);
+            final EditBox fare = new EditBox(this.font, x + 126, rowY, 60, 18,
+                    Component.translatable("gui.trdm.script.tier_fare"));
+            fare.setValue(trimNumber(tier.fareYuan()));
+            fare.setResponder(text -> {
+                try {
+                    final ScriptTier current = table.tiers.get(row);
+                    table.tiers.set(row, new ScriptTier(current.upTo(), Double.parseDouble(text.trim())));
+                } catch (NumberFormatException ignored) {
+                    // 继续输入
+                }
+            });
+            addRenderableWidget(fare);
+            addRenderableWidget(Button.builder(Component.literal("×"), button -> {
+                        table.tiers.remove(row);
+                        error = "";
+                        rebuild();
+                    }).bounds(x + 192, rowY, 18, 18).build());
+        }
+        addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.add_row"),
+                        button -> {
+                            if (table.tiers.size() >= 6) {
+                                error = Component.translatable("gui.trdm.script.limit_tiers").getString();
+                                rebuild();
+                                return;
+                            }
+                            double next = 10.0;
+                            if (!table.tiers.isEmpty()) {
+                                final ScriptTier last = table.tiers.get(table.tiers.size() - 1);
+                                if (last.upTo() != null) {
+                                    next = last.upTo() + 10.0;
+                                }
+                            }
+                            int insert = table.tiers.size();
+                            if (insert > 0 && table.tiers.get(insert - 1).upTo() == null) {
+                                insert--;
+                            }
+                            table.tiers.add(insert, new ScriptTier(next, 0.0));
+                            error = "";
+                            rebuild();
+                        })
+                .bounds(x + 220, y + 22, 80, 18).build());
+    }
+
     private boolean hasUnsupported() {
         for (final ScriptNode node : chain()) {
             if ("if".equals(node.type) || (node.otherwise != null && !node.otherwise.isBlank())) {
@@ -396,21 +799,66 @@ public final class FareScriptScreen extends Screen {
         return false;
     }
 
+    // ===== 命中与工具 =====
+
+    private int paletteStatementAt(double mx, double my) {
+        int y = 52;
+        for (int index = 0; index < STATEMENT_TYPES.length; index++) {
+            if (mx >= 16 && mx < 16 + PALETTE_W && my >= y && my < y + 19) {
+                return index;
+            }
+            y += PALETTE_ROW;
+        }
+        return -1;
+    }
+
+    private int paletteValueAt(double mx, double my) {
+        int y = 52 + STATEMENT_TYPES.length * PALETTE_ROW + 18;
+        for (int index = 0; index < VALUE_TYPES.length; index++) {
+            if (mx >= 16 && mx < 16 + PALETTE_W && my >= y && my < y + 19) {
+                return index;
+            }
+            y += PALETTE_ROW;
+        }
+        return -1;
+    }
+
     private static boolean valueStatement(String type) {
         return "set_fare".equals(type) || "add_fare".equals(type) || "multiply_fare".equals(type)
                 || "cap_fare".equals(type) || "floor_fare".equals(type);
     }
 
-    private String blockLabel(ScriptNode node) {
-        return Component.translatable("gui.trdm.script.block." + node.type).getString();
+    private static int colorFor(String type) {
+        return switch (type) {
+            case "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare" -> 0xFF2F7D4F;
+            case "round_fare" -> 0xFF2D6E82;
+            case "number", "context_intervals", "context_meters", "context_stations",
+                 "context_zone_diff" -> 0xFF8A5A2B;
+            case "table_intervals", "table_meters" -> 0xFF6B4A8A;
+            default -> 0xFF555555;
+        };
+    }
+
+    private static int brighten(int color) {
+        final int r = Math.min(255, ((color >> 16) & 0xFF) + 24);
+        final int g = Math.min(255, ((color >> 8) & 0xFF) + 24);
+        final int b = Math.min(255, (color & 0xFF) + 24);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    private String blockLabel(String type) {
+        return Component.translatable("gui.trdm.script.block." + type).getString();
     }
 
     private String valueLabel(ScriptNode node) {
-        if ("table_intervals".equals(node.type) || "table_meters".equals(node.type)) {
-            return Component.translatable("gui.trdm.script.block." + node.type).getString()
-                    + " (" + node.tiers.size() + ")";
+        final String label = blockLabel(node.type);
+        if ("number".equals(node.type)) {
+            return label + " " + node.fields.getOrDefault("value", "0");
         }
-        return Component.translatable("gui.trdm.script.block." + node.type).getString();
+        if ("table_intervals".equals(node.type) || "table_meters".equals(node.type)) {
+            return label + " (" + node.tiers.size() + ")";
+        }
+        return label;
     }
 
     private static String nextMode(String mode) {
@@ -425,8 +873,28 @@ public final class FareScriptScreen extends Screen {
         return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
     }
 
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private void fill(GuiGraphics guiGraphics, int x, int y, int w, int h, int color) {
+        guiGraphics.fill(x, y, x + w, y + h, color);
+    }
+
+    private void drawString(GuiGraphics guiGraphics, String text, int x, int y, int color) {
+        guiGraphics.drawString(this.font, text, x, y, color, false);
+    }
+
+    @Override
+    public void onClose() {
+        if (minecraft != null) {
+            minecraft.setScreen(parent);
+        }
+    }
+
     private void rebuild() {
         this.clearWidgets();
         this.init(this.minecraft, this.width, this.height);
+        this.canvasScroll = Math.min(this.canvasScroll, maxScroll());
     }
 }

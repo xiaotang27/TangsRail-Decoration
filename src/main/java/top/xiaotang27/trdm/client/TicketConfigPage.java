@@ -30,8 +30,9 @@ final class TicketConfigPage {
 
     private static final float RULES_SECTION_Y = 112F;
     private static final float RULES_TOP = 136F;
-    private static final float TEMPLATES_SECTION_Y = 286F;
-    private static final float TEMPLATES_TOP = 310F;
+    private static final float RULES_PANEL_H = 136F;
+    private static final float TEMPLATES_SECTION_Y = 300F;
+    private static final float TEMPLATES_TOP = 324F;
     private static final float ROW_H = 34F;
 
     private static final float DROP_W = 250F;
@@ -139,6 +140,7 @@ final class TicketConfigPage {
     private int lastClickKind = SELECT_NONE;
     private int lastClickIndex = -1;
     private long lastClickAt;
+    private float ruleScroll;
 
     TicketConfigPage(TrdmScreenBase host) {
         this.host = host;
@@ -300,10 +302,7 @@ final class TicketConfigPage {
                 host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F, 50F, 18F),
                 TrdmScreenBase.FONT_SUB);
 
-        renderRuleRow(guiGraphics, -1, 0, mx, my);
-        for (int index = 0; index < rules.size(); index++) {
-            renderRuleRow(guiGraphics, index, index + 1, mx, my);
-        }
+        renderRulesPanel(guiGraphics, mx, my);
 
         host.section(guiGraphics, "gui.trdm.ticket.templates", TEMPLATES_SECTION_Y);
         host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
@@ -318,9 +317,29 @@ final class TicketConfigPage {
         }
     }
 
+    private void renderRulesPanel(GuiGraphics guiGraphics, float mx, float my) {
+        final float x = TrdmScreenBase.CONTENT_X;
+        final float y = RULES_TOP;
+        final float w = TrdmScreenBase.CONTENT_W;
+        host.rect(guiGraphics, x - 2F, y - 2F, w + 4F, RULES_PANEL_H + 4F, 0xFF5A5A5A);
+        host.rect(guiGraphics, x, y, w, RULES_PANEL_H, 0x50000000);
+        host.scissorOn(guiGraphics, x, y, w, RULES_PANEL_H);
+        renderRuleRow(guiGraphics, -1, 0, mx, my);
+        for (int index = 0; index < rules.size(); index++) {
+            renderRuleRow(guiGraphics, index, index + 1, mx, my);
+        }
+        host.scissorOff(guiGraphics);
+        final float total = (rules.size() + 1) * ROW_H;
+        host.scrollbar(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 6F, y, RULES_PANEL_H,
+                total, RULES_PANEL_H, ruleScroll);
+    }
+
     private void renderRuleRow(GuiGraphics guiGraphics, int ruleIndex, int visualIndex, float mx, float my) {
-        final float top = RULES_TOP + visualIndex * ROW_H;
-        final boolean hovered = hoveredRow(top, mx, my);
+        final float top = RULES_TOP + visualIndex * ROW_H - ruleScroll;
+        if (top + ROW_H < RULES_TOP || top > RULES_TOP + RULES_PANEL_H) {
+            return;
+        }
+        final boolean hovered = hoveredRuleRow(top, mx, my);
         final boolean selected = selectedKind == (ruleIndex < 0 ? SELECT_SYSTEM : SELECT_RULE)
                 && selectedIndex == ruleIndex;
         host.row(guiGraphics, TrdmScreenBase.CONTENT_X, top, TrdmScreenBase.CONTENT_W, ROW_H - 2F,
@@ -789,6 +808,7 @@ final class TicketConfigPage {
         FareRuntime.get().save();
         detailRuleIndex = config.rules.size() - 1;
         view = VIEW_RULE;
+        ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
     }
 
     private void addScriptRule() {
@@ -799,6 +819,7 @@ final class TicketConfigPage {
         FareRuntime.get().save();
         detailRuleIndex = config.rules.size() - 1;
         view = VIEW_RULE;
+        ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
     }
 
     private String uniqueRuleId() {
@@ -831,6 +852,7 @@ final class TicketConfigPage {
         selectedIndex = -1;
         view = VIEW_MAIN;
         rebuildOwners();
+        ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
     }
 
     private void cancelEditor() {
@@ -1143,12 +1165,15 @@ final class TicketConfigPage {
     }
 
     private boolean clickRuleRow(int ruleIndex, int visualIndex, float mx, float my) {
-        final float top = RULES_TOP + visualIndex * ROW_H;
+        final float top = RULES_TOP + visualIndex * ROW_H - ruleScroll;
+        if (top + ROW_H < RULES_TOP || top > RULES_TOP + RULES_PANEL_H) {
+            return false;
+        }
         if (host.hit(mx, my, dropX(), top + 6F, DROP_W, DROP_H)) {
             openDrop(ruleIndex < 0 ? DROP_SYSTEM : DROP_RULE, ruleIndex);
             return true;
         }
-        if (hoveredRow(top, mx, my)) {
+        if (hoveredRuleRow(top, mx, my)) {
             rowClick(ruleIndex < 0 ? SELECT_SYSTEM : SELECT_RULE, ruleIndex);
             return true;
         }
@@ -1223,17 +1248,23 @@ final class TicketConfigPage {
     }
 
     boolean scroll(double delta, float mx, float my) {
-        if (dropKind == DROP_NONE) {
-            return false;
+        if (dropKind != DROP_NONE) {
+            final float[] rect = popupRect(dropOptions().size());
+            if (host.hit(mx, my, rect[0], rect[1], rect[2], rect[3])) {
+                final int count = dropOptions().size();
+                final float max = Math.max(0F, count * DROP_ROW_H + 6F - rect[3]);
+                dropScroll = Math.max(0F, Math.min(max, dropScroll - (float) delta * DROP_ROW_H));
+                return true;
+            }
         }
-        final float[] rect = popupRect(dropOptions().size());
-        if (!host.hit(mx, my, rect[0], rect[1], rect[2], rect[3])) {
-            return false;
+        if (view == VIEW_MAIN && mx >= TrdmScreenBase.CONTENT_X && mx < TrdmScreenBase.CONTENT_RIGHT
+                && my >= RULES_TOP && my < RULES_TOP + RULES_PANEL_H) {
+            final float total = (rules.size() + 1) * ROW_H;
+            final float max = Math.max(0F, total - RULES_PANEL_H);
+            ruleScroll = Math.max(0F, Math.min(max, ruleScroll - (float) delta * 20F));
+            return true;
         }
-        final int count = dropOptions().size();
-        final float max = Math.max(0F, count * DROP_ROW_H + 6F - rect[3]);
-        dropScroll = Math.max(0F, Math.min(max, dropScroll - (float) delta * DROP_ROW_H));
-        return true;
+        return false;
     }
 
     boolean keyPressed(int keyCode) {
@@ -1294,13 +1325,13 @@ final class TicketConfigPage {
     }
 
     private float dropX() {
-        return TrdmScreenBase.CONTENT_RIGHT - DROP_W;
+        return TrdmScreenBase.CONTENT_RIGHT - DROP_W - 10F;
     }
 
     private float dropAnchorY() {
         return switch (dropKind) {
-            case DROP_RULE -> RULES_TOP + (dropIndex + 1) * ROW_H + 6F;
-            case DROP_SYSTEM -> RULES_TOP + 6F;
+            case DROP_RULE -> RULES_TOP + (dropIndex + 1) * ROW_H - ruleScroll + 6F;
+            case DROP_SYSTEM -> RULES_TOP - ruleScroll + 6F;
             case DROP_TEMPLATE -> TEMPLATES_TOP + dropIndex * ROW_H + 6F;
             default -> DETAIL_SCOPE_Y;
         };
@@ -1450,6 +1481,10 @@ final class TicketConfigPage {
     private boolean hoveredRow(float top, float mx, float my) {
         return mx >= TrdmScreenBase.CONTENT_X && mx < TrdmScreenBase.CONTENT_RIGHT
                 && my >= top && my < top + ROW_H - 2F;
+    }
+
+    private boolean hoveredRuleRow(float top, float mx, float my) {
+        return my >= RULES_TOP && my < RULES_TOP + RULES_PANEL_H && hoveredRow(top, mx, my);
     }
 
     private boolean inWorld() {
