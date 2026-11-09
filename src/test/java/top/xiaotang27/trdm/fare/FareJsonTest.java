@@ -77,6 +77,40 @@ class FareJsonTest {
     }
 
     @Test
+    void scriptRuleRoundTrip() {
+        final top.xiaotang27.trdm.fare.script.FareScript script =
+                new top.xiaotang27.trdm.fare.script.FareScript();
+        final top.xiaotang27.trdm.fare.script.ScriptNode hat =
+                new top.xiaotang27.trdm.fare.script.ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final top.xiaotang27.trdm.fare.script.ScriptNode set =
+                new top.xiaotang27.trdm.fare.script.ScriptNode("set", "set_fare");
+        set.inputs.put("value", "table");
+        final top.xiaotang27.trdm.fare.script.ScriptNode table =
+                new top.xiaotang27.trdm.fare.script.ScriptNode("table", "table_intervals");
+        table.tiers.add(new top.xiaotang27.trdm.fare.script.ScriptTier(2.0, 2.0));
+        table.tiers.add(new top.xiaotang27.trdm.fare.script.ScriptTier(null, 4.0));
+        script.hat = "hat";
+        script.nodes.add(hat);
+        script.nodes.add(set);
+        script.nodes.add(table);
+
+        final FareConfig config = new FareConfig();
+        final FareRule rule = new FareRule("script", "积木", FareRule.Kind.SCRIPT);
+        rule.script = script;
+        config.rules.add(rule);
+
+        final FareConfig parsed = FareJson.parse(FareJson.write(config));
+        final FareRule parsedRule = parsed.rules.get(0);
+        assertEquals(FareRule.Kind.SCRIPT, parsedRule.kind);
+        assertNotNull(parsedRule.script);
+        assertEquals("hat", parsedRule.script.hat);
+        assertEquals(3, parsedRule.script.nodes.size());
+        assertEquals(Double.valueOf(2.0), parsedRule.script.node("table").tiers.get(0).upTo());
+        assertNull(parsedRule.script.node("table").tiers.get(1).upTo());
+    }
+
+    @Test
     void moneyFormatting() {
         assertEquals("2", FareMoney.text(200L));
         assertEquals("2.50", FareMoney.text(250L));

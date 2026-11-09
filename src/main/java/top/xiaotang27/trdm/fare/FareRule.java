@@ -1,5 +1,9 @@
 package top.xiaotang27.trdm.fare;
 
+import top.xiaotang27.trdm.fare.script.FareScript;
+import top.xiaotang27.trdm.fare.script.ScriptContext;
+import top.xiaotang27.trdm.fare.script.ScriptRuntime;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,7 +24,9 @@ public final class FareRule {
         /** 按区间数查阶梯表。 */
         INTERVAL_TABLE,
         /** 按里程（米）查阶梯表。 */
-        DISTANCE_TABLE
+        DISTANCE_TABLE,
+        /** 图形化积木脚本。 */
+        SCRIPT
     }
 
     /**
@@ -45,6 +51,8 @@ public final class FareRule {
     public long flatFareCents;
     /** 阶梯表，按 {@code upTo} 升序，最后一行可以是开放式。 */
     public final List<Tier> tiers = new ArrayList<>();
+    /** {@link Kind#SCRIPT} 使用的积木脚本；其它类型为 {@code null}。 */
+    public FareScript script;
 
     public FareRule(String id, String name, Kind kind) {
         this.id = id;
@@ -63,6 +71,7 @@ public final class FareRule {
         copy.maxFareCents = maxFareCents;
         copy.flatFareCents = flatFareCents;
         copy.tiers.addAll(tiers);
+        copy.script = script == null ? null : script.copy();
         return copy;
     }
 
@@ -73,12 +82,34 @@ public final class FareRule {
     /** 未应用 {@code maxFare} 封顶的票价（分）。 */
     public long baseFareCents(long intervals, long meters, int fromZone, int toZone) {
         return switch (kind) {
-            case MTR_VANILLA -> FareEngine.VANILLA_BASE_CENTS
-                    + FareEngine.VANILLA_ZONE_CENTS * Math.abs(toZone - fromZone);
+            case MTR_VANILLA -> vanillaFareCents(fromZone, toZone);
             case FLAT -> Math.max(0L, flatFareCents);
             case INTERVAL_TABLE -> tierFareCents(intervals);
             case DISTANCE_TABLE -> tierFareCents(meters);
+            case SCRIPT -> scriptFareCents(intervals, meters, fromZone, toZone);
         };
+    }
+
+    private long vanillaFareCents(int fromZone, int toZone) {
+        return FareEngine.VANILLA_BASE_CENTS
+                + FareEngine.VANILLA_ZONE_CENTS * Math.abs(toZone - fromZone);
+    }
+
+    /** 执行积木脚本；脚本缺失/编译失败/运行失败时回退 MTR 原版公式。 */
+    private long scriptFareCents(long intervals, long meters, int fromZone, int toZone) {
+        if (script == null || script.isEmpty()) {
+            return vanillaFareCents(fromZone, toZone);
+        }
+        try {
+            final double yuan = ScriptRuntime.evaluate(script,
+                    new ScriptContext(intervals, meters, fromZone, toZone));
+            if (!Double.isFinite(yuan)) {
+                return vanillaFareCents(fromZone, toZone);
+            }
+            return Math.max(0L, Math.round(yuan * 100.0));
+        } catch (RuntimeException exception) {
+            return vanillaFareCents(fromZone, toZone);
+        }
     }
 
     /** 在阶梯表里按数值取票价；超出所有行时退回最后一行的票价。 */

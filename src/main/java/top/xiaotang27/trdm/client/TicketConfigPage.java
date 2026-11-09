@@ -455,6 +455,10 @@ final class TicketConfigPage {
             summaryRow(guiGraphics, Component.translatable("gui.trdm.ticket.rule_fare"),
                     FareMoney.yuan(rule.flatFareCents), y);
             y += DETAIL_CONTENT_LINE;
+        } else if (rule.kind == FareRule.Kind.SCRIPT) {
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.ticket.rule_blocks"),
+                    String.valueOf(rule.script == null ? 0 : rule.script.nodes.size()), y);
+            y += DETAIL_CONTENT_LINE;
         } else {
             int shown = 0;
             for (final FareRule.Tier tier : rule.tiers) {
@@ -492,6 +496,7 @@ final class TicketConfigPage {
             case FLAT -> "gui.trdm.ticket.kind.flat";
             case INTERVAL_TABLE -> "gui.trdm.ticket.kind.interval";
             case DISTANCE_TABLE -> "gui.trdm.ticket.kind.distance";
+            case SCRIPT -> "gui.trdm.ticket.kind.script";
         };
         return Component.translatable(key).getString();
     }
@@ -736,6 +741,14 @@ final class TicketConfigPage {
 
     private void openEditor() {
         if (detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
+            return;
+        }
+        if (rules.get(detailRuleIndex).kind == FareRule.Kind.SCRIPT) {
+            final Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(
+                        Component.translatable("gui.trdm.ticket.script_editor_todo"), false);
+            }
             return;
         }
         draft = rules.get(detailRuleIndex).copy();

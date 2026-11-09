@@ -103,6 +103,8 @@ public final class FareConfig {
                     yield lowest == Long.MAX_VALUE ? 0L : lowest;
                 }
                 case MTR_VANILLA -> FareEngine.VANILLA_BASE_CENTS;
+                // 积木脚本可能出现 0 元，入闸门槛按 0 处理，避免错误拦截。
+                case SCRIPT -> 0L;
             };
             min = Math.min(min, Math.max(0L, fare));
         }

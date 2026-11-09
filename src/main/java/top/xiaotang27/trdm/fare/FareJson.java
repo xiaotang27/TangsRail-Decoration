@@ -7,6 +7,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import top.xiaotang27.trdm.fare.script.FareScript;
+import top.xiaotang27.trdm.fare.script.ScriptNode;
+import top.xiaotang27.trdm.fare.script.ScriptTier;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -118,6 +121,9 @@ public final class FareJson {
                 }
                 item.add("tiers", tiers);
             }
+            if (rule.kind == FareRule.Kind.SCRIPT && rule.script != null) {
+                item.add("script", writeScript(rule.script));
+            }
             rules.add(item);
         }
         root.add("rules", rules);
@@ -178,7 +184,116 @@ public final class FareJson {
                 rule.tiers.add(new FareRule.Tier(upTo, money(tier, "fare", 0L)));
             }
         }
+        if (kind == FareRule.Kind.SCRIPT && object.has("script") && object.get("script").isJsonObject()) {
+            rule.script = parseScript(object.getAsJsonObject("script"));
+        }
         return rule;
+    }
+
+    // ===== 积木脚本编解码 =====
+
+    private static FareScript parseScript(JsonObject object) {
+        final FareScript script = new FareScript();
+        script.schemaVersion = integer(object, "schemaVersion", FareScript.SCHEMA_VERSION);
+        script.hat = string(object, "hat", "");
+        if (object.has("nodes") && object.get("nodes").isJsonArray()) {
+            for (final JsonElement element : object.getAsJsonArray("nodes")) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                final JsonObject nodeObject = element.getAsJsonObject();
+                final ScriptNode node = new ScriptNode(
+                        string(nodeObject, "id", ""), string(nodeObject, "type", ""));
+                node.next = string(nodeObject, "next", null);
+                node.otherwise = string(nodeObject, "otherwise", null);
+                node.x = integer(nodeObject, "x", 0);
+                node.y = integer(nodeObject, "y", 0);
+                if (nodeObject.has("inputs") && nodeObject.get("inputs").isJsonObject()) {
+                    for (final Map.Entry<String, JsonElement> entry
+                            : nodeObject.getAsJsonObject("inputs").entrySet()) {
+                        node.inputs.put(entry.getKey(), entry.getValue().getAsString());
+                    }
+                }
+                if (nodeObject.has("fields") && nodeObject.get("fields").isJsonObject()) {
+                    for (final Map.Entry<String, JsonElement> entry
+                            : nodeObject.getAsJsonObject("fields").entrySet()) {
+                        node.fields.put(entry.getKey(), entry.getValue().getAsString());
+                    }
+                }
+                if (nodeObject.has("tiers") && nodeObject.get("tiers").isJsonArray()) {
+                    for (final JsonElement tierElement : nodeObject.getAsJsonArray("tiers")) {
+                        if (!tierElement.isJsonObject()) {
+                            continue;
+                        }
+                        final JsonObject tierObject = tierElement.getAsJsonObject();
+                        final Double upTo = tierObject.has("upTo") && !tierObject.get("upTo").isJsonNull()
+                                ? tierObject.get("upTo").getAsDouble() : null;
+                        node.tiers.add(new ScriptTier(upTo, doubleValue(tierObject.get("fare"))));
+                    }
+                }
+                script.nodes.add(node);
+            }
+        }
+        return script;
+    }
+
+    private static JsonObject writeScript(FareScript script) {
+        final JsonObject object = new JsonObject();
+        object.addProperty("schemaVersion", script.schemaVersion);
+        object.addProperty("hat", script.hat);
+        final JsonArray nodes = new JsonArray();
+        for (final ScriptNode node : script.nodes) {
+            final JsonObject nodeObject = new JsonObject();
+            nodeObject.addProperty("id", node.id);
+            nodeObject.addProperty("type", node.type);
+            if (node.next != null) {
+                nodeObject.addProperty("next", node.next);
+            }
+            if (node.otherwise != null) {
+                nodeObject.addProperty("otherwise", node.otherwise);
+            }
+            nodeObject.addProperty("x", node.x);
+            nodeObject.addProperty("y", node.y);
+            if (!node.inputs.isEmpty()) {
+                final JsonObject inputs = new JsonObject();
+                for (final Map.Entry<String, String> entry : node.inputs.entrySet()) {
+                    inputs.addProperty(entry.getKey(), entry.getValue());
+                }
+                nodeObject.add("inputs", inputs);
+            }
+            if (!node.fields.isEmpty()) {
+                final JsonObject fields = new JsonObject();
+                for (final Map.Entry<String, String> entry : node.fields.entrySet()) {
+                    fields.addProperty(entry.getKey(), entry.getValue());
+                }
+                nodeObject.add("fields", fields);
+            }
+            if (!node.tiers.isEmpty()) {
+                final JsonArray tiers = new JsonArray();
+                for (final ScriptTier tier : node.tiers) {
+                    final JsonObject tierObject = new JsonObject();
+                    if (tier.upTo() != null) {
+                        tierObject.addProperty("upTo", tier.upTo());
+                    }
+                    tierObject.addProperty("fare", tier.fareYuan());
+                    tiers.add(tierObject);
+                }
+                nodeObject.add("tiers", tiers);
+            }
+            nodes.add(nodeObject);
+        }
+        object.add("nodes", nodes);
+        return object;
+    }
+
+    private static double doubleValue(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return 0.0;
+        }
+        if (element.getAsJsonPrimitive().isString()) {
+            return Double.parseDouble(element.getAsString().trim());
+        }
+        return element.getAsDouble();
     }
 
     private static String string(JsonObject object, String key, String fallback) {
