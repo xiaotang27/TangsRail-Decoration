@@ -1,7 +1,11 @@
 package top.xiaotang27.trdm.fare;
 
+import top.xiaotang27.trdm.fare.script.RuleResolver;
+
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 报价引擎。
@@ -51,7 +55,10 @@ public final class FareEngine {
             final FareStation end = graph.station(leg.toId);
             final int startZone = start == null ? 0 : start.zone();
             final int endZone = end == null ? 0 : end.zone();
-            long fare = leg.rule.baseFareCents(leg.intervals, leg.meters, startZone, endZone);
+            final Set<String> visiting = new HashSet<>();
+            visiting.add(leg.rule.id);
+            final RuleResolver resolver = config.ruleResolver(visiting);
+            long fare = leg.rule.baseFareCents(leg.intervals, leg.meters, startZone, endZone, resolver);
             boolean capped = false;
             if (leg.rule.maxFareCents > 0L && fare > leg.rule.maxFareCents) {
                 fare = leg.rule.maxFareCents;

@@ -69,11 +69,11 @@ class TicketDataTest {
     void transactionListIsCapped() {
         final ItemStack card = new ItemStack(Items.PAPER);
         TicketData.issueCard(card, 0L, 18, station, "minecraft:overworld");
-        for (int index = 0; index < 15; index++) {
+        for (int index = 0; index < TicketData.MAX_TX + 5; index++) {
             TicketData.addTx(card, index, "topup", 100L, 100L * (index + 1));
         }
         assertEquals(TicketData.MAX_TX, TicketData.txCount(card));
-        assertEquals(14L, TicketData.txAt(card, 0).time());
+        assertEquals(TicketData.MAX_TX + 4L, TicketData.txAt(card, 0).time());
     }
 
     @Test

@@ -35,8 +35,7 @@ import java.util.Set;
 public final class FareScriptScreen extends Screen {
 
     private static final String[] STATEMENT_TYPES = {
-            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare", "round_fare"};
-    private static final String[] NUMERIC_VALUE_TYPES = {
+            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare", "round_fare"};    private static final String[] NUMERIC_VALUE_TYPES = {
             "number", "context_intervals", "context_meters", "context_stations",
             "context_zone_diff", "table_intervals", "table_meters"};
     private static final String[] ARITHMETIC_VALUE_TYPES = {
@@ -86,6 +85,8 @@ public final class FareScriptScreen extends Screen {
         for (final String type : List.of("set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, true, false, colorFor(type)));
         }
+        list.add(new PaletteEntry("gui.trdm.script.block.use_rule", "use_rule", true, false,
+                colorFor("use_rule")));
         list.add(new PaletteEntry("gui.trdm.script.category.round", null, false, true, 0xFF2D6E82));
         list.add(new PaletteEntry("gui.trdm.script.block.round_fare", "round_fare", true, false,
                 colorFor("round_fare")));
@@ -233,6 +234,20 @@ public final class FareScriptScreen extends Screen {
     private int operatorListW;
     private int operatorListH;
 
+    private boolean ruleDropOpen;
+    private String ruleDropNodeId;
+    private int ruleListX;
+    private int ruleListY;
+    private int ruleListW;
+    private int ruleListH;
+    private int ruleDropScroll;
+    private final List<String> missingRules = new ArrayList<>();
+    private boolean warningsDismissed;
+    private int noticeX;
+    private int noticeY;
+    private int noticeW;
+    private int noticeH;
+
     private final Deque<FareScript> undoStack = new ArrayDeque<>();
     private final Deque<FareScript> redoStack = new ArrayDeque<>();
     private boolean restoring;
@@ -267,6 +282,7 @@ public final class FareScriptScreen extends Screen {
         this.rule = rule;
         this.script = rule.script == null ? Scripts.empty() : rule.script.copy();
         Scripts.ensureHat(this.script);
+        refreshMissingRules();
         final String first = topLevelFirst();
         if (first != null) {
             this.selectedStatement = first;
@@ -513,7 +529,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private int trashX() {
-        return canvasRight - 96;
+        return canvasLeft + 12;
     }
 
     private int trashY() {
@@ -540,15 +556,14 @@ public final class FareScriptScreen extends Screen {
             drawPopupLabels(guiGraphics, valueTarget);
             drawTierScrollbar(guiGraphics);
         }
-        if (!error.isEmpty()) {
-            drawString(guiGraphics, error, 200, 15, 0xFFFFD0D0);
-        }
         if (dragStatementType != null || dragValueType != null || dragStatementId != null
                 || dragValueId != null) {
             drawGhost(guiGraphics);
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        drawRuleDropdown(guiGraphics, mouseX, mouseY);
         drawOperatorDropdown(guiGraphics, mouseX, mouseY);
+        drawNotice(guiGraphics);
         if (confirmCloseOpen) {
             drawConfirmClose(guiGraphics);
         }
@@ -805,6 +820,10 @@ public final class FareScriptScreen extends Screen {
         drawBlockShape(guiGraphics, x, top, w, view.height, colorFor(node.type), selected, hovered,
                 attachedAbove(view), attachedBelow(view), drawBottomGroove(view));
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
+        if ("use_rule".equals(node.type)) {
+            drawRuleField(guiGraphics, view);
+            return;
+        }
         if (!valueStatement(node.type)) {
             if ("round_fare".equals(node.type)) {
                 drawString(guiGraphics, "取整  " + node.fields.getOrDefault("mode", "HALF")
@@ -828,7 +847,292 @@ public final class FareScriptScreen extends Screen {
                 chipTop + Math.max(2, Math.round(4 * zoom)), target ? 0xFF202020 : 0xE8E8E8);
     }
 
-    /** 画带顶部凸起、底部凹槽、阴影的积木块；每块上沿都画分隔线。 */
+    private int[] ruleFieldRect(View view) {
+        final int h = Math.max(12, Math.round(20 * zoom));
+        return new int[]{view.left + 10, view.top + Math.round(30 * zoom),
+                Math.max(40, view.width - 20), h};
+    }
+
+    private void drawRuleField(GuiGraphics guiGraphics, View view) {
+        final int[] rect = ruleFieldRect(view);
+        final int x = rect[0];
+        final int y = rect[1];
+        final int w = rect[2];
+        final int h = rect[3];
+        fill(guiGraphics, x, y, w, h, 0xFF202020);
+        fill(guiGraphics, x + 2, y + 1, 3, h - 2, colorFor("use_rule"));
+        final ScriptNode node = view.node;
+        final FareRule selected = selectedRule(node);
+        final String text;
+        final int color;
+        if (selected != null) {
+            text = selected.name;
+            color = selected.enabled ? 0xE8E8E8 : 0xFFB0B0B0;
+        } else if (node.fields.get("rule") != null && !node.fields.get("rule").isBlank()) {
+            final String storedName = node.fields.get("rule_name");
+            text = storedName == null || storedName.isBlank()
+                    ? node.fields.get("rule") : storedName;
+            color = 0xFFFF9090;
+        } else {
+            text = Component.translatable("gui.trdm.script.choose_rule").getString();
+            color = 0xFFB0B0B0;
+        }
+        drawString(guiGraphics, fit(text, w - 24), x + 9, y + Math.max(2, (h - 8) / 2), color);
+        final int tx = x + w - 13;
+        final int ty = y + h / 2 - 2;
+        for (int row = 0; row < 4; row++) {
+            fill(guiGraphics, tx + row, ty + row, 8 - row * 2, 1, 0xFFB0B0B0);
+        }
+    }
+
+    private FareRule selectedRule(ScriptNode node) {
+        final String id = node == null ? null : node.fields.get("rule");
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        for (final FareRule rule : FareRuntime.get().config().rules) {
+            if (id.equals(rule.id)) {
+                return rule;
+            }
+        }
+        return null;
+    }
+
+    private List<FareRule> availableRules() {
+        final List<FareRule> all = FareRuntime.get().config().rules;
+        final List<FareRule> result = new ArrayList<>();
+        for (final FareRule rule : all) {
+            if (this.rule.id == null || !this.rule.id.equals(rule.id)) {
+                result.add(rule);
+            }
+        }
+        return result;
+    }
+
+    private View ruleFieldAt(double mx, double my) {
+        for (final View view : views) {
+            if (!"use_rule".equals(view.node.type)) {
+                continue;
+            }
+            final int[] rect = ruleFieldRect(view);
+            if (mx >= rect[0] && mx < rect[0] + rect[2]
+                    && my >= rect[1] && my < rect[1] + rect[3]) {
+                return view;
+            }
+        }
+        return null;
+    }
+
+    private boolean handleRuleClick(double mx, double my) {
+        if (ruleDropOpen) {
+            final FareRule chosen = ruleOptionAt(mx, my);
+            if (chosen != null) {
+                final ScriptNode node = script.node(ruleDropNodeId);
+                if (node != null) {
+                    pushUndo();
+                    node.fields.put("rule", chosen.id);
+                    node.fields.put("rule_name", chosen.name);
+                    warningsDismissed = false;
+                    refreshMissingRules();
+                    error = "";
+                }
+                ruleDropOpen = false;
+                rebuild();
+                return true;
+            }
+            final boolean insideList = mx >= ruleListX && mx < ruleListX + ruleListW
+                    && my >= ruleListY && my < ruleListY + ruleListH;
+            ruleDropOpen = false;
+            if (insideList || ruleFieldAt(mx, my) != null) {
+                return true;
+            }
+            return false;
+        }
+        if (insidePopup(mx, my)) {
+            return false;
+        }
+        final View field = ruleFieldAt(mx, my);
+        if (field == null) {
+            return false;
+        }
+        if (availableRules().isEmpty()) {
+            error = Component.translatable("gui.trdm.script.no_rules").getString();
+            return true;
+        }
+        ruleDropOpen = true;
+        ruleDropNodeId = field.node.id;
+        ruleDropScroll = 0;
+        operatorDropOpen = false;
+        return true;
+    }
+
+    private FareRule ruleOptionAt(double mx, double my) {
+        if (!ruleDropOpen || ruleListW <= 0 || ruleListH <= 0) {
+            return null;
+        }
+        if (mx < ruleListX || mx >= ruleListX + ruleListW
+                || my < ruleListY || my >= ruleListY + ruleListH) {
+            return null;
+        }
+        final int row = (int) ((my - ruleListY - 2) / 18);
+        if (row < 0 || row >= Math.min(8, availableRules().size())) {
+            return null;
+        }
+        final int index = row + ruleDropScroll;
+        final List<FareRule> rules = availableRules();
+        return index >= 0 && index < rules.size() ? rules.get(index) : null;
+    }
+
+    private void drawRuleDropdown(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!ruleDropOpen) {
+            return;
+        }
+        final ScriptNode node = script.node(ruleDropNodeId);
+        final View view = ruleDropNodeId == null ? null : viewById.get(ruleDropNodeId);
+        if (node == null || view == null) {
+            ruleDropOpen = false;
+            return;
+        }
+        final List<FareRule> rules = availableRules();
+        if (rules.isEmpty()) {
+            ruleDropOpen = false;
+            return;
+        }
+        final int[] field = ruleFieldRect(view);
+        final int visible = Math.min(8, rules.size());
+        ruleListX = field[0];
+        ruleListW = Math.max(240, field[2]);
+        ruleListH = visible * 18 + 4;
+        ruleListY = field[1] + field[3] + 2;
+        if (ruleListY + ruleListH > this.height - 8) {
+            ruleListY = Math.max(44, field[1] - ruleListH - 2);
+        }
+        ruleDropScroll = Math.max(0, Math.min(ruleDropScroll,
+                Math.max(0, rules.size() - visible)));
+        fill(guiGraphics, ruleListX - 1, ruleListY - 1, ruleListW + 2, ruleListH + 2, PANEL_BORDER);
+        fill(guiGraphics, ruleListX, ruleListY, ruleListW, ruleListH, 0xF0161616);
+        for (int row = 0; row < visible; row++) {
+            final int index = row + ruleDropScroll;
+            if (index >= rules.size()) {
+                break;
+            }
+            final FareRule rule = rules.get(index);
+            final int top = ruleListY + 2 + row * 18;
+            final boolean hovered = mouseX >= ruleListX && mouseX < ruleListX + ruleListW
+                    && mouseY >= top && mouseY < top + 18;
+            final boolean selected = rule.id.equals(node.fields.get("rule"));
+            if (selected) {
+                fill(guiGraphics, ruleListX + 1, top, ruleListW - 2, 18, 0x3345B35A);
+            } else if (hovered) {
+                fill(guiGraphics, ruleListX + 1, top, ruleListW - 2, 18, 0x33FFFFFF);
+            }
+            final String label = rule.enabled ? rule.name
+                    : rule.name + Component.translatable("gui.trdm.ticket.disabled_suffix").getString();
+            drawString(guiGraphics, fit(label, ruleListW - 16), ruleListX + 8, top + 5,
+                    hovered ? 0xFFFFFFFF : 0xFFD0D0D0);
+        }
+        if (rules.size() > visible) {
+            final int trackX = ruleListX + ruleListW - 5;
+            final int trackH = ruleListH - 6;
+            fill(guiGraphics, trackX, ruleListY + 3, 3, trackH, 0xFF3A3A3A);
+            final int thumbH = Math.max(10, Math.round(trackH * (float) visible / rules.size()));
+            final int maxScroll = rules.size() - visible;
+            final int thumbY = ruleListY + 3 + Math.round((trackH - thumbH)
+                    * (float) ruleDropScroll / maxScroll);
+            fill(guiGraphics, trackX, thumbY, 3, thumbH, 0xFF8A8A8A);
+        }
+    }
+
+    /** 重新扫描“使用规则”积木引用的规则；缺失引用只警告并跳过，不阻断保存。 */
+    private void refreshMissingRules() {
+        final List<String> previous = new ArrayList<>(missingRules);
+        missingRules.clear();
+        final Set<String> seen = new HashSet<>();
+        for (final ScriptNode node : script.nodes) {
+            if (!"use_rule".equals(node.type)) {
+                continue;
+            }
+            final String id = node.fields.get("rule");
+            if (id == null || id.isBlank()) {
+                continue;
+            }
+            boolean found = false;
+            for (final FareRule rule : FareRuntime.get().config().rules) {
+                if (id.equals(rule.id)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                final String storedName = node.fields.get("rule_name");
+                final String name = storedName == null || storedName.isBlank() ? id : storedName;
+                if (name != null && !name.isBlank() && seen.add(name)) {
+                    missingRules.add(name);
+                }
+            }
+        }
+        if (!missingRules.equals(previous)) {
+            warningsDismissed = false;
+        }
+    }
+
+    private boolean noticeVisible() {
+        return !error.isEmpty() || (!warningsDismissed && !missingRules.isEmpty());
+    }
+
+    private void drawNotice(GuiGraphics guiGraphics) {
+        if (!noticeVisible()) {
+            return;
+        }
+        final boolean missing = !warningsDismissed && !missingRules.isEmpty();
+        final String title = missing
+                ? Component.translatable("gui.trdm.script.missing_rules_title").getString()
+                : Component.translatable("gui.trdm.script.notice_title").getString();
+        final List<String> lines = new ArrayList<>();
+        if (missing) {
+            for (final String name : missingRules) {
+                lines.add("· " + name);
+            }
+            if (!error.isEmpty()) {
+                lines.add("· " + error);
+            }
+        } else {
+            lines.add(error);
+        }
+        final int width = 300;
+        final int height = 24 + lines.size() * 12 + 8;
+        noticeX = Math.max(canvasLeft + 4, canvasRight - width - 10);
+        noticeY = Math.max(canvasTop + 4, canvasBottom - height - 12);
+        noticeW = width;
+        noticeH = height;
+        fill(guiGraphics, noticeX + 3, noticeY + 4, width, height, 0x50000000);
+        fill(guiGraphics, noticeX - 1, noticeY - 1, width + 2, height + 2, 0xFF6A1A1A);
+        fill(guiGraphics, noticeX, noticeY, width, height, 0xF2A02A2A);
+        fill(guiGraphics, noticeX, noticeY, 4, height, 0xFFE05A5A);
+        drawString(guiGraphics, fit(title, width - 28), noticeX + 10, noticeY + 7, 0xFFFFE0E0);
+        for (int index = 0; index < lines.size(); index++) {
+            drawString(guiGraphics, fit(lines.get(index), width - 22),
+                    noticeX + 12, noticeY + 22 + index * 12, 0xFFFFFFFF);
+        }
+        drawString(guiGraphics, "×", noticeX + width - 17, noticeY + 5, 0xFFFFFFFF);
+    }
+
+    private boolean handleNoticeClick(double mx, double my) {
+        if (!noticeVisible()) {
+            return false;
+        }
+        final boolean inside = mx >= noticeX && mx < noticeX + noticeW
+                && my >= noticeY && my < noticeY + noticeH;
+        if (!inside) {
+            return false;
+        }
+        if (mx >= noticeX + noticeW - 20 && my < noticeY + 20) {
+            error = "";
+            warningsDismissed = true;
+        }
+        return true;
+    }
+
     private void drawBlockShape(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
                                 boolean selected, boolean hovered, boolean attachedAbove,
                                 boolean attachedBelow, boolean drawGroove) {
@@ -1004,6 +1308,7 @@ public final class FareScriptScreen extends Screen {
         }
         if (inOperatorField(mx, my)) {
             operatorDropOpen = true;
+            ruleDropOpen = false;
             return true;
         }
         return false;
@@ -1120,6 +1425,12 @@ public final class FareScriptScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (confirmCloseOpen) {
             return handleConfirmClick(mouseX, mouseY);
+        }
+        if (handleNoticeClick(mouseX, mouseY)) {
+            return true;
+        }
+        if (handleRuleClick(mouseX, mouseY)) {
+            return true;
         }
         if (handleOperatorClick(mouseX, mouseY)) {
             return true;
@@ -1325,6 +1636,14 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (ruleDropOpen && mouseX >= ruleListX && mouseX < ruleListX + ruleListW
+                && mouseY >= ruleListY && mouseY < ruleListY + ruleListH) {
+            final int visible = Math.min(8, availableRules().size());
+            final int max = Math.max(0, availableRules().size() - visible);
+            final int direction = delta > 0 ? -1 : 1;
+            ruleDropScroll = clamp(ruleDropScroll + direction, 0, max);
+            return true;
+        }
         final ScriptNode table = popupValue();
         if (table != null && isTable(table.type) && table.tiers.size() > TIER_VISIBLE
                 && popupVisible && mouseX >= popupX && mouseX < popupX + popupW
@@ -1413,6 +1732,9 @@ public final class FareScriptScreen extends Screen {
         } else if ("round_fare".equals(nodeType)) {
             node.fields.put("mode", "HALF");
             node.fields.put("unit", "0.1");
+        } else if ("use_rule".equals(nodeType)) {
+            node.fields.put("rule", "");
+            node.fields.put("rule_name", "");
         }
         script.nodes.add(node);
         return node;
@@ -1686,7 +2008,7 @@ public final class FareScriptScreen extends Screen {
 
     private void cycleStatementType() {
         final ScriptNode node = selectedStatementNode();
-        if (node == null || "if".equals(node.type)) {
+        if (node == null || "if".equals(node.type) || "use_rule".equals(node.type)) {
             return;
         }
         pushUndo();
@@ -2347,6 +2669,8 @@ public final class FareScriptScreen extends Screen {
         error = "";
         dirty = true;
         restoring = false;
+        ruleDropOpen = false;
+        refreshMissingRules();
         rebuild();
     }
 
@@ -2359,7 +2683,7 @@ public final class FareScriptScreen extends Screen {
 
     private static boolean statementType(String type) {
         return "on_fare".equals(type) || "if".equals(type) || "round_fare".equals(type)
-                || valueStatement(type);
+                || "use_rule".equals(type) || valueStatement(type);
     }
 
     private static boolean hasElseBranch(ScriptNode node) {
@@ -2397,6 +2721,7 @@ public final class FareScriptScreen extends Screen {
             case "if", "if_else" -> 0xFFB06A1F;
             case "compare", "and", "or", "not" -> 0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare" -> 0xFF2F7D4F;
+            case "use_rule" -> 0xFF2F6E7D;
             case "round_fare" -> 0xFF2D6E82;
             case "number", "context_intervals", "context_meters", "context_stations",
                  "context_zone_diff", "add", "subtract", "multiply", "divide", "min", "max" ->
@@ -2514,6 +2839,10 @@ public final class FareScriptScreen extends Screen {
         if (backspaceHeld && keyCode != org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE) {
             backspaceHeld = false;
             backspaceBox = null;
+        }
+        if (ruleDropOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            ruleDropOpen = false;
+            return true;
         }
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE
                 && this.getFocused() instanceof EditBox box) {
@@ -2707,6 +3036,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void rebuild() {
+        refreshMissingRules();
         this.clearWidgets();
         this.init(this.minecraft, this.width, this.height);
     }

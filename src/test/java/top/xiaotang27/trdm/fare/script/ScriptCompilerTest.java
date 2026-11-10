@@ -85,6 +85,28 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void useRuleResolvesAtRuntime() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "use";
+        final ScriptNode use = new ScriptNode("use", "use_rule");
+        use.fields.put("rule", "other");
+        use.next = "add";
+        final ScriptNode add = new ScriptNode("add", "add_fare");
+        add.inputs.put("value", "num");
+        final ScriptNode num = new ScriptNode("num", "number");
+        num.fields.put("value", "1");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, use, add, num));
+
+        final RuleResolver resolver = (ruleId, context) -> "other".equals(ruleId) ? 5.0 : null;
+        assertEquals(6.0, ScriptRuntime.evaluate(script,
+                new ScriptContext(0, 0, 0, 0), resolver), 1e-9);
+        assertEquals(1.0, ScriptRuntime.evaluate(script,
+                new ScriptContext(0, 0, 0, 0), (ruleId, context) -> null), 1e-9);
+    }
+
+    @Test
     void ifElseUsesCompare() {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");

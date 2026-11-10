@@ -38,7 +38,7 @@ public final class TicketData {
     public record Tx(long time, String type, long amountCents, long balanceAfter) {
     }
 
-    public static final int MAX_TX = 10;
+    public static final int MAX_TX = 50;
 
     private static final String KEY_SERIAL = "serial";
     private static final String KEY_TYPE = "type";

@@ -156,6 +156,9 @@ final class TicketConfigPage {
     private String exportedFileName = "";
     private Path exportedFile;
     private boolean confirmDeleteOpen;
+    private boolean noticeOpen;
+    private boolean noticeError;
+    private String noticeText = "";
 
     TicketConfigPage(TrdmScreenBase host) {
         this.host = host;
@@ -287,6 +290,8 @@ final class TicketConfigPage {
             renderDeleteConfirm(guiGraphics, mx, my);
         } else if (exportDialogOpen) {
             renderExportDialog(guiGraphics, mx, my);
+        } else if (noticeOpen) {
+            renderNotice(guiGraphics, mx, my);
         }
     }
 
@@ -320,6 +325,26 @@ final class TicketConfigPage {
                 TrdmScreenBase.DESIGN_W / 2F, 262F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
         host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.export_folder_hint"),
                 TrdmScreenBase.DESIGN_W / 2F, 290F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        final float okX = 420F;
+        host.buttonText(guiGraphics, okX, 320F, 120F, 28F,
+                Component.translatable("gui.trdm.ticket.ok"), false,
+                host.hit(mx, my, okX, 320F, 120F, 28F), TrdmScreenBase.FONT_ROW);
+    }
+
+    private void renderNotice(GuiGraphics guiGraphics, float mx, float my) {
+        host.rect(guiGraphics, 0F, 0F, TrdmScreenBase.DESIGN_W, TrdmScreenBase.DESIGN_H, 0x90000000);
+        final int border = noticeError ? 0xFF6A1A1A : 0xFF9A9A9A;
+        final int background = noticeError ? 0xF0602020 : 0xF0202020;
+        host.rect(guiGraphics, 219F, 219F, 522F, 152F, border);
+        host.rect(guiGraphics, 220F, 220F, 520F, 150F, background);
+        host.centred(guiGraphics, Component.translatable(noticeError
+                        ? "gui.trdm.ticket.notice_error" : "gui.trdm.ticket.notice_info"),
+                TrdmScreenBase.DESIGN_W / 2F, 244F, TrdmScreenBase.FONT_ROW,
+                noticeError ? 0xFFFFC0C0 : TrdmScreenBase.COLOR_SUB);
+        host.centred(guiGraphics, Component.literal(
+                        ellipsize(noticeText, 480F, TrdmScreenBase.FONT_BODY)),
+                TrdmScreenBase.DESIGN_W / 2F, 276F, TrdmScreenBase.FONT_BODY,
+                noticeError ? 0xFFFFFFFF : TrdmScreenBase.COLOR_TEXT);
         final float okX = 420F;
         host.buttonText(guiGraphics, okX, 320F, 120F, 28F,
                 Component.translatable("gui.trdm.ticket.ok"), false,
@@ -405,13 +430,16 @@ final class TicketConfigPage {
         host.row(guiGraphics, TrdmScreenBase.CONTENT_X, top, TrdmScreenBase.CONTENT_W, ROW_H - 2F,
                 selected, hovered);
 
-        final String name = ruleIndex < 0
+        final FareRule rowRule = ruleIndex < 0 ? null : rules.get(ruleIndex);
+        final boolean rowEnabled = rowRule == null || rowRule.enabled;
+        final String name = (ruleIndex < 0
                 ? Component.translatable("gui.trdm.ticket.mtr_rule").getString()
-                : rules.get(ruleIndex).name;
+                : rules.get(ruleIndex).name)
+                + (rowEnabled ? "" : Component.translatable("gui.trdm.ticket.disabled_suffix").getString());
         final float nameWidth = dropX() - TrdmScreenBase.CONTENT_X - 18F;
         host.text(guiGraphics, Component.literal(ellipsize(name, nameWidth, TrdmScreenBase.FONT_ROW)),
                 TrdmScreenBase.CONTENT_X + 9F, top + 10F,
-                TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+                TrdmScreenBase.FONT_ROW, rowEnabled ? TrdmScreenBase.COLOR_TEXT : TrdmScreenBase.COLOR_SUB);
 
         host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.line_scope"),
                 dropX() - 8F, top + 11F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
@@ -535,6 +563,14 @@ final class TicketConfigPage {
         host.section(guiGraphics, "gui.trdm.ticket.rule_content", DETAIL_CONTENT_SECTION_Y);
         renderRuleSummary(guiGraphics, rule);
         renderEditButton(guiGraphics, mx, my);
+        host.text(guiGraphics, Component.translatable("gui.trdm.ticket.rule_enable"),
+                TrdmScreenBase.CONTENT_X, DETAIL_EDIT_BUTTON_Y + 8F,
+                TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+        host.toggle(guiGraphics, TrdmScreenBase.CONTENT_X + 92F, DETAIL_EDIT_BUTTON_Y + 3F, rule.enabled);
+        final float copyX = TrdmScreenBase.CONTENT_X + 160F;
+        host.buttonText(guiGraphics, copyX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
+                Component.translatable("gui.trdm.ticket.copy_rule"), false,
+                host.hit(mx, my, copyX, DETAIL_EDIT_BUTTON_Y, 120F, 24F), TrdmScreenBase.FONT_ROW);
         final float exportX = TrdmScreenBase.CONTENT_RIGHT - 380F;
         host.buttonText(guiGraphics, exportX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
                 Component.translatable("gui.trdm.ticket.export_rule"), false,
@@ -885,6 +921,24 @@ final class TicketConfigPage {
         ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
     }
 
+    private void duplicateSelectedRule() {
+        if (detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
+            return;
+        }
+        final FareRule source = rules.get(detailRuleIndex);
+        final FareRule copy = source.copy();
+        copy.id = uniqueRuleId();
+        copy.name = uniqueRuleName(source.name + " "
+                + Component.translatable("gui.trdm.ticket.rule_copy_suffix").getString());
+        config.rules.add(copy);
+        FareRuntime.get().save();
+        detailRuleIndex = config.rules.size() - 1;
+        selectedKind = SELECT_RULE;
+        selectedIndex = detailRuleIndex;
+        ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
+        rebuildOwners();
+    }
+
     /** 把选中的规则导出成单独的文件；文件名使用规则名。 */
     private void exportSelectedRule() {
         if (detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
@@ -909,8 +963,9 @@ final class TicketConfigPage {
             exportedFileName = fileName;
             exportDialogOpen = true;
             confirmDeleteOpen = false;
+            noticeOpen = false;
         } catch (Exception exception) {
-            showMessage(Component.translatable("gui.trdm.ticket.export_failed",
+            showError(Component.translatable("gui.trdm.ticket.export_failed",
                     String.valueOf(exception.getMessage())));
         }
     }
@@ -985,7 +1040,7 @@ final class TicketConfigPage {
             rebuildOwners();
             showMessage(Component.translatable("gui.trdm.ticket.import_done", imported));
         } else if (invalid) {
-            showMessage(Component.translatable("gui.trdm.ticket.import_invalid"));
+            showError(Component.translatable("gui.trdm.ticket.import_invalid"));
         }
     }
 
@@ -1051,15 +1106,25 @@ final class TicketConfigPage {
     }
 
     private void showMessage(Component message) {
-        final Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player != null) {
-            minecraft.player.displayClientMessage(message, false);
-        }
+        noticeText = message.getString();
+        noticeError = false;
+        noticeOpen = true;
+        confirmDeleteOpen = false;
+        exportDialogOpen = false;
+    }
+
+    private void showError(Component message) {
+        noticeText = message.getString();
+        noticeError = true;
+        noticeOpen = true;
+        confirmDeleteOpen = false;
+        exportDialogOpen = false;
     }
 
     private void requestDeleteRule() {
         confirmDeleteOpen = true;
         exportDialogOpen = false;
+        noticeOpen = false;
     }
 
     private void openExportedFolder() {
@@ -1093,7 +1158,7 @@ final class TicketConfigPage {
         } catch (Exception ignored) {
             // 打不开文件夹时文件仍然已保存。
         }
-        showMessage(Component.translatable("gui.trdm.ticket.open_folder_failed"));
+        showError(Component.translatable("gui.trdm.ticket.open_folder_failed"));
     }
 
     private void addScriptRule() {
@@ -1396,6 +1461,12 @@ final class TicketConfigPage {
         if (!inWorld()) {
             return false;
         }
+        if (noticeOpen) {
+            if (host.hit(mx, my, 420F, 320F, 120F, 28F)) {
+                noticeOpen = false;
+            }
+            return true;
+        }
         if (confirmDeleteOpen) {
             if (host.hit(mx, my, 350F, 320F, 120F, 28F)) {
                 confirmDeleteOpen = false;
@@ -1533,6 +1604,20 @@ final class TicketConfigPage {
             return true;
         }
         if (view == VIEW_RULE && detailRuleIndex >= 0
+                && host.hit(mx, my, TrdmScreenBase.CONTENT_X, DETAIL_EDIT_BUTTON_Y, 150F, 24F)) {
+            final FareRule rule = rules.get(detailRuleIndex);
+            rule.enabled = !rule.enabled;
+            FareRuntime.get().save();
+            rebuildOwners();
+            return true;
+        }
+        if (view == VIEW_RULE && detailRuleIndex >= 0
+                && host.hit(mx, my, TrdmScreenBase.CONTENT_X + 160F,
+                DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
+            duplicateSelectedRule();
+            return true;
+        }
+        if (view == VIEW_RULE && detailRuleIndex >= 0
                 && host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 380F,
                 DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
             exportSelectedRule();
@@ -1579,6 +1664,12 @@ final class TicketConfigPage {
     }
 
     boolean keyPressed(int keyCode) {
+        if (noticeOpen) {
+            if (keyCode == 256 || keyCode == 257) {
+                noticeOpen = false;
+            }
+            return true;
+        }
         if (confirmDeleteOpen) {
             if (keyCode == 256) {
                 confirmDeleteOpen = false;

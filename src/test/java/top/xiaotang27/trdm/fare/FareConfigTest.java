@@ -1,11 +1,16 @@
 package top.xiaotang27.trdm.fare;
 
 import org.junit.jupiter.api.Test;
+import top.xiaotang27.trdm.fare.script.RuleResolver;
+import top.xiaotang27.trdm.fare.script.ScriptContext;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /** 最低票价（入闸余额门槛）的计算。 */
@@ -65,5 +70,25 @@ class FareConfigTest {
         assertEquals(1, target.rules.size());
         assertEquals("x", target.rules.get(0).id);
         assertEquals("x", target.routeRules.get("minecraft:overworld|7"));
+    }
+
+    @Test
+    void ruleResolverResolvesEnabledAndSkipsMissingOrCyclic() {
+        final FareConfig config = new FareConfig();
+        final FareRule flat = new FareRule("flat", "Flat", FareRule.Kind.FLAT);
+        flat.flatFareCents = 500L;
+        flat.maxFareCents = 400L;
+        config.rules.add(flat);
+
+        final Set<String> visiting = new HashSet<>();
+        visiting.add("root");
+        final RuleResolver resolver = config.ruleResolver(visiting);
+        final ScriptContext context = new ScriptContext(3L, 1200L, 0, 1);
+        assertEquals(4.0, resolver.resolve("flat", context), 1e-9);
+        assertNull(resolver.resolve("missing", context));
+        assertNull(resolver.resolve("root", context));
+
+        flat.enabled = false;
+        assertNull(resolver.resolve("flat", context));
     }
 }

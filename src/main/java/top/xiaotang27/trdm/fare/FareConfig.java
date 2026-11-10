@@ -1,13 +1,16 @@
 package top.xiaotang27.trdm.fare;
 
+import top.xiaotang27.trdm.fare.script.RuleResolver;
 import top.xiaotang27.trdm.fare.script.ScriptContext;
 import top.xiaotang27.trdm.fare.script.ScriptRuntime;
 import top.xiaotang27.trdm.ticket.PassRule;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 票务设置 + 规则 + 线路绑定。
@@ -68,6 +71,37 @@ public final class FareConfig {
     }
 
     /**
+     * 供“使用规则”积木在运行期解析其他规则。
+     * <p>
+     * {@code visiting} 保存当前调用链；规则不存在、被停用或出现循环引用时返回 {@code null}，
+     * 积木会被跳过而不会让整条规则报错。
+     */
+    RuleResolver ruleResolver(Set<String> visiting) {
+        return new RuleResolver() {
+            @Override
+            public Double resolve(String ruleId, ScriptContext context) {
+                if (ruleId == null || ruleId.isBlank() || !visiting.add(ruleId)) {
+                    return null;
+                }
+                try {
+                    final FareRule referenced = ruleById(ruleId);
+                    if (referenced == null || !referenced.enabled) {
+                        return null;
+                    }
+                    long cents = referenced.baseFareCents(context.intervals(), context.meters(),
+                            context.fromZone(), context.toZone(), this);
+                    if (referenced.maxFareCents > 0L && cents > referenced.maxFareCents) {
+                        cents = referenced.maxFareCents;
+                    }
+                    return Math.max(0L, cents) / 100.0;
+                } finally {
+                    visiting.remove(ruleId);
+                }
+            }
+        };
+    }
+
+    /**
      * 查线路绑定的规则。
      * <p>
      * 未绑定、绑到已删除的规则或规则被停用时返回 {@code null}，由报价引擎回退 MTR 原版公式。
@@ -115,8 +149,10 @@ public final class FareConfig {
                         yield FareEngine.VANILLA_BASE_CENTS;
                     }
                     try {
+                        final Set<String> visiting = new HashSet<>();
+                        visiting.add(rule.id);
                         final double yuan = ScriptRuntime.evaluate(rule.script,
-                                new ScriptContext(0L, 0L, 0, 0));
+                                new ScriptContext(0L, 0L, 0, 0), ruleResolver(visiting));
                         yield Math.max(0L, Math.round(yuan * 100.0));
                     } catch (RuntimeException exception) {
                         yield FareEngine.VANILLA_BASE_CENTS;

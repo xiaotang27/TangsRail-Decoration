@@ -54,6 +54,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     /** 补票/补记录时，选择的车站代表“入闸站”；出闸站临时改为所选站。 */
     private static final int RECORD_ENTRY = 0;
     private static final int RECORD_EXIT = 1;
+    private static final int RECORD_PAGE_SIZE = 10;
 
     private static final int ACTION_NONE = 0;
     private static final int ACTION_PAY_FARE = 1;
@@ -66,6 +67,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     private final BlockPos pos;
 
     private int view = VIEW_HOME;
+    private int recordPage;
     private String amountInput = "";
     private String dialog;
     private Component dialogMessage = Component.empty();
@@ -433,10 +435,20 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                 TicketUi.PANEL_X + 540F, 112F, FONT_SUB, TicketUi.TEXT_DARK);
 
         final List<String[]> rows = recordRows();
-        for (int index = 0; index < rows.size(); index++) {
+        final int pageCount = Math.max(1, (rows.size() + RECORD_PAGE_SIZE - 1) / RECORD_PAGE_SIZE);
+        if (recordPage < 0) {
+            recordPage = 0;
+        }
+        if (recordPage >= pageCount) {
+            recordPage = pageCount - 1;
+        }
+        final int start = recordPage * RECORD_PAGE_SIZE;
+        final int end = Math.min(rows.size(), start + RECORD_PAGE_SIZE);
+        for (int index = start; index < end; index++) {
             final String[] row = rows.get(index);
-            final float y = 140F + index * 26F;
-            if (index > 0) {
+            final int visual = index - start;
+            final float y = 140F + visual * 26F;
+            if (visual > 0) {
                 rect(guiGraphics, TicketUi.PANEL_X + 14F, y - 5F, TicketUi.PANEL_W - 28F, 1F, 0xFFDDDDDD);
             }
             text(guiGraphics, Component.literal(row[0]), TicketUi.PANEL_X + 24F, y,
@@ -452,18 +464,32 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
             text(guiGraphics, Component.translatable("gui.trdm.terminal.records.empty"),
                     TicketUi.PANEL_X + 24F, 146F, FONT_SUB, TicketUi.TEXT_MUTED);
         }
-        text(guiGraphics, Component.translatable("gui.trdm.terminal.records.hint"),
-                TicketUi.PANEL_X + 24F, 424F, FONT_SUB, TicketUi.TEXT_MUTED);
+        if (rows.size() > RECORD_PAGE_SIZE) {
+            final float prevX = TicketUi.PANEL_X + 24F;
+            final float nextX = TicketUi.PANEL_X + TicketUi.PANEL_W - 88F;
+            if (recordPage > 0) {
+                TicketUi.button(this, guiGraphics, prevX, 424F, 64F, 20F,
+                        Component.translatable("gui.trdm.terminal.records.prev"), hit(mx, my, prevX, 424F, 64F, 20F), FONT_SUB);
+            }
+            if (recordPage < pageCount - 1) {
+                TicketUi.button(this, guiGraphics, nextX, 424F, 64F, 20F,
+                        Component.translatable("gui.trdm.terminal.records.next"), hit(mx, my, nextX, 424F, 64F, 20F), FONT_SUB);
+            }
+            final String page = Component.translatable("gui.trdm.terminal.records.page",
+                    recordPage + 1, pageCount).getString();
+            text(guiGraphics, Component.literal(page),
+                    TicketUi.PANEL_X + TicketUi.PANEL_W / 2F - 40F, 430F, FONT_SUB, TicketUi.TEXT_MUTED);
+        }
     }
 
-    /** 从主手交通卡里读最近 10 条交易记录。 */
+    /** 从主手交通卡里读取全部交易记录，界面分页显示。 */
     private List<String[]> recordRows() {
         final List<String[]> rows = new ArrayList<>();
         final ItemStack held = heldItem();
         if (!held.is(Trdm.TRANSIT_CARD_ITEM) || !TicketData.hasData(held)) {
             return rows;
         }
-        final int count = Math.min(10, TicketData.txCount(held));
+        final int count = Math.min(TicketData.MAX_TX, TicketData.txCount(held));
         for (int index = 0; index < count; index++) {
             final TicketData.Tx tx = TicketData.txAt(held, index);
             if (tx == null) {
@@ -520,11 +546,30 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
             case VIEW_INFO -> clickInfo(mx, my);
             case VIEW_CARD -> clickCardMenu(mx, my);
             case VIEW_RECHARGE -> clickRecharge(mx, my);
-            case VIEW_RECORDS -> false;
+            case VIEW_RECORDS -> clickRecords(mx, my);
             case VIEW_RECORD_TYPE -> clickRecordType(mx, my);
             case VIEW_STATION -> clickStation(mx, my);
             default -> clickHome(mx, my);
         };
+    }
+
+    private boolean clickRecords(float mx, float my) {
+        final int count = recordRows().size();
+        final int pageCount = Math.max(1, (count + RECORD_PAGE_SIZE - 1) / RECORD_PAGE_SIZE);
+        if (pageCount <= 1) {
+            return false;
+        }
+        final float prevX = TicketUi.PANEL_X + 24F;
+        final float nextX = TicketUi.PANEL_X + TicketUi.PANEL_W - 88F;
+        if (recordPage > 0 && hit(mx, my, prevX, 424F, 64F, 20F)) {
+            recordPage--;
+            return true;
+        }
+        if (recordPage < pageCount - 1 && hit(mx, my, nextX, 424F, 64F, 20F)) {
+            recordPage++;
+            return true;
+        }
+        return false;
     }
 
     private boolean clickHome(float mx, float my) {
@@ -971,6 +1016,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         }
         if (hit(mx, my, 510F, 170F, 200F, 160F)) {
             view = VIEW_RECORDS;
+            recordPage = 0;
             return true;
         }
         return false;

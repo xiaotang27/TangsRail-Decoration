@@ -24,7 +24,7 @@ public final class ScriptCompiler {
 
     private static final Set<String> STATEMENTS = Set.of(
             "on_fare", "set_fare", "add_fare", "multiply_fare", "cap_fare",
-            "floor_fare", "round_fare", "if");
+            "floor_fare", "round_fare", "if", "use_rule");
     private static final Set<String> NUMBER_VALUES = Set.of(
             "number", "context_intervals", "context_stations", "context_meters",
             "context_zone_diff", "add", "subtract", "multiply", "divide", "min", "max",
@@ -125,8 +125,12 @@ public final class ScriptCompiler {
                 errors.add("语句块存在环: " + node.id);
                 return;
             }
-            if ("set_fare".equals(node.type)) {
+            if ("set_fare".equals(node.type) || "use_rule".equals(node.type)) {
                 reachableSetFare++;
+            }
+            if ("use_rule".equals(node.type)
+                    && (node.fields.get("rule") == null || node.fields.get("rule").isBlank())) {
+                errors.add("“使用规则”没有选择规则: " + node.id);
             }
             if ("if".equals(node.type)) {
                 validateInput(node, "condition", true);
@@ -327,6 +331,7 @@ public final class ScriptCompiler {
         private final FareScript script;
         private final java.util.Map<String, ScriptNode> nodes;
         private int steps;
+        private RuleResolver resolver;
 
         private CompiledScript(FareScript script, java.util.Map<String, ScriptNode> nodes) {
             this.script = script;
@@ -339,17 +344,26 @@ public final class ScriptCompiler {
 
         /** @return 票价（元）；脚本决定不设置票价或运行失败时抛异常。 */
         public double run(ScriptContext context) {
+            return run(context, null);
+        }
+
+        public double run(ScriptContext context, RuleResolver resolver) {
             steps = 0;
-            final State state = new State();
-            final ScriptNode hat = nodes.get(script.hat);
-            if (hat == null) {
-                throw new ScriptException("缺少帽子块");
+            this.resolver = resolver;
+            try {
+                final State state = new State();
+                final ScriptNode hat = nodes.get(script.hat);
+                if (hat == null) {
+                    throw new ScriptException("缺少帽子块");
+                }
+                execute(hat.next, state, context, 0);
+                if (!state.hasFare) {
+                    throw new ScriptException("脚本没有设置票价");
+                }
+                return state.fare;
+            } finally {
+                this.resolver = null;
             }
-            execute(hat.next, state, context, 0);
-            if (!state.hasFare) {
-                throw new ScriptException("脚本没有设置票价");
-            }
-            return state.fare;
         }
 
         private void execute(String statementId, State state, ScriptContext context, int depth) {
@@ -393,6 +407,17 @@ public final class ScriptCompiler {
                     case "round_fare" -> {
                         state.fare = round(state.fare, node);
                         state.hasFare = true;
+                        cursor = node.next;
+                    }
+                    case "use_rule" -> {
+                        final String ruleId = node.fields.get("rule");
+                        if (resolver != null && ruleId != null && !ruleId.isBlank()) {
+                            final Double value = resolver.resolve(ruleId, context);
+                            if (value != null && Double.isFinite(value)) {
+                                state.fare = Math.max(0.0, value);
+                                state.hasFare = true;
+                            }
+                        }
                         cursor = node.next;
                     }
                     case "if" -> {

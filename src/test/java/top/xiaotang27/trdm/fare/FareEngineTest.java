@@ -78,8 +78,7 @@ class FareEngineTest {
         config.routeRules.put(FareConfig.bindingKey(DIM, routeId), rule.id);
     }
 
-    private static FareScript flatScript(double yuan) {
-        final FareScript script = new FareScript();
+    private static FareScript flatScript(double yuan) {        final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");
         hat.next = "set";
         final ScriptNode set = new ScriptNode("set", "set_fare");
@@ -244,6 +243,32 @@ class FareEngineTest {
         bind(separate, 10L, intervalRule(400L));
         bind(separate, 20L, intervalRule(400L));
         assertEquals(400L, FareEngine.quote(separate, graph(), 1, 5, DIM).totalCents());
+    }
+
+    @Test
+    void scriptCanReferenceAnotherRule() {
+        final FareRule base = new FareRule("base", "基础规则", FareRule.Kind.FLAT);
+        base.flatFareCents = 500L;
+        base.maxFareCents = 500L;
+
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "use";
+        final ScriptNode use = new ScriptNode("use", "use_rule");
+        use.fields.put("rule", "base");
+        use.fields.put("rule_name", "基础规则");
+        script.hat = "hat";
+        script.nodes.add(hat);
+        script.nodes.add(use);
+
+        final FareRule referencing = new FareRule("referencing", "引用规则", FareRule.Kind.SCRIPT);
+        referencing.script = script;
+        final FareConfig config = new FareConfig();
+        bind(config, 10L, base);
+        bind(config, 10L, referencing);
+        config.routeRules.put(FareConfig.bindingKey(DIM, 10L), "referencing");
+
+        assertEquals(500L, FareEngine.quote(config, graph(), 1, 2, DIM).totalCents());
     }
 
     @Test
