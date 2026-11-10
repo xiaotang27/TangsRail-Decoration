@@ -2,13 +2,18 @@ package top.xiaotang27.trdm.client;
 
 import mtr.client.ClientData;
 import mtr.data.Route;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.fare.FareConfig;
+import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareRule;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -286,13 +291,17 @@ final class TicketConfigPage {
         host.section(guiGraphics, "gui.trdm.ticket.rules", RULES_SECTION_Y);
         if (lines.isEmpty()) {
             host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.no_line_data"),
-                    TrdmScreenBase.CONTENT_RIGHT - 120F, RULES_SECTION_Y + 5F,
+                    TrdmScreenBase.CONTENT_RIGHT - 230F, RULES_SECTION_Y + 5F,
                     TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_WARN);
         } else {
             host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
-                    TrdmScreenBase.CONTENT_RIGHT - 120F, RULES_SECTION_Y + 5F,
+                    TrdmScreenBase.CONTENT_RIGHT - 230F, RULES_SECTION_Y + 5F,
                     TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         }
+        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F,
+                60F, 18F, Component.translatable("gui.trdm.ticket.export_short"), false,
+                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F),
+                TrdmScreenBase.FONT_SUB);
         host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F,
                 50F, 18F, Component.translatable("gui.trdm.ticket.add_rule_short"), false,
                 host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F),
@@ -821,6 +830,25 @@ final class TicketConfigPage {
         ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
     }
 
+    /** 把当前同步到的配置导出成可分享的 JSON 文件。 */
+    private void exportJson() {
+        final Path path = FabricLoader.getInstance().getConfigDir().resolve("trdm-fares-export.json");
+        final Minecraft minecraft = Minecraft.getInstance();
+        try {
+            Files.createDirectories(path.getParent());
+            Files.writeString(path, FareJson.write(config), StandardCharsets.UTF_8);
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(Component.translatable(
+                        "gui.trdm.ticket.export_done", "config/trdm-fares-export.json"), false);
+            }
+        } catch (Exception exception) {
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(Component.translatable(
+                        "gui.trdm.ticket.export_failed", String.valueOf(exception.getMessage())), false);
+            }
+        }
+    }
+
     private void addScriptRule() {
         final FareRule rule = new FareRule(uniqueRuleId(),
                 Component.translatable("gui.trdm.ticket.new_rule_default").getString(), FareRule.Kind.SCRIPT);
@@ -1134,6 +1162,10 @@ final class TicketConfigPage {
     }
 
     private boolean clickMain(float mx, float my) {
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F)) {
+            exportJson();
+            return true;
+        }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F)) {
             addFareRule();
             return true;

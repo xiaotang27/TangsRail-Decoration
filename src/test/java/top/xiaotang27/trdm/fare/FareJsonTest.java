@@ -2,6 +2,7 @@ package top.xiaotang27.trdm.fare;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import top.xiaotang27.trdm.fare.script.ScriptNode;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,10 +24,27 @@ class FareJsonTest {
         assertEquals(FareRule.Kind.SCRIPT, parsed.rules.get(0).kind);
         assertNotNull(parsed.rules.get(0).script);
         assertEquals(400L, parsed.maxFareCapCents());
-        assertEquals(3, parsed.rules.get(1).tiers.size());
-        assertNull(parsed.rules.get(1).tiers.get(2).upTo());
-        assertEquals(400L, parsed.rules.get(1).tiers.get(2).fareCents());
+        assertEquals(FareRule.Kind.SCRIPT, parsed.rules.get(1).kind);
+        final ScriptNode intervalTable = findNode(parsed.rules.get(1), "table_intervals");
+        assertNotNull(intervalTable);
+        assertEquals(3, intervalTable.tiers.size());
+        assertNull(intervalTable.tiers.get(2).upTo());
+        assertEquals(4.0, intervalTable.tiers.get(2).fareYuan(), 1e-9);
+        assertEquals(FareRule.Kind.SCRIPT, parsed.rules.get(2).kind);
+        assertNotNull(findNode(parsed.rules.get(2), "table_meters"));
         assertTrue(parsed.routeRules.isEmpty());
+    }
+
+    private static ScriptNode findNode(FareRule rule, String type) {
+        if (rule.script == null) {
+            return null;
+        }
+        for (final ScriptNode node : rule.script.nodes) {
+            if (type.equals(node.type)) {
+                return node;
+            }
+        }
+        return null;
     }
 
     @Test
@@ -125,6 +143,7 @@ class FareJsonTest {
         branch.next = "a";
         branch.otherwise = "b";
         branch.after = "c";
+        branch.fields.put("else", "1");
         script.hat = "hat";
         script.nodes.addAll(java.util.List.of(hat, branch,
                 new top.xiaotang27.trdm.fare.script.ScriptNode("cmp", "compare"),
@@ -141,6 +160,7 @@ class FareJsonTest {
         assertEquals("a", parsed.script.node("if").next);
         assertEquals("b", parsed.script.node("if").otherwise);
         assertEquals("c", parsed.script.node("if").after);
+        assertEquals("1", parsed.script.node("if").fields.get("else"));
     }
 
     @Test

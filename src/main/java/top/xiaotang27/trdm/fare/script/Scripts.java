@@ -1,5 +1,7 @@
 package top.xiaotang27.trdm.fare.script;
 
+import java.util.List;
+
 /** 脚本的构造辅助（界面默认模板、测试）。 */
 public final class Scripts {
 
@@ -25,6 +27,19 @@ public final class Scripts {
         script.node(script.hat).next = set.id;
         script.nodes.add(set);
         script.nodes.add(number);
+        return script;
+    }
+
+    /** 帽子块 + 设置票价 = 一张阶梯表（区间或里程）。 */
+    public static FareScript table(String tableType, List<ScriptTier> tiers) {
+        final FareScript script = empty();
+        final ScriptNode set = new ScriptNode(uniqueId(script, "s"), "set_fare");
+        final ScriptNode table = new ScriptNode(uniqueId(script, "v"), tableType);
+        table.tiers.addAll(tiers);
+        set.inputs.put("value", table.id);
+        script.node(script.hat).next = set.id;
+        script.nodes.add(set);
+        script.nodes.add(table);
         return script;
     }
 

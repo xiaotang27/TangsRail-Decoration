@@ -44,7 +44,6 @@ public final class FareScriptScreen extends Screen {
     private static final String[] OPS = {"<", "<=", ">", ">=", "==", "!="};
 
     private static final int BLOCK_H = 58;
-    private static final int BLOCK_GAP = 8;
     private static final int INDENT = 18;
     private static final int IF_HEADER = 40;
     private static final int IF_DIVIDER = 24;
@@ -77,6 +76,8 @@ public final class FareScriptScreen extends Screen {
         final List<PaletteEntry> list = new ArrayList<>();
         list.add(new PaletteEntry("gui.trdm.script.category.control", null, false, true, 0xFF8C5A20));
         list.add(new PaletteEntry("gui.trdm.script.block.if", "if", true, false, colorFor("if")));
+        list.add(new PaletteEntry("gui.trdm.script.block.if_else", "if_else", true, false,
+                colorFor("if")));
         list.add(new PaletteEntry("gui.trdm.script.category.conditions", null, false, true, 0xFF2F6E45));
         for (final String type : List.of("compare", "and", "or", "not")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
@@ -169,6 +170,8 @@ public final class FareScriptScreen extends Screen {
         private int width;
         private int height;
         private boolean isIf;
+        private boolean hasElse;
+        private boolean firstInChain;
         private int headerH;
         private int thenTop;
         private int thenBottom;
@@ -199,13 +202,11 @@ public final class FareScriptScreen extends Screen {
     private int canvasBottom;
     private int blockW;
     private int blockH;
-    private int gapScreen;
     private int indentScreen;
     private int slotMinScreen;
     private int ifHeaderScreen;
     private int ifDividerScreen;
     private int ifFooterScreen;
-    private int slotPad;
     private float zoom = 1.0F;
     private float panX;
     private float panY;
@@ -226,7 +227,7 @@ public final class FareScriptScreen extends Screen {
     private final Deque<FareScript> undoStack = new ArrayDeque<>();
     private final Deque<FareScript> redoStack = new ArrayDeque<>();
     private boolean restoring;
-    private boolean dragUndoPushed;
+    private boolean dragMoved;
 
     private String selectedStatement;
     private String selectedValue;
@@ -239,11 +240,8 @@ public final class FareScriptScreen extends Screen {
     private String dragValueType;
     private double dragX;
     private double dragY;
-    private double dragGrabScreenX;
-    private double dragGrabScreenY;
-    private int dragBaseLeftScreen;
-    private int dragBaseTopScreen;
     private DropTarget statementDrop;
+    private boolean dropOnSelf;
     private boolean overTrash;
     private String tierScrollNode;
     private int tierScroll;
@@ -318,19 +316,17 @@ public final class FareScriptScreen extends Screen {
         viewById.clear();
         blockW = Math.max(190, Math.min(Math.round(330 * zoom), canvasRight - canvasLeft - 20));
         blockH = Math.max(36, Math.round(BLOCK_H * zoom));
-        gapScreen = Math.max(6, Math.round(BLOCK_GAP * zoom));
         indentScreen = Math.max(14, Math.round(INDENT * zoom));
         slotMinScreen = Math.max(18, Math.round(IF_SLOT_MIN * zoom));
         ifHeaderScreen = Math.max(32, Math.round(IF_HEADER * zoom));
         ifDividerScreen = Math.max(18, Math.round(IF_DIVIDER * zoom));
         ifFooterScreen = Math.max(6, Math.round(IF_FOOTER * zoom));
-        slotPad = Math.max(3, Math.round(4 * zoom));
 
         final ScriptNode hat = script.node(script.hat);
         if (hat == null || hat.next == null || hat.next.isBlank()) {
             return;
         }
-        final int baseLeft = canvasLeft + Math.round(panX) + Math.round(16 * zoom);
+        final int baseLeft = canvasLeft + Math.round(panX) + Math.round(20 * zoom);
         final int baseTop = canvasTop + Math.round(panY) + Math.round(10 * zoom);
         layoutChain(hat.next, baseLeft, baseTop, 0, new BranchKey("", Branch.TOP), new HashSet<>());
     }
@@ -348,8 +344,9 @@ public final class FareScriptScreen extends Screen {
                 break;
             }
             final View view = new View(node, depth, branch);
-            view.left = baseLeft + Math.round(node.x * zoom);
-            view.top = cursor + Math.round(node.y * zoom);
+            view.left = baseLeft;
+            view.top = cursor;
+            view.firstInChain = id.equals(firstId);
             view.width = Math.max(120, blockW - depth * indentScreen);
             view.isIf = "if".equals(node.type);
             view.nextSiblingId = view.isIf ? node.after : node.next;
@@ -360,6 +357,7 @@ public final class FareScriptScreen extends Screen {
 
             if (view.isIf) {
                 view.headerH = ifHeaderScreen;
+                view.hasElse = hasElseBranch(node);
                 view.condLeft = view.left + 10 + font.width(blockLabel("if")) + 8;
                 view.condTop = view.top + Math.max(5, Math.round(6 * zoom));
                 view.condHeight = Math.max(16, view.headerH - 2 * Math.max(5, Math.round(6 * zoom)));
@@ -369,27 +367,34 @@ public final class FareScriptScreen extends Screen {
                         view.width - (view.condLeft - view.left) - 10 - thenLabelWidth);
 
                 final int bodyLeft = view.left + indentScreen;
-                final int thenBase = view.top + view.headerH + slotPad;
+                final int thenBase = view.top + view.headerH;
                 final int thenBottom = layoutChain(node.next, bodyLeft, thenBase, depth + 1,
                         new BranchKey(node.id, Branch.THEN), laidOut);
-                final int thenEnd = Math.max(thenBase + slotMinScreen, thenBottom + slotPad);
-                view.thenTop = view.top + view.headerH;
+                final int thenEnd = Math.max(thenBase + slotMinScreen, thenBottom);
+                view.thenTop = thenBase;
                 view.thenBottom = thenEnd;
 
-                view.elseHeaderTop = thenEnd;
-                final int elseBase = view.elseHeaderTop + ifDividerScreen + slotPad;
-                final int elseBottom = layoutChain(node.otherwise, bodyLeft, elseBase, depth + 1,
-                        new BranchKey(node.id, Branch.ELSE), laidOut);
-                final int elseEnd = Math.max(elseBase + slotMinScreen, elseBottom + slotPad);
-                view.elseTop = view.elseHeaderTop + ifDividerScreen;
-                view.elseBottom = elseEnd;
-                view.height = elseEnd + ifFooterScreen - view.top;
+                if (view.hasElse) {
+                    view.elseHeaderTop = thenEnd;
+                    final int elseBase = view.elseHeaderTop + ifDividerScreen;
+                    final int elseBottom = layoutChain(node.otherwise, bodyLeft, elseBase, depth + 1,
+                            new BranchKey(node.id, Branch.ELSE), laidOut);
+                    final int elseEnd = Math.max(elseBase + slotMinScreen, elseBottom);
+                    view.elseTop = elseBase;
+                    view.elseBottom = elseEnd;
+                    view.height = elseEnd + ifFooterScreen - view.top;
+                } else {
+                    view.elseHeaderTop = thenEnd;
+                    view.elseTop = thenEnd;
+                    view.elseBottom = thenEnd;
+                    view.height = thenEnd + ifFooterScreen - view.top;
+                }
             } else {
                 view.height = blockH;
             }
 
             maxBottom = Math.max(maxBottom, view.top + view.height);
-            cursor = view.top + view.height + gapScreen;
+            cursor = view.top + view.height;
             id = view.nextSiblingId;
         }
         return maxBottom;
@@ -437,75 +442,60 @@ public final class FareScriptScreen extends Screen {
         if (my >= view.thenTop && my < view.thenBottom) {
             return Branch.THEN;
         }
-        if (my >= view.elseTop && my < view.elseBottom) {
+        if (view.hasElse && my >= view.elseTop && my < view.elseBottom) {
             return Branch.ELSE;
         }
         return null;
     }
 
-    /** 找出鼠标下最深的 if 分支（允许落在分支里的子块上，用于新建语句）。 */
-    private DropTarget ifBodyTarget(double mx, double my, boolean allowOverChildren) {
-        View best = null;
-        Branch bestBranch = null;
-        for (final View view : views) {
-            if (!view.isIf) {
-                continue;
-            }
-            final Branch branch = branchInIfBody(view, mx, my);
-            if (branch == null) {
-                continue;
-            }
-            if (!allowOverChildren && viewAt(mx, my) != view) {
-                continue;
-            }
-            if (best == null || view.depth > best.depth) {
-                best = view;
-                bestBranch = branch;
-            }
-        }
-        return best == null ? null : new DropTarget(DropKind.BRANCH_APPEND, best.node.id,
-                new BranchKey(best.node.id, bestBranch));
-    }
-
-    private DropTarget nearestPort(double mx, double my, String exclude) {
-        double best = 30;
-        View bestView = null;
-        boolean bestBefore = false;
-        for (final View view : views) {
-            if (exclude != null && (view.node.id.equals(exclude) || isDescendant(view.node.id, exclude))) {
-                continue;
-            }
-            final double cx = view.left + view.width / 2.0;
-            final double dTop = Math.hypot(mx - cx, my - view.top);
-            if (dTop < best) {
-                best = dTop;
-                bestView = view;
-                bestBefore = true;
-            }
-            final double dBottom = Math.hypot(mx - cx, my - (view.top + view.height));
-            if (dBottom < best) {
-                best = dBottom;
-                bestView = view;
-                bestBefore = false;
-            }
-        }
-        if (bestView == null) {
-            return null;
-        }
-        return new DropTarget(bestBefore ? DropKind.PORT_BEFORE : DropKind.PORT_AFTER,
-                bestView.node.id, bestView.branch);
-    }
-
-    private DropTarget computeStatementDrop(double mx, double my, String exclude, boolean palette) {
+    private DropTarget computeStatementDrop(double mx, double my, String exclude) {
         overTrash = inTrash(mx, my);
+        dropOnSelf = false;
         if (overTrash) {
             return null;
         }
-        final DropTarget port = nearestPort(mx, my, exclude);
-        if (port != null) {
-            return port;
+        final View under = viewAt(mx, my);
+        if (under != null) {
+            if (exclude != null && (under.node.id.equals(exclude)
+                    || isDescendant(under.node.id, exclude))) {
+                dropOnSelf = true;
+                return null;
+            }
+            final Branch body = under.isIf ? branchInIfBody(under, mx, my) : null;
+            if (body != null) {
+                return new DropTarget(DropKind.BRANCH_APPEND, under.node.id,
+                        new BranchKey(under.node.id, body));
+            }
+            final boolean before = my < under.top + under.height / 2.0;
+            return new DropTarget(before ? DropKind.PORT_BEFORE : DropKind.PORT_AFTER,
+                    under.node.id, under.branch);
         }
-        return ifBodyTarget(mx, my, palette);
+        if (inCanvas(mx, my)) {
+            final View first = viewById.get(topLevelFirst());
+            if (first != null && my < first.top) {
+                return new DropTarget(DropKind.PORT_BEFORE, first.node.id, first.branch);
+            }
+            final View last = lastTopLevelView();
+            if (last != null && my > last.top + last.height) {
+                return new DropTarget(DropKind.PORT_AFTER, last.node.id, last.branch);
+            }
+        }
+        return null;
+    }
+
+    private View lastTopLevelView() {
+        String id = topLevelFirst();
+        View last = null;
+        int guard = 0;
+        while (id != null && guard++ < FareScript.MAX_NODES) {
+            final View view = viewById.get(id);
+            if (view == null) {
+                break;
+            }
+            last = view;
+            id = view.nextSiblingId;
+        }
+        return last;
     }
 
     private int trashX() {
@@ -611,22 +601,12 @@ public final class FareScriptScreen extends Screen {
             }
         }
 
-        // 先画所有 C 形块的“外壳”，再画连接线和块内容。
+        // 先画所有 C 形块的“外壳”，再按顺序画块内容；块与块直接咬合，没有连接线。
         for (final View view : views) {
             if (view.isIf && visible(view)) {
                 final boolean hovered = mouseX >= view.left && mouseX <= view.left + view.width
                         && mouseY >= view.top && mouseY <= view.top + view.height;
                 drawIfBackground(guiGraphics, view, view.node.id.equals(selectedStatement), hovered);
-            }
-        }
-        for (final View view : views) {
-            if (!visible(view)) {
-                continue;
-            }
-            final View next = view.nextSiblingId == null ? null : viewById.get(view.nextSiblingId);
-            if (next != null && visible(next)) {
-                drawConnector(guiGraphics, view.left + view.width / 2, view.top + view.height,
-                        next.left + next.width / 2, next.top);
             }
         }
         for (final View view : views) {
@@ -652,7 +632,7 @@ public final class FareScriptScreen extends Screen {
             if (statementDrop.kind() == DropKind.BRANCH_APPEND) {
                 drawBranchHighlight(guiGraphics, statementDrop.branch());
             } else {
-                drawPortRing(guiGraphics, statementDrop);
+                drawDropGap(guiGraphics, statementDrop);
             }
         }
         if (dragStatementId != null || dragStatementType != null) {
@@ -667,6 +647,8 @@ public final class FareScriptScreen extends Screen {
 
         drawString(guiGraphics, "缩放 " + Math.round(zoom * 100) + "%",
                 canvasRight - 90, canvasTop + 6, TEXT_MUTED);
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_hint").getString(),
+                canvasLeft + 8, canvasBottom - 14, TEXT_MUTED);
     }
 
     private boolean visible(View view) {
@@ -674,10 +656,21 @@ public final class FareScriptScreen extends Screen {
                 && view.left + view.width >= canvasLeft && view.left <= canvasRight;
     }
 
-    private void drawConnector(GuiGraphics guiGraphics, int x1, int y1, int x2, int y2) {
-        fill(guiGraphics, x1 - 1, Math.min(y1, y2), 2, Math.abs(y2 - y1), 0xFF8A8A8A);
-        fill(guiGraphics, Math.min(x1, x2), y2 - 1, Math.abs(x2 - x1), 2, 0xFF8A8A8A);
-        fill(guiGraphics, x2 - 4, y2 - 2, 8, 4, 0xFF8A8A8A);
+    private boolean attachedAbove(View view) {
+        return !view.firstInChain || view.branch.branch() != Branch.TOP;
+    }
+
+    private boolean attachedBelow(View view) {
+        return view.branch.branch() != Branch.TOP
+                || (view.nextSiblingId != null && viewById.containsKey(view.nextSiblingId));
+    }
+
+    private boolean hasNextBlock(View view) {
+        return view.nextSiblingId != null && viewById.containsKey(view.nextSiblingId);
+    }
+
+    private boolean drawBottomGroove(View view) {
+        return hasNextBlock(view) || view.branch.branch() == Branch.TOP;
     }
 
     private void drawIfBackground(GuiGraphics guiGraphics, View view, boolean selected, boolean hovered) {
@@ -686,36 +679,55 @@ public final class FareScriptScreen extends Screen {
         final int w = view.width;
         final int h = view.height;
         final int color = hovered ? brighten(colorFor("if")) : colorFor("if");
+        final boolean above = attachedAbove(view);
+        final boolean below = attachedBelow(view);
         fill(guiGraphics, x + 3, y + 4, w, h, 0x28000000);
-        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF2A2A2A);
+        fill(guiGraphics, x - 1, y - 1, 1, h + 2, 0xFF2A2A2A);
+        fill(guiGraphics, x + w, y - 1, 1, h + 2, 0xFF2A2A2A);
+        if (!above) {
+            fill(guiGraphics, x - 1, y - 1, w + 2, 1, 0xFF2A2A2A);
+        }
+        if (!below) {
+            fill(guiGraphics, x - 1, y + h, w + 2, 1, 0xFF2A2A2A);
+        }
         fill(guiGraphics, x, y, w, h, color);
-        fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
+        if (!above) {
+            fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
+        }
 
         // 顶部凹槽/凸起。
         fill(guiGraphics, x + 11, y - 5, 22, 6, 0xFF2A2A2A);
         fill(guiGraphics, x + 12, y - 4, 20, 4, color);
 
-        // 挖空“那么”和“否则”分支，留下的左竖条和横条就是 C 形。
+        // 挖空“那么”（和“否则”）分支，留下的左竖条和横条就是 C 形。
         final int bodyLeft = x + indentScreen;
         final int bodyWidth = w - indentScreen;
         fill(guiGraphics, bodyLeft, view.thenTop, bodyWidth, view.thenBottom - view.thenTop, CANVAS_BG);
         fill(guiGraphics, bodyLeft, view.thenTop, bodyWidth, 1, 0xFF2A2A2A);
-        fill(guiGraphics, bodyLeft, view.elseTop, bodyWidth, view.elseBottom - view.elseTop, CANVAS_BG);
-        fill(guiGraphics, bodyLeft, view.elseTop, bodyWidth, 1, 0xFF2A2A2A);
-        fill(guiGraphics, x, view.elseHeaderTop, w, ifDividerScreen, color);
-        fill(guiGraphics, bodyLeft, view.elseBottom - 1, bodyWidth, 1, 0xFF2A2A2A);
+        if (view.hasElse) {
+            fill(guiGraphics, bodyLeft, view.elseTop, bodyWidth, view.elseBottom - view.elseTop, CANVAS_BG);
+            fill(guiGraphics, bodyLeft, view.elseTop, bodyWidth, 1, 0xFF2A2A2A);
+            fill(guiGraphics, x, view.elseHeaderTop, w, ifDividerScreen, color);
+            fill(guiGraphics, bodyLeft, view.elseBottom - 1, bodyWidth, 1, 0xFF2A2A2A);
+        }
 
         // 底部凸条和凹槽。
-        final int footTop = view.elseBottom;
+        final int footTop = view.hasElse ? view.elseBottom : view.thenBottom;
         fill(guiGraphics, x, footTop, w, ifFooterScreen, color);
-        fill(guiGraphics, x + 12, y + h - 5, 20, 5, CANVAS_BG);
-        fill(guiGraphics, x + 12, y + h - 5, 20, 1, 0xFF2A2A2A);
-        fill(guiGraphics, x, y + h - 3, w, 3, 0x30000000);
+        if (drawBottomGroove(view)) {
+            fill(guiGraphics, x + 12, y + h - 5, 20, 5, CANVAS_BG);
+            fill(guiGraphics, x + 12, y + h - 5, 20, 1, 0xFF2A2A2A);
+        }
+        if (!below) {
+            fill(guiGraphics, x, y + h - 3, w, 3, 0x30000000);
+        }
 
         drawString(guiGraphics, Component.translatable("gui.trdm.script.block.if").getString(),
                 x + 10, y + 8, 0xFFFFFF);
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.else").getString(),
-                x + 10, view.elseHeaderTop + Math.max(3, (ifDividerScreen - 8) / 2), 0xFFFFFF);
+        if (view.hasElse) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.else").getString(),
+                    x + 10, view.elseHeaderTop + Math.max(3, (ifDividerScreen - 8) / 2), 0xFFFFFF);
+        }
 
         if (selected) {
             fill(guiGraphics, x - 2, y - 2, w + 4, 2, 0xFFFFD45A);
@@ -732,7 +744,7 @@ public final class FareScriptScreen extends Screen {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.drop_statement").getString(),
                     view.left + indentScreen + 8, view.thenTop + 7, TEXT_MUTED);
         }
-        if (ScriptTree.first(script, new ScriptTree.Slot(node.id, Branch.ELSE)) == null) {
+        if (view.hasElse && ScriptTree.first(script, new ScriptTree.Slot(node.id, Branch.ELSE)) == null) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.drop_statement").getString(),
                     view.left + indentScreen + 8, view.elseTop + 7, TEXT_MUTED);
         }
@@ -769,7 +781,8 @@ public final class FareScriptScreen extends Screen {
         final int x = view.left;
         final int top = view.top;
         final int w = view.width;
-        drawBlockShape(guiGraphics, x, top, w, view.height, colorFor(node.type), selected, hovered);
+        drawBlockShape(guiGraphics, x, top, w, view.height, colorFor(node.type), selected, hovered,
+                attachedAbove(view), attachedBelow(view));
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
         if (!valueStatement(node.type)) {
             if ("round_fare".equals(node.type)) {
@@ -794,16 +807,28 @@ public final class FareScriptScreen extends Screen {
                 chipTop + Math.max(2, Math.round(4 * zoom)), target ? 0xFF202020 : 0xE8E8E8);
     }
 
-    /** 画带顶部凸起、底部凹槽、阴影的积木块。 */
+    /** 画带顶部凸起、底部凹槽、阴影的积木块；直接堆叠时省掉接缝处的边框和阴影。 */
     private void drawBlockShape(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
-                                boolean selected, boolean hovered) {
+                                boolean selected, boolean hovered, boolean attachedAbove,
+                                boolean attachedBelow) {
         fill(guiGraphics, x + 3, y + 4, w, h, 0x28000000);
         fill(guiGraphics, x + 11, y - 5, 22, 6, 0xFF2A2A2A);
         fill(guiGraphics, x + 12, y - 4, 20, 4, color);
-        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF2A2A2A);
+        fill(guiGraphics, x - 1, y - 1, 1, h + 2, 0xFF2A2A2A);
+        fill(guiGraphics, x + w, y - 1, 1, h + 2, 0xFF2A2A2A);
+        if (!attachedAbove) {
+            fill(guiGraphics, x - 1, y - 1, w + 2, 1, 0xFF2A2A2A);
+        }
+        if (!attachedBelow) {
+            fill(guiGraphics, x - 1, y + h, w + 2, 1, 0xFF2A2A2A);
+        }
         fill(guiGraphics, x, y, w, h, hovered ? brighten(color) : color);
-        fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
-        fill(guiGraphics, x, y + h - 3, w, 3, 0x30000000);
+        if (!attachedAbove) {
+            fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
+        }
+        if (!attachedBelow) {
+            fill(guiGraphics, x, y + h - 3, w, 3, 0x30000000);
+        }
         fill(guiGraphics, x + 12, y + h - 5, 20, 5, CANVAS_BG);
         fill(guiGraphics, x + 12, y + h - 5, 20, 1, 0xFF2A2A2A);
         if (selected) {
@@ -816,7 +841,7 @@ public final class FareScriptScreen extends Screen {
 
     private void drawBranchHighlight(GuiGraphics guiGraphics, BranchKey key) {
         final View view = viewById.get(key.ownerId());
-        if (view == null || !view.isIf) {
+        if (view == null || !view.isIf || (key.branch() == Branch.ELSE && !view.hasElse)) {
             return;
         }
         final int top = key.branch() == Branch.THEN ? view.thenTop : view.elseTop;
@@ -827,16 +852,25 @@ public final class FareScriptScreen extends Screen {
                 view.left + indentScreen + 8, top + 7, 0xFF8A5A00);
     }
 
-    private void drawPortRing(GuiGraphics guiGraphics, DropTarget target) {
+    private void drawDropGap(GuiGraphics guiGraphics, DropTarget target) {
         final View view = viewById.get(target.nodeId());
         if (view == null) {
             return;
         }
-        final int px = view.left + view.width / 2;
-        final int py = target.kind() == DropKind.PORT_BEFORE
+        final int y = target.kind() == DropKind.PORT_BEFORE
                 ? view.top : view.top + view.height;
-        fill(guiGraphics, px - 7, py - 7, 14, 14, 0xFFFF8A00);
-        fill(guiGraphics, px - 4, py - 4, 8, 8, CANVAS_BG);
+        // 顺序堆叠的插入提示：在两块之间画一条亮色接缝。
+        fill(guiGraphics, view.left - 4, y - 2, view.width + 8, 4, 0xFFFF9F1C);
+        fill(guiGraphics, view.left - 4, y - 4, 4, 8, 0xFFFF9F1C);
+        fill(guiGraphics, view.left + view.width, y - 4, 4, 8, 0xFFFF9F1C);
+        final String hint = Component.translatable("gui.trdm.script.snap_hint").getString();
+        int hintX = view.left + view.width + 8;
+        if (hintX + font.width(hint) > canvasRight - 4) {
+            hintX = view.left - font.width(hint) - 8;
+        }
+        if (hintX >= canvasLeft + 2) {
+            drawString(guiGraphics, hint, hintX, y - 4, 0xFFFF9F1C);
+        }
     }
 
     private void drawPopup(GuiGraphics guiGraphics) {
@@ -1045,11 +1079,7 @@ public final class FareScriptScreen extends Screen {
             selectedStatement = view.node.id;
             selectedValue = null;
             dragStatementId = view.node.id;
-            dragUndoPushed = false;
-            dragGrabScreenX = mouseX - view.left;
-            dragGrabScreenY = mouseY - view.top;
-            dragBaseLeftScreen = view.left - Math.round(view.node.x * zoom);
-            dragBaseTopScreen = view.top - Math.round(view.node.y * zoom);
+            dragMoved = false;
             popupVisible = false;
             dragX = mouseX;
             dragY = mouseY;
@@ -1073,12 +1103,12 @@ public final class FareScriptScreen extends Screen {
             return super.mouseReleased(mouseX, mouseY, button);
         }
         if (dragStatementType != null) {
-            final DropTarget target = computeStatementDrop(mouseX, mouseY, null, true);
+            final DropTarget target = computeStatementDrop(mouseX, mouseY, null);
             if (!overTrash) {
                 if (target != null) {
                     insertNewStatement(dragStatementType, target);
                 } else if (inCanvas(mouseX, mouseY)) {
-                    insertNewStatementAt(dragStatementType, mouseX, mouseY);
+                    insertNewStatementTop(dragStatementType);
                 }
             }
             clearDrag();
@@ -1095,19 +1125,19 @@ public final class FareScriptScreen extends Screen {
         }
         if (dragStatementId != null) {
             final String id = dragStatementId;
-            final boolean moved = dragUndoPushed;
-            final DropTarget target = moved ? computeStatementDrop(mouseX, mouseY, id, false) : null;
-            if (moved && overTrash) {
-                deleteStatement(id, false);
+            final boolean moved = dragMoved;
+            final DropTarget target = moved ? computeStatementDrop(mouseX, mouseY, id) : null;
+            if (moved && !dropOnSelf && overTrash) {
+                deleteStatement(id, true);
                 selectedStatement = null;
                 selectedValue = null;
-            } else if (moved && target != null) {
+            } else if (moved && !dropOnSelf && target != null) {
                 moveStatement(id, target);
-            } else if (moved && inCanvas(mouseX, mouseY)
+            } else if (moved && !dropOnSelf && inCanvas(mouseX, mouseY)
                     && viewById.containsKey(id)
                     && viewById.get(id).branch.branch() != Branch.TOP) {
-                // 从 C 形块里拖到画布空白处：变成顶层语句。
-                moveOutToTop(id, mouseX, mouseY);
+                // 从 C 形块里拖到画布空白处：移到顶层末尾。
+                moveToTopLevelEnd(id);
             }
             clearDrag();
             popupVisible = selectedStatement != null;
@@ -1147,8 +1177,9 @@ public final class FareScriptScreen extends Screen {
         dragValueType = null;
         dragStatementId = null;
         dragValueId = null;
-        dragUndoPushed = false;
+        dragMoved = false;
         statementDrop = null;
+        dropOnSelf = false;
         overTrash = false;
     }
 
@@ -1163,25 +1194,14 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (dragStatementId != null) {
-            if (!dragUndoPushed) {
-                pushUndo();
-                dragUndoPushed = true;
-            }
-            final ScriptNode node = script.node(dragStatementId);
-            if (node != null) {
-                final double newLeft = mouseX - dragGrabScreenX;
-                final double newTop = mouseY - dragGrabScreenY;
-                node.x = (int) Math.round(((newLeft - dragBaseLeftScreen) / zoom) / 5) * 5;
-                node.y = (int) Math.round(((newTop - dragBaseTopScreen) / zoom) / 5) * 5;
-                layout();
-            }
-            statementDrop = computeStatementDrop(mouseX, mouseY, dragStatementId, false);
+            dragMoved = true;
+            statementDrop = computeStatementDrop(mouseX, mouseY, dragStatementId);
             this.dragX = mouseX;
             this.dragY = mouseY;
             return true;
         }
         if (dragStatementType != null) {
-            statementDrop = computeStatementDrop(mouseX, mouseY, null, true);
+            statementDrop = computeStatementDrop(mouseX, mouseY, null);
             this.dragX = mouseX;
             this.dragY = mouseY;
             return true;
@@ -1256,17 +1276,13 @@ public final class FareScriptScreen extends Screen {
         error = "";
     }
 
-    private void insertNewStatementAt(String type, double mouseX, double mouseY) {
+    private void insertNewStatementTop(String type) {
         final BranchKey top = new BranchKey("", Branch.TOP);
         if (!canAddStatement(top)) {
             return;
         }
         pushUndo();
         final ScriptNode node = newStatementNode(type);
-        final int baseLeft = canvasLeft + Math.round(panX) + Math.round(16 * zoom);
-        final int baseTop = topLevelAppendTop();
-        node.x = (int) Math.round((((mouseX - baseLeft) / zoom)) / 5) * 5;
-        node.y = (int) Math.round((((mouseY - baseTop) / zoom)) / 5) * 5;
         appendToBranch(top, node.id);
         selectedStatement = node.id;
         selectedValue = node.inputs.get("condition") != null ? node.inputs.get("condition")
@@ -1276,34 +1292,23 @@ public final class FareScriptScreen extends Screen {
     }
 
     private ScriptNode newStatementNode(String type) {
-        final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "s"), type);
-        if ("if".equals(type)) {
+        final boolean ifElse = "if_else".equals(type);
+        final String nodeType = ifElse ? "if" : type;
+        final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "s"), nodeType);
+        if ("if".equals(nodeType)) {
             final ScriptNode condition = newBooleanValue("compare");
             node.inputs.put("condition", condition.id);
-        } else if (valueStatement(type)) {
+            if (ifElse) {
+                node.fields.put("else", "1");
+            }
+        } else if (valueStatement(nodeType)) {
             node.inputs.put("value", newNumberValue("number").id);
-        } else if ("round_fare".equals(type)) {
+        } else if ("round_fare".equals(nodeType)) {
             node.fields.put("mode", "HALF");
             node.fields.put("unit", "0.1");
         }
         script.nodes.add(node);
         return node;
-    }
-
-    private int topLevelAppendTop() {
-        final int defaultTop = canvasTop + Math.round(panY) + Math.round(10 * zoom);
-        String id = topLevelFirst();
-        View last = null;
-        int guard = 0;
-        while (id != null && guard++ < FareScript.MAX_NODES) {
-            final View view = viewById.get(id);
-            if (view == null) {
-                break;
-            }
-            last = view;
-            id = view.nextSiblingId;
-        }
-        return last == null ? defaultTop : last.top + last.height + gapScreen;
     }
 
     private void moveStatement(String id, DropTarget target) {
@@ -1325,10 +1330,9 @@ public final class FareScriptScreen extends Screen {
             error = Component.translatable("gui.trdm.script.limit_depth").getString();
             return;
         }
-        if (!dragUndoPushed) {
-            pushUndo();
-        }
+        pushUndo();
         detach(id);
+        // 位置字段只用于旧存档兼容；界面改为顺序堆叠后不再使用。
         node.x = 0;
         node.y = 0;
         switch (target.kind()) {
@@ -1342,21 +1346,13 @@ public final class FareScriptScreen extends Screen {
         error = "";
     }
 
-    /** 把嵌套语句拖到 C 形块外，按落点放回顶层。 */
-    private void moveOutToTop(String id, double mouseX, double mouseY) {
-        final ScriptNode node = script.node(id);
-        if (node == null) {
+    /** 把嵌套语句拖到 C 形块外，追加到顶层末尾。 */
+    private void moveToTopLevelEnd(String id) {
+        if (script.node(id) == null) {
             return;
         }
-        if (!dragUndoPushed) {
-            pushUndo();
-        }
+        pushUndo();
         detach(id);
-        layout();
-        final int baseLeft = canvasLeft + Math.round(panX) + Math.round(16 * zoom);
-        final int baseTop = topLevelAppendTop();
-        node.x = (int) Math.round((((mouseX - baseLeft) / zoom)) / 5) * 5;
-        node.y = (int) Math.round((((mouseY - baseTop) / zoom)) / 5) * 5;
         appendToBranch(new BranchKey("", Branch.TOP), id);
         selectedStatement = id;
         selectedValue = null;
@@ -1795,6 +1791,31 @@ public final class FareScriptScreen extends Screen {
             addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.delete"),
                             button -> deleteSelected())
                     .bounds(x + 118, popupY + 46, 64, 18).build());
+            final boolean hasElse = hasElseBranch(statement);
+            if (hasElse) {
+                if (ScriptTree.first(script, new ScriptTree.Slot(statement.id, Branch.ELSE)) == null) {
+                    addRenderableWidget(Button.builder(
+                                    Component.translatable("gui.trdm.script.remove_else"),
+                                    button -> {
+                                        pushUndo();
+                                        statement.fields.remove("else");
+                                        statement.otherwise = null;
+                                        error = "";
+                                        rebuild();
+                                    })
+                            .bounds(x + 190, popupY + 46, 96, 18).build());
+                }
+            } else {
+                addRenderableWidget(Button.builder(
+                                Component.translatable("gui.trdm.script.add_else"),
+                                button -> {
+                                    pushUndo();
+                                    statement.fields.put("else", "1");
+                                    error = "";
+                                    rebuild();
+                                })
+                        .bounds(x + 190, popupY + 46, 96, 18).build());
+            }
             return;
         }
 
@@ -2208,6 +2229,12 @@ public final class FareScriptScreen extends Screen {
                 || valueStatement(type);
     }
 
+    private static boolean hasElseBranch(ScriptNode node) {
+        return node != null && "if".equals(node.type)
+                && ("1".equals(node.fields.get("else"))
+                || (node.otherwise != null && !node.otherwise.isBlank()));
+    }
+
     private static boolean isValueNode(ScriptNode node) {
         return node != null && !statementType(node.type);
     }
@@ -2234,7 +2261,7 @@ public final class FareScriptScreen extends Screen {
 
     private static int colorFor(String type) {
         return switch (type) {
-            case "if" -> 0xFFB06A1F;
+            case "if", "if_else" -> 0xFFB06A1F;
             case "compare", "and", "or", "not" -> 0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare" -> 0xFF2F7D4F;
             case "round_fare" -> 0xFF2D6E82;
