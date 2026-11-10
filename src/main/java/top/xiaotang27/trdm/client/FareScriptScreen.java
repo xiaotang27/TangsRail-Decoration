@@ -118,7 +118,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private int paletteViewHeight() {
-        return Math.max(0, this.height - PALETTE_TOP - 40);
+        return Math.max(0, this.height - PALETTE_TOP - 12);
     }
 
     private float paletteMaxScroll() {
@@ -591,11 +591,6 @@ public final class FareScriptScreen extends Screen {
             final float thumbY = PALETTE_TOP + (viewH - thumbH) * paletteScroll / paletteMaxScroll();
             fill(guiGraphics, x, Math.round(thumbY), 4, Math.round(thumbH), 0xFF8A8A8A);
         }
-
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_legend").getString(),
-                PALETTE_X + 8, this.height - 34, TEXT_MUTED);
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_hint").getString(),
-                PALETTE_X + 8, this.height - 20, TEXT_MUTED);
     }
 
     private void drawPaletteBlock(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
@@ -682,15 +677,15 @@ public final class FareScriptScreen extends Screen {
             final int ty = trashY();
             fill(guiGraphics, tx, ty, 88, 32, overTrash ? 0xFFC0392B : 0xFFE8E8E8);
             fill(guiGraphics, tx, ty, 88, 2, 0xFF9A9A9A);
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.trash").getString(),
-                    tx + 12, ty + 11, overTrash ? 0xFFFFFFFF : TEXT_MUTED);
+            final int icon = overTrash ? 0xFFFFFFFF : 0xFF5A5A5A;
+            fill(guiGraphics, tx + 33, ty + 7, 22, 3, icon);
+            fill(guiGraphics, tx + 39, ty + 5, 10, 2, icon);
+            fill(guiGraphics, tx + 36, ty + 10, 16, 14, icon);
+            fill(guiGraphics, tx + 39, ty + 12, 2, 9, overTrash ? 0xFFC0392B : 0xFFE8E8E8);
+            fill(guiGraphics, tx + 44, ty + 12, 2, 9, overTrash ? 0xFFC0392B : 0xFFE8E8E8);
+            fill(guiGraphics, tx + 49, ty + 12, 2, 9, overTrash ? 0xFFC0392B : 0xFFE8E8E8);
         }
         guiGraphics.disableScissor();
-
-        drawString(guiGraphics, "缩放 " + Math.round(zoom * 100) + "%",
-                canvasRight - 90, canvasTop + 6, TEXT_MUTED);
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_hint").getString(),
-                canvasLeft + 8, canvasBottom - 14, TEXT_MUTED);
     }
 
     private boolean visible(View view) {
@@ -776,16 +771,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void drawIfDetails(GuiGraphics guiGraphics, View view, ValueTarget valueTarget) {
-        final ScriptNode node = view.node;
         drawConditionChip(guiGraphics, view, valueTarget);
-        if (ScriptTree.first(script, new ScriptTree.Slot(node.id, Branch.THEN)) == null) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.drop_statement").getString(),
-                    view.left + indentScreen + 8, view.thenTop + 7, TEXT_MUTED);
-        }
-        if (view.hasElse && ScriptTree.first(script, new ScriptTree.Slot(node.id, Branch.ELSE)) == null) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.drop_statement").getString(),
-                    view.left + indentScreen + 8, view.elseTop + 7, TEXT_MUTED);
-        }
     }
 
     private void drawConditionChip(GuiGraphics guiGraphics, View view, ValueTarget valueTarget) {
@@ -884,8 +870,6 @@ public final class FareScriptScreen extends Screen {
         final int bottom = key.branch() == Branch.THEN ? view.thenBottom : view.elseBottom;
         fill(guiGraphics, view.left + indentScreen, top, view.width - indentScreen, bottom - top,
                 0x35FFD45A);
-        drawString(guiGraphics, Component.translatable("gui.trdm.script.drop_here").getString(),
-                view.left + indentScreen + 8, top + 7, 0xFF8A5A00);
     }
 
     private void drawDropGap(GuiGraphics guiGraphics, DropTarget target) {
@@ -899,14 +883,6 @@ public final class FareScriptScreen extends Screen {
         fill(guiGraphics, view.left - 4, y - 2, view.width + 8, 4, 0xFFFF9F1C);
         fill(guiGraphics, view.left - 4, y - 4, 4, 8, 0xFFFF9F1C);
         fill(guiGraphics, view.left + view.width, y - 4, 4, 8, 0xFFFF9F1C);
-        final String hint = Component.translatable("gui.trdm.script.snap_hint").getString();
-        int hintX = view.left + view.width + 8;
-        if (hintX + font.width(hint) > canvasRight - 4) {
-            hintX = view.left - font.width(hint) - 8;
-        }
-        if (hintX >= canvasLeft + 2) {
-            drawString(guiGraphics, hint, hintX, y - 4, 0xFFFF9F1C);
-        }
     }
 
     private void drawPopup(GuiGraphics guiGraphics) {
@@ -926,10 +902,6 @@ public final class FareScriptScreen extends Screen {
             title = Component.translatable("gui.trdm.script.title").getString();
         }
         drawString(guiGraphics, title, popupX + 10, popupY + 8, TEXT_DARK);
-        if (value != null && isTable(value.type) && value.tiers.size() > TIER_VISIBLE) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.tier_scroll_hint").getString(),
-                    popupX + popupW - 88, popupY + 8, TEXT_MUTED);
-        }
     }
 
     private void drawPopupLabels(GuiGraphics guiGraphics, ValueTarget valueTarget) {
@@ -966,20 +938,14 @@ public final class FareScriptScreen extends Screen {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_right").getString(),
                     popupX + 10, popupY + 80, TEXT_MUTED);
         } else if ("and".equals(value.type) || "or".equals(value.type)) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.boolean_hint").getString(),
-                    popupX + 10, popupY + 28, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.condition_a").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.condition_b").getString(),
                     popupX + 10, popupY + 80, TEXT_MUTED);
         } else if ("not".equals(value.type)) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.boolean_hint").getString(),
-                    popupX + 10, popupY + 28, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.condition_a").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
         } else if (isArithmetic(value.type)) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.math_hint").getString(),
-                    popupX + 10, popupY + 30, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_left").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_right").getString(),
