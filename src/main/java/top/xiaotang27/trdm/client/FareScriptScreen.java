@@ -659,10 +659,7 @@ public final class FareScriptScreen extends Screen {
                         hovered);
             }
         }
-        if (views.isEmpty()) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.canvas_empty").getString(),
-                    canvasLeft + 20, canvasTop + 20, TEXT_MUTED);
-        }
+        // 空画布不显示文字提示。
 
         // 拖放反馈画在块内容之上。
         if (statementDrop != null) {
