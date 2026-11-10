@@ -118,7 +118,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private int paletteViewHeight() {
-        return Math.max(0, this.height - PALETTE_TOP - 28);
+        return Math.max(0, this.height - PALETTE_TOP - 40);
     }
 
     private float paletteMaxScroll() {
@@ -578,7 +578,8 @@ public final class FareScriptScreen extends Screen {
                 final boolean hover = mouseX >= PALETTE_X + 6 && mouseX < PALETTE_X + PALETTE_W - 6
                         && mouseY >= y && mouseY < y + 21;
                 drawPaletteBlock(guiGraphics, PALETTE_X + 6, y, PALETTE_W - 12, 21,
-                        entry.color(), Component.translatable(entry.labelKey()).getString(), hover);
+                        entry.color(), Component.translatable(entry.labelKey()).getString(), hover,
+                        entry.statement());
             }
         }
         guiGraphics.disableScissor();
@@ -591,16 +592,39 @@ public final class FareScriptScreen extends Screen {
             fill(guiGraphics, x, Math.round(thumbY), 4, Math.round(thumbH), 0xFF8A8A8A);
         }
 
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_legend").getString(),
+                PALETTE_X + 8, this.height - 34, TEXT_MUTED);
         drawString(guiGraphics, Component.translatable("gui.trdm.script.palette_hint").getString(),
                 PALETTE_X + 8, this.height - 20, TEXT_MUTED);
     }
 
     private void drawPaletteBlock(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
-                                  String label, boolean hover) {
-        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF2A2A2A);
-        fill(guiGraphics, x, y, w, h, hover ? brighten(color) : color);
-        fill(guiGraphics, x, y, w, 2, 0x45FFFFFF);
-        drawString(guiGraphics, label, x + 6, y + 6, 0xFFFFFF);
+                                  String label, boolean hover, boolean statement) {
+        final int fillColor = hover ? brighten(color) : color;
+        if (statement) {
+            // 可上下拼接的语句：带顶部凸起和底部凹槽的小积木。
+            fill(guiGraphics, x + 6, y - 4, 14, 4, 0xFF2A2A2A);
+            fill(guiGraphics, x + 7, y - 3, 12, 3, fillColor);
+            fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF2A2A2A);
+            fill(guiGraphics, x, y, w, h, fillColor);
+            fill(guiGraphics, x, y, w, 2, 0x45FFFFFF);
+            fill(guiGraphics, x + 6, y + h - 4, 14, 4, PANEL_BG);
+            fill(guiGraphics, x + 6, y + h - 4, 14, 1, 0xFF2A2A2A);
+            drawString(guiGraphics, label, x + 7, y + 6, 0xFFFFFF);
+            // 右侧双横线提示“可以接在下面”。
+            fill(guiGraphics, x + w - 14, y + 8, 7, 1, 0xC8FFFFFF);
+            fill(guiGraphics, x + w - 14, y + 11, 7, 1, 0xC8FFFFFF);
+        } else {
+            // 只能填进槽位的值：圆角胶囊形，没有上下接口。
+            fill(guiGraphics, x + 2, y - 1, w - 4, h + 2, 0xFF2A2A2A);
+            fill(guiGraphics, x - 1, y + 3, w + 2, h - 6, 0xFF2A2A2A);
+            fill(guiGraphics, x + 2, y, w - 4, h, fillColor);
+            fill(guiGraphics, x, y + 3, w, h - 6, fillColor);
+            fill(guiGraphics, x + 3, y + 1, w - 6, 2, 0x45FFFFFF);
+            drawString(guiGraphics, label, x + 8, y + 6, 0xFFFFFF);
+            // 左侧圆点提示“值/填充块”。
+            fill(guiGraphics, x + 3, y + h / 2 - 1, 2, 3, 0xD0FFFFFF);
+        }
     }
 
     private void drawCanvas(GuiGraphics guiGraphics, int mouseX, int mouseY, ValueTarget valueTarget) {
@@ -1516,8 +1540,8 @@ public final class FareScriptScreen extends Screen {
                 value.tiers.add(new ScriptTier(null, 4.0));
             }
             case "table_meters" -> {
-                value.tiers.add(new ScriptTier(1000.0, 2.0));
-                value.tiers.add(new ScriptTier(3000.0, 3.0));
+                value.tiers.add(new ScriptTier(1.0, 2.0));
+                value.tiers.add(new ScriptTier(3.0, 3.0));
                 value.tiers.add(new ScriptTier(null, 4.0));
             }
             case "add", "subtract", "multiply", "divide", "min", "max" -> {

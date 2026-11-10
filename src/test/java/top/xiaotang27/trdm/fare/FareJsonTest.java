@@ -31,7 +31,11 @@ class FareJsonTest {
         assertNull(intervalTable.tiers.get(2).upTo());
         assertEquals(4.0, intervalTable.tiers.get(2).fareYuan(), 1e-9);
         assertEquals(FareRule.Kind.SCRIPT, parsed.rules.get(2).kind);
-        assertNotNull(findNode(parsed.rules.get(2), "table_meters"));
+        final ScriptNode distanceTable = findNode(parsed.rules.get(2), "table_meters");
+        assertNotNull(distanceTable);
+        assertEquals(1.0, distanceTable.tiers.get(0).upTo(), 1e-9);
+        assertEquals(3.0, distanceTable.tiers.get(1).upTo(), 1e-9);
+        assertNull(distanceTable.tiers.get(2).upTo());
         assertTrue(parsed.routeRules.isEmpty());
     }
 
@@ -45,6 +49,33 @@ class FareJsonTest {
             }
         }
         return null;
+    }
+
+    @Test
+    void oldMeterScriptMigratesToKilometers() {
+        final String json = """
+                {
+                  "schemaVersion": 2,
+                  "rules": [
+                    {"id":"r","name":"R","kind":"SCRIPT","script":{
+                      "schemaVersion":1,
+                      "hat":"hat",
+                      "nodes":[
+                        {"id":"hat","type":"on_fare","next":"set"},
+                        {"id":"set","type":"set_fare","inputs":{"value":"t"}},
+                        {"id":"t","type":"table_meters","tiers":[
+                          {"upTo":1000,"fare":2},{"upTo":3000,"fare":3},{"fare":4}]}
+                      ]
+                    }}
+                  ]
+                }
+                """;
+        final FareRule rule = FareJson.parse(json).rules.get(0);
+        assertEquals(2, rule.script.schemaVersion);
+        final ScriptNode table = findNode(rule, "table_meters");
+        assertNotNull(table);
+        assertEquals(1.0, table.tiers.get(0).upTo(), 1e-9);
+        assertEquals(3.0, table.tiers.get(1).upTo(), 1e-9);
     }
 
     @Test
@@ -70,6 +101,9 @@ class FareJsonTest {
         assertEquals(200L, config.rules.get(0).tiers.get(0).fareCents());
         assertNull(config.rules.get(0).tiers.get(1).upTo());
         assertEquals(350L, config.rules.get(0).tiers.get(1).fareCents());
+        final ScriptNode migrated = findNode(config.rules.get(0), "table_meters");
+        assertNotNull(migrated);
+        assertEquals(1.0, migrated.tiers.get(0).upTo(), 1e-9);
         assertEquals("x", config.routeRules.get("minecraft:overworld|7"));
     }
 

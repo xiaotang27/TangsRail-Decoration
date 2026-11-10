@@ -57,6 +57,34 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void mileageUsesKilometers() {
+        final FareScript context = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "km");
+        final ScriptNode km = new ScriptNode("km", "context_meters");
+        context.hat = "hat";
+        context.nodes.addAll(List.of(hat, set, km));
+        assertEquals(1.5, eval(context, 0, 1500, 0, 0), 1e-9);
+
+        final FareScript table = new FareScript();
+        final ScriptNode tableHat = new ScriptNode("hat", "on_fare");
+        tableHat.next = "set";
+        final ScriptNode tableSet = new ScriptNode("set", "set_fare");
+        tableSet.inputs.put("value", "tiers");
+        final ScriptNode tiers = new ScriptNode("tiers", "table_meters");
+        tiers.tiers.add(new ScriptTier(1.0, 2.0));
+        tiers.tiers.add(new ScriptTier(3.0, 3.0));
+        tiers.tiers.add(new ScriptTier(null, 4.0));
+        table.hat = "hat";
+        table.nodes.addAll(List.of(tableHat, tableSet, tiers));
+        assertEquals(2.0, eval(table, 0, 500, 0, 0), 1e-9);
+        assertEquals(3.0, eval(table, 0, 2500, 0, 0), 1e-9);
+        assertEquals(4.0, eval(table, 0, 4000, 0, 0), 1e-9);
+    }
+
+    @Test
     void ifElseUsesCompare() {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");

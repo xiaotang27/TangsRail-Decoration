@@ -7,6 +7,11 @@ public record ScriptContext(long intervals, long meters, int fromZone, int toZon
         return intervals + 1L;
     }
 
+    /** 脚本里的“里程”统一用公里；底层路径仍以米保存。 */
+    public double kilometers() {
+        return meters / 1000.0;
+    }
+
     public int zoneDiff() {
         return Math.abs(toZone - fromZone);
     }

@@ -160,9 +160,11 @@ public final class FareRule {
             final ScriptNode table = new ScriptNode(Scripts.uniqueId(result, "v"),
                     kind == Kind.INTERVAL_TABLE ? "table_intervals" : "table_meters");
             for (final Tier tier : tiers) {
-                table.tiers.add(new ScriptTier(
-                        tier.upTo() == null ? null : (double) tier.upTo(),
-                        Math.max(0L, tier.fareCents()) / 100.0));
+                final Double upTo = tier.upTo() == null ? null
+                        : kind == Kind.DISTANCE_TABLE
+                        ? (double) tier.upTo() / 1000.0
+                        : (double) tier.upTo();
+                table.tiers.add(new ScriptTier(upTo, Math.max(0L, tier.fareCents()) / 100.0));
             }
             set.inputs.put("value", table.id);
             result.nodes.add(table);

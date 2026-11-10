@@ -33,8 +33,8 @@ public final class FareDefaults {
                         new ScriptTier(null, 4.0))), 400L));
         config.rules.add(scriptRule("distance", "按里程阶梯计费",
                 Scripts.table("table_meters", List.of(
-                        new ScriptTier(1000.0, 2.0),
-                        new ScriptTier(3000.0, 3.0),
+                        new ScriptTier(1.0, 2.0),
+                        new ScriptTier(3.0, 3.0),
                         new ScriptTier(null, 4.0))), 400L));
 
         config.passRules.addAll(PassRules.defaults());

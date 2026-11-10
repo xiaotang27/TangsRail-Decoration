@@ -1066,13 +1066,34 @@ final class TicketConfigPage {
         if (exportedFile == null) {
             return;
         }
+        final Path folder = exportedFile.getParent();
+        if (folder == null) {
+            return;
+        }
+        try {
+            final String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+            final ProcessBuilder builder;
+            if (os.contains("win")) {
+                builder = new ProcessBuilder("explorer.exe", folder.toAbsolutePath().toString());
+            } else if (os.contains("mac")) {
+                builder = new ProcessBuilder("open", folder.toAbsolutePath().toString());
+            } else {
+                builder = new ProcessBuilder("xdg-open", folder.toAbsolutePath().toString());
+            }
+            builder.start();
+            return;
+        } catch (Exception ignored) {
+            // 尝试 Desktop 兜底。
+        }
         try {
             if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().open(exportedFile.getParent().toFile());
+                Desktop.getDesktop().open(folder.toFile());
+                return;
             }
         } catch (Exception ignored) {
             // 打不开文件夹时文件仍然已保存。
         }
+        showMessage(Component.translatable("gui.trdm.ticket.open_folder_failed"));
     }
 
     private void addScriptRule() {

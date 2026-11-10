@@ -10,7 +10,8 @@ import java.util.List;
  */
 public final class FareScript {
 
-    public static final int SCHEMA_VERSION = 1;
+    /** 2：里程阶梯表/里程上下文的单位从米改为公里。 */
+    public static final int SCHEMA_VERSION = 2;
     public static final int MAX_NODES = 200;
 
     public int schemaVersion = SCHEMA_VERSION;

@@ -421,7 +421,7 @@ public final class ScriptCompiler {
                 }
                 case "context_intervals" -> context.intervals();
                 case "context_stations" -> context.stations();
-                case "context_meters" -> context.meters();
+                case "context_meters" -> context.kilometers();
                 case "context_zone_diff" -> context.zoneDiff();
                 case "add" -> number(node.inputs.get("a"), context) + number(node.inputs.get("b"), context);
                 case "subtract" -> number(node.inputs.get("a"), context)
@@ -440,7 +440,7 @@ public final class ScriptCompiler {
                 case "max" -> Math.max(number(node.inputs.get("a"), context),
                         number(node.inputs.get("b"), context));
                 case "table_intervals" -> lookup(node, context.intervals());
-                case "table_meters" -> lookup(node, context.meters());
+                case "table_meters" -> lookup(node, context.kilometers());
                 default -> throw new ScriptException("这里需要数值块: " + node.type);
             };
         }
@@ -474,7 +474,7 @@ public final class ScriptCompiler {
             };
         }
 
-        private double lookup(ScriptNode node, long value) {
+        private double lookup(ScriptNode node, double value) {
             double last = 0.0;
             for (final ScriptTier tier : node.tiers) {
                 last = tier.fareYuan();

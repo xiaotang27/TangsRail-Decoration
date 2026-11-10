@@ -227,7 +227,7 @@ public final class FareJson {
 
     private static FareScript parseScript(JsonObject object) {
         final FareScript script = new FareScript();
-        script.schemaVersion = integer(object, "schemaVersion", FareScript.SCHEMA_VERSION);
+        script.schemaVersion = integer(object, "schemaVersion", 1);
         script.hat = string(object, "hat", "");
         if (object.has("nodes") && object.get("nodes").isJsonArray()) {
             for (final JsonElement element : object.getAsJsonArray("nodes")) {
@@ -268,7 +268,26 @@ public final class FareJson {
                 script.nodes.add(node);
             }
         }
+        if (script.schemaVersion < FareScript.SCHEMA_VERSION) {
+            migrateMileageToKilometers(script);
+            script.schemaVersion = FareScript.SCHEMA_VERSION;
+        }
         return script;
+    }
+
+    /** v1 的里程阶梯表以米为单位；v2 起统一用公里。 */
+    private static void migrateMileageToKilometers(FareScript script) {
+        for (final ScriptNode node : script.nodes) {
+            if (!"table_meters".equals(node.type)) {
+                continue;
+            }
+            for (int index = 0; index < node.tiers.size(); index++) {
+                final ScriptTier tier = node.tiers.get(index);
+                if (tier.upTo() != null) {
+                    node.tiers.set(index, new ScriptTier(tier.upTo() / 1000.0, tier.fareYuan()));
+                }
+            }
+        }
     }
 
     private static JsonObject writeScript(FareScript script) {
