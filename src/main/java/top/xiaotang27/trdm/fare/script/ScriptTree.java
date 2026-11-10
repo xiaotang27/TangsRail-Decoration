@@ -1,6 +1,7 @@
 package top.xiaotang27.trdm.fare.script;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -291,8 +292,12 @@ public final class ScriptTree {
         }
     }
 
-    /** 收集一个语句及其嵌套分支、值槽（不包含 after 之后的兄弟）。 */
+    /** 收集一个语句及其嵌套分支、值槽（不包含它之后的兄弟）。 */
     public static void collectSubtree(FareScript script, String id, Set<String> out) {
+        collectStatement(script, id, out);
+    }
+
+    private static void collectStatement(FareScript script, String id, Set<String> out) {
         if (script == null || id == null || out == null) {
             return;
         }
@@ -304,8 +309,21 @@ public final class ScriptTree {
             collectValueTree(script, valueId, out);
         }
         if ("if".equals(node.type)) {
-            collectSubtree(script, node.next, out);
-            collectSubtree(script, node.otherwise, out);
+            collectChain(script, node.next, out);
+            collectChain(script, node.otherwise, out);
+        }
+    }
+
+    /** 收集一条分支链上的所有语句；到达链尾或遇到已收集节点时停止。 */
+    private static void collectChain(FareScript script, String firstId, Set<String> out) {
+        String cursor = firstId;
+        int guard = 0;
+        while (cursor != null && guard++ < FareScript.MAX_NODES) {
+            if (out.contains(cursor)) {
+                return;
+            }
+            collectStatement(script, cursor, out);
+            cursor = next(script, cursor);
         }
     }
 
@@ -460,6 +478,86 @@ public final class ScriptTree {
         for (final ScriptNode node : script.nodes) {
             node.inputs.entrySet().removeIf(entry -> valueId.equals(entry.getValue()));
         }
+    }
+
+    // ===== 复制 / 粘贴 =====
+
+    /**
+     * 复制一个语句子树或值子树，保留原 ID 和内部连接，供剪贴板使用。
+     * 语句只复制它自己的嵌套分支和值，不复制 after 之后的兄弟。
+     */
+    public static List<ScriptNode> copyNodes(FareScript source, String rootId, boolean statement) {
+        if (source == null || rootId == null || source.node(rootId) == null) {
+            return List.of();
+        }
+        final Set<String> ids = new HashSet<>();
+        if (statement) {
+            collectSubtree(source, rootId, ids);
+        } else {
+            collectValueTree(source, rootId, ids);
+        }
+        final List<ScriptNode> copies = new java.util.ArrayList<>();
+        for (final ScriptNode node : source.nodes) {
+            if (ids.contains(node.id)) {
+                copies.add(node.copy());
+            }
+        }
+        return copies;
+    }
+
+    /**
+     * 把剪贴板节点重新分配 ID 后加入目标脚本，返回新根节点 ID。
+     * 只加节点，不插入语句链；调用方负责 {@link #append}/{@link #insertBefore}。
+     */
+    public static String duplicate(FareScript target, List<ScriptNode> clipboard, String sourceRootId) {
+        if (target == null || clipboard == null || clipboard.isEmpty() || sourceRootId == null) {
+            return null;
+        }
+        final java.util.Map<String, String> idMap = new java.util.HashMap<>();
+        final Set<String> reserved = new HashSet<>();
+        for (final ScriptNode source : clipboard) {
+            if (source.id == null || source.id.isBlank()) {
+                continue;
+            }
+            idMap.put(source.id, freshId(target, reserved));
+        }
+        if (!idMap.containsKey(sourceRootId)) {
+            return null;
+        }
+        final List<ScriptNode> copies = new java.util.ArrayList<>();
+        for (final ScriptNode source : clipboard) {
+            final String id = idMap.get(source.id);
+            if (id == null) {
+                continue;
+            }
+            final ScriptNode copy = new ScriptNode(id, source.type);
+            copy.x = 0;
+            copy.y = 0;
+            copy.fields.putAll(source.fields);
+            copy.tiers.addAll(source.tiers);
+            for (final java.util.Map.Entry<String, String> entry : source.inputs.entrySet()) {
+                final String mapped = idMap.get(entry.getValue());
+                if (mapped != null) {
+                    copy.inputs.put(entry.getKey(), mapped);
+                }
+            }
+            copy.next = idMap.get(source.next);
+            copy.otherwise = idMap.get(source.otherwise);
+            copy.after = idMap.get(source.after);
+            copies.add(copy);
+        }
+        target.nodes.addAll(copies);
+        return idMap.get(sourceRootId);
+    }
+
+    private static String freshId(FareScript script, Set<String> reserved) {
+        int index = 1;
+        while (script.node("c" + index) != null || reserved.contains("c" + index)) {
+            index++;
+        }
+        final String id = "c" + index;
+        reserved.add(id);
+        return id;
     }
 
     private static String blankToNull(String value) {

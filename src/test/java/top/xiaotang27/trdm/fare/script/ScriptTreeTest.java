@@ -3,10 +3,12 @@ package top.xiaotang27.trdm.fare.script;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -200,6 +202,83 @@ class ScriptTreeTest {
         assertEquals(after.id, ScriptTree.next(script, branch.id));
         assertEquals(3.0, eval(script, 1), 1e-9);
         assertEquals(1.0, eval(script, 5), 1e-9);
+    }
+
+    @Test
+    void copyIfIncludesWholeBranchesAndNotAfter() {
+        final FareScript source = Scripts.empty();
+        final ScriptNode branch = ifNode(source, "<=");
+        ScriptTree.append(source, ScriptTree.Slot.top(), branch.id);
+        final ScriptNode thenSet = setFare(source, 2);
+        final ScriptNode thenAdd = addFare(source, 1);
+        ScriptTree.append(source, new ScriptTree.Slot(branch.id, ScriptTree.Branch.THEN), thenSet.id);
+        ScriptTree.append(source, new ScriptTree.Slot(branch.id, ScriptTree.Branch.THEN), thenAdd.id);
+        final ScriptNode elseSet = setFare(source, 3);
+        final ScriptNode elseAdd = addFare(source, 1);
+        ScriptTree.append(source, new ScriptTree.Slot(branch.id, ScriptTree.Branch.ELSE), elseSet.id);
+        ScriptTree.append(source, new ScriptTree.Slot(branch.id, ScriptTree.Branch.ELSE), elseAdd.id);
+        final ScriptNode after = addFare(source, 9);
+        ScriptTree.append(source, ScriptTree.Slot.top(), after.id);
+
+        final List<ScriptNode> copied = ScriptTree.copyNodes(source, branch.id, true);
+        assertTrue(copied.stream().anyMatch(node -> node.id.equals(thenAdd.id)));
+        assertTrue(copied.stream().anyMatch(node -> node.id.equals(elseAdd.id)));
+        assertFalse(copied.stream().anyMatch(node -> node.id.equals(after.id)));
+
+        final FareScript target = Scripts.empty();
+        final String copiedRoot = ScriptTree.duplicate(target, copied, branch.id);
+        assertNotNull(copiedRoot);
+        ScriptTree.append(target, ScriptTree.Slot.top(), copiedRoot);
+        assertEquals(3.0, eval(target, 1), 1e-9);
+        assertEquals(4.0, eval(target, 5), 1e-9);
+        assertEquals(target.nodes.size(),
+                target.nodes.stream().map(node -> node.id).distinct().count());
+    }
+
+    @Test
+    void copyValueAndPasteIntoValueSlot() {
+        final FareScript source = Scripts.empty();
+        final ScriptNode set = add(source, "set_fare");
+        ScriptTree.append(source, ScriptTree.Slot.top(), set.id);
+        final ScriptNode addNode = new ScriptNode(Scripts.uniqueId(source, "v"), "add");
+        source.nodes.add(addNode);
+        final ScriptNode two = number(source, 2);
+        final ScriptNode multiply = new ScriptNode(Scripts.uniqueId(source, "v"), "multiply");
+        source.nodes.add(multiply);
+        final ScriptNode left = number(source, 2);
+        final ScriptNode right = number(source, 3);
+        multiply.inputs.put("a", left.id);
+        multiply.inputs.put("b", right.id);
+        addNode.inputs.put("a", two.id);
+        addNode.inputs.put("b", multiply.id);
+        set.inputs.put("value", addNode.id);
+        assertEquals(8.0, eval(source, 0), 1e-9);
+
+        final List<ScriptNode> copied = ScriptTree.copyNodes(source, addNode.id, false);
+        final FareScript target = Scripts.empty();
+        final ScriptNode targetSet = add(target, "set_fare");
+        ScriptTree.append(target, ScriptTree.Slot.top(), targetSet.id);
+        final String copiedRoot = ScriptTree.duplicate(target, copied, addNode.id);
+        assertNotNull(copiedRoot);
+        targetSet.inputs.put("value", copiedRoot);
+        assertEquals(8.0, eval(target, 0), 1e-9);
+        assertEquals(target.nodes.size(),
+                target.nodes.stream().map(node -> node.id).distinct().count());
+    }
+
+    @Test
+    void duplicateAvoidsExistingIds() {
+        final FareScript target = Scripts.empty();
+        target.nodes.add(new ScriptNode("c1", "number"));
+
+        final FareScript source = Scripts.empty();
+        final ScriptNode number = number(source, 4);
+        final List<ScriptNode> copied = ScriptTree.copyNodes(source, number.id, false);
+        final String copiedRoot = ScriptTree.duplicate(target, copied, number.id);
+        assertNotNull(copiedRoot);
+        assertFalse("c1".equals(copiedRoot));
+        assertEquals(target.nodes.size(),
+                target.nodes.stream().map(node -> node.id).distinct().count());
     }
 
     @Test

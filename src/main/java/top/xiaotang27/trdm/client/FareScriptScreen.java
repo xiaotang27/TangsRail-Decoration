@@ -39,6 +39,8 @@ public final class FareScriptScreen extends Screen {
     private static final String[] NUMERIC_VALUE_TYPES = {
             "number", "context_intervals", "context_meters", "context_stations",
             "context_zone_diff", "table_intervals", "table_meters"};
+    private static final String[] ARITHMETIC_VALUE_TYPES = {
+            "add", "subtract", "multiply", "divide", "min", "max"};
     private static final String[] OPS = {"<", "<=", ">", ">=", "==", "!="};
 
     private static final int BLOCK_H = 58;
@@ -89,6 +91,10 @@ public final class FareScriptScreen extends Screen {
         list.add(new PaletteEntry("gui.trdm.script.category.values", null, false, true, 0xFF8A5A2B));
         for (final String type : List.of("number", "context_intervals", "context_meters",
                 "context_stations", "context_zone_diff")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.math", null, false, true, 0xFF8A5A2B));
+        for (final String type : ARITHMETIC_VALUE_TYPES) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.category.tables", null, false, true, 0xFF6B4A8A));
@@ -224,6 +230,9 @@ public final class FareScriptScreen extends Screen {
 
     private String selectedStatement;
     private String selectedValue;
+    private List<ScriptNode> clipboard = List.of();
+    private String clipboardRootId;
+    private boolean clipboardStatement;
     private String dragStatementId;
     private String dragValueId;
     private String dragStatementType;
@@ -278,6 +287,16 @@ public final class FareScriptScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.redo"),
                         button -> redo())
                 .bounds(this.width - 94, 6, 84, 20).build());
+        final Button copy = Button.builder(Component.translatable("gui.trdm.script.copy"),
+                        button -> copySelection())
+                .bounds(80, 6, 48, 20).build();
+        copy.active = selectedStatement != null || selectedValue != null;
+        addRenderableWidget(copy);
+        final Button paste = Button.builder(Component.translatable("gui.trdm.script.paste"),
+                        button -> pasteClipboard())
+                .bounds(132, 6, 48, 20).build();
+        paste.active = !clipboard.isEmpty();
+        addRenderableWidget(paste);
 
         if (popupVisible) {
             addPopupWidgets();
@@ -887,6 +906,13 @@ public final class FareScriptScreen extends Screen {
                     popupX + 10, popupY + 28, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.condition_a").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
+        } else if (isArithmetic(value.type)) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.math_hint").getString(),
+                    popupX + 10, popupY + 30, TEXT_MUTED);
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.value_left").getString(),
+                    popupX + 10, popupY + 56, TEXT_MUTED);
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.value_right").getString(),
+                    popupX + 10, popupY + 80, TEXT_MUTED);
         }
         for (final ChipArea chip : popupChips) {
             final ScriptNode owner = script.node(chip.ownerId());
@@ -1363,7 +1389,9 @@ public final class FareScriptScreen extends Screen {
     }
 
     private ScriptNode newNumberValue(String type) {
+        // 先登记再创建子节点，避免子节点和父节点拿到同一个 ID。
         final ScriptNode value = new ScriptNode(Scripts.uniqueId(script, "v"), type);
+        script.nodes.add(value);
         switch (type) {
             case "number" -> value.fields.put("value", "3.0");
             case "table_intervals" -> {
@@ -1376,15 +1404,39 @@ public final class FareScriptScreen extends Screen {
                 value.tiers.add(new ScriptTier(3000.0, 3.0));
                 value.tiers.add(new ScriptTier(null, 4.0));
             }
+            case "add", "subtract", "multiply", "divide", "min", "max" -> {
+                final ScriptNode a = newNumberValue("number");
+                final ScriptNode b = newNumberValue("number");
+                switch (type) {
+                    case "subtract" -> {
+                        a.fields.put("value", "3.0");
+                        b.fields.put("value", "1.0");
+                    }
+                    case "divide" -> {
+                        a.fields.put("value", "6.0");
+                        b.fields.put("value", "2.0");
+                    }
+                    case "min", "max" -> {
+                        a.fields.put("value", "2.0");
+                        b.fields.put("value", "3.0");
+                    }
+                    default -> {
+                        a.fields.put("value", "2.0");
+                        b.fields.put("value", "2.0");
+                    }
+                }
+                value.inputs.put("a", a.id);
+                value.inputs.put("b", b.id);
+            }
             default -> {
             }
         }
-        script.nodes.add(value);
         return value;
     }
 
     private ScriptNode newBooleanValue(String type) {
         final ScriptNode value = new ScriptNode(Scripts.uniqueId(script, "v"), type);
+        script.nodes.add(value);
         switch (type) {
             case "compare" -> {
                 value.fields.put("op", ">=");
@@ -1399,7 +1451,6 @@ public final class FareScriptScreen extends Screen {
             default -> {
             }
         }
-        script.nodes.add(value);
         return value;
     }
 
@@ -1505,7 +1556,7 @@ public final class FareScriptScreen extends Screen {
         if (ownerId == null || slot == null) {
             return;
         }
-        if (old != null && isBoolean(old.type)) {
+        if (old != null && !isLiteralNumeric(old.type)) {
             return;
         }
         final ScriptNode replacement;
@@ -1661,6 +1712,10 @@ public final class FareScriptScreen extends Screen {
             popupH = 146;
         } else if (selected != null && "not".equals(selected.type)) {
             popupH = 128;
+        } else if (selected != null && isArithmetic(selected.type)) {
+            popupH = 146;
+        } else if (value != null && isArithmetic(value.type)) {
+            popupH = 146;
         } else if (value != null && isTable(value.type)) {
             popupH = 168;
         } else {
@@ -1686,17 +1741,21 @@ public final class FareScriptScreen extends Screen {
         popupX = clamp(px, 8, Math.max(8, this.width - popupW - 8));
         popupY = clamp(py, 44, Math.max(44, this.height - popupH - 40));
 
-        if (selected == null) {
+        if (selected == null && (value == null || !isArithmetic(value.type))) {
             return;
         }
-        if ("compare".equals(selected.type)) {
-            addChip(selected.id, "a", false, popupY + 52);
-            addChip(selected.id, "b", false, popupY + 76);
-        } else if ("and".equals(selected.type) || "or".equals(selected.type)) {
-            addChip(selected.id, "a", true, popupY + 52);
-            addChip(selected.id, "b", true, popupY + 76);
-        } else if ("not".equals(selected.type)) {
-            addChip(selected.id, "a", true, popupY + 52);
+        final ScriptNode chipOwner = selected != null ? selected : value;
+        if ("compare".equals(chipOwner.type)) {
+            addChip(chipOwner.id, "a", false, popupY + 52);
+            addChip(chipOwner.id, "b", false, popupY + 76);
+        } else if ("and".equals(chipOwner.type) || "or".equals(chipOwner.type)) {
+            addChip(chipOwner.id, "a", true, popupY + 52);
+            addChip(chipOwner.id, "b", true, popupY + 76);
+        } else if ("not".equals(chipOwner.type)) {
+            addChip(chipOwner.id, "a", true, popupY + 52);
+        } else if (isArithmetic(chipOwner.type)) {
+            addChip(chipOwner.id, "a", false, popupY + 52);
+            addChip(chipOwner.id, "b", false, popupY + 76);
         }
     }
 
@@ -1785,8 +1844,7 @@ public final class FareScriptScreen extends Screen {
                 addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.back"),
                                 button -> {
                                     final ScriptNode ownerNode = script.node(owner.ownerId());
-                                    selectedValue = ownerNode != null && isBoolean(ownerNode.type)
-                                            ? ownerNode.id : null;
+                                    selectedValue = isValueNode(ownerNode) ? ownerNode.id : null;
                                     selectedStatement = containingStatement(owner.ownerId());
                                     popupVisible = true;
                                     rebuild();
@@ -1795,12 +1853,13 @@ public final class FareScriptScreen extends Screen {
                 bx += 82;
             }
         }
-        if (selected != null && isNumeric(selected.type)) {
+        if (selected != null && isLiteralNumeric(selected.type)) {
             addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.change_value"),
                             button -> cycleValueType())
                     .bounds(bx, buttonY, 84, 18).build());
             bx += 90;
-        } else if (selected == null && valueStatement(statement.type)) {
+        } else if (selected == null && valueStatement(statement.type)
+                && (value == null || isLiteralNumeric(value.type))) {
             addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.change_value"),
                             button -> cycleValueType())
                     .bounds(bx, buttonY, 84, 18).build());
@@ -1951,6 +2010,135 @@ public final class FareScriptScreen extends Screen {
         return value != null && isTable(value.type) ? value : null;
     }
 
+    // ===== 复制 / 粘贴 =====
+
+    private void copySelection() {
+        final String root = selectedValue != null ? selectedValue : selectedStatement;
+        if (root == null) {
+            return;
+        }
+        final boolean statement = selectedValue == null;
+        final List<ScriptNode> copied = ScriptTree.copyNodes(script, root, statement);
+        if (copied.isEmpty()) {
+            return;
+        }
+        clipboard = copied;
+        clipboardRootId = root;
+        clipboardStatement = statement;
+        error = "";
+        rebuild();
+    }
+
+    private void pasteClipboard() {
+        if (clipboard.isEmpty() || clipboardRootId == null) {
+            return;
+        }
+        if (clipboardStatement) {
+            pasteStatement();
+        } else {
+            pasteValue();
+        }
+    }
+
+    private void pasteStatement() {
+        pushUndo();
+        final String root = ScriptTree.duplicate(script, clipboard, clipboardRootId);
+        if (root == null) {
+            error = Component.translatable("gui.trdm.script.paste_failed").getString();
+            rebuild();
+            return;
+        }
+        final String anchor = selectedValue != null ? containingStatement(selectedValue)
+                : selectedStatement;
+        final View anchorView = anchor == null ? null : viewById.get(anchor);
+        if (anchorView != null) {
+            final String next = ScriptTree.next(script, anchor);
+            ScriptTree.insertBefore(script, slot(anchorView.branch), root, next);
+        } else {
+            ScriptTree.append(script, ScriptTree.Slot.top(), root);
+        }
+        selectedStatement = root;
+        selectedValue = null;
+        popupVisible = true;
+        error = "";
+        pruneUnreachable();
+        rebuild();
+    }
+
+    private void pasteValue() {
+        final String templateType = clipboardRootType();
+        final ValueTarget target = currentValueTarget();
+        if (target == null) {
+            error = Component.translatable("gui.trdm.script.paste_no_target").getString();
+            rebuild();
+            return;
+        }
+        if (templateType == null || !typeFits(target.booleanSlot(), templateType)) {
+            error = Component.translatable("gui.trdm.script.paste_type_mismatch").getString();
+            rebuild();
+            return;
+        }
+        pushUndo();
+        final String root = ScriptTree.duplicate(script, clipboard, clipboardRootId);
+        if (root == null || script.node(target.ownerId()) == null) {
+            if (root != null) {
+                pruneUnreachable();
+            }
+            error = Component.translatable("gui.trdm.script.paste_failed").getString();
+            rebuild();
+            return;
+        }
+        script.node(target.ownerId()).inputs.put(target.slot(), root);
+        selectedValue = root;
+        selectedStatement = containingStatement(root);
+        popupVisible = true;
+        error = "";
+        pruneUnreachable();
+        rebuild();
+    }
+
+    private String clipboardRootType() {
+        for (final ScriptNode node : clipboard) {
+            if (node.id.equals(clipboardRootId)) {
+                return node.type;
+            }
+        }
+        return null;
+    }
+
+    /** 粘贴值时当前可替换的槽位。 */
+    private ValueTarget currentValueTarget() {
+        if (selectedValue != null) {
+            final ValueOwner owner = ownerOfValue(selectedValue);
+            if (owner != null) {
+                return new ValueTarget(owner.ownerId(), owner.slot(),
+                        slotIsBoolean(owner.ownerId(), owner.slot()));
+            }
+        }
+        final ScriptNode statement = selectedStatementNode();
+        if (statement == null) {
+            return null;
+        }
+        if ("if".equals(statement.type)) {
+            return new ValueTarget(statement.id, "condition", true);
+        }
+        if (valueStatement(statement.type)) {
+            return new ValueTarget(statement.id, "value", false);
+        }
+        return null;
+    }
+
+    private boolean slotIsBoolean(String ownerId, String slot) {
+        final ScriptNode owner = script.node(ownerId);
+        if (owner == null) {
+            return false;
+        }
+        if ("if".equals(owner.type)) {
+            return "condition".equals(slot);
+        }
+        return "and".equals(owner.type) || "or".equals(owner.type) || "not".equals(owner.type);
+    }
+
     private void save() {
         final ScriptCompiler.Result result = ScriptCompiler.compile(script);
         if (result.compiled() == null) {
@@ -2015,12 +2203,29 @@ public final class FareScriptScreen extends Screen {
                 || "cap_fare".equals(type) || "floor_fare".equals(type);
     }
 
+    private static boolean statementType(String type) {
+        return "on_fare".equals(type) || "if".equals(type) || "round_fare".equals(type)
+                || valueStatement(type);
+    }
+
+    private static boolean isValueNode(ScriptNode node) {
+        return node != null && !statementType(node.type);
+    }
+
     private static boolean isBoolean(String type) {
         return "compare".equals(type) || "and".equals(type) || "or".equals(type) || "not".equals(type);
     }
 
+    private static boolean isLiteralNumeric(String type) {
+        return List.of(NUMERIC_VALUE_TYPES).contains(type);
+    }
+
+    private static boolean isArithmetic(String type) {
+        return List.of(ARITHMETIC_VALUE_TYPES).contains(type);
+    }
+
     private static boolean isNumeric(String type) {
-        return NUMERIC_VALUE_TYPES.length > 0 && List.of(NUMERIC_VALUE_TYPES).contains(type);
+        return isLiteralNumeric(type) || isArithmetic(type);
     }
 
     private static boolean isTable(String type) {
@@ -2034,7 +2239,8 @@ public final class FareScriptScreen extends Screen {
             case "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare" -> 0xFF2F7D4F;
             case "round_fare" -> 0xFF2D6E82;
             case "number", "context_intervals", "context_meters", "context_stations",
-                 "context_zone_diff" -> 0xFF8A5A2B;
+                 "context_zone_diff", "add", "subtract", "multiply", "divide", "min", "max" ->
+                    0xFF8A5A2B;
             case "table_intervals", "table_meters" -> 0xFF6B4A8A;
             default -> 0xFF555555;
         };
@@ -2074,8 +2280,21 @@ public final class FareScriptScreen extends Screen {
             case "or" -> valueSummary(node.inputs.get("a"), depth + 1) + " 或 "
                     + valueSummary(node.inputs.get("b"), depth + 1);
             case "not" -> "非 " + valueSummary(node.inputs.get("a"), depth + 1);
+            case "add" -> arithmeticSummary(node, "+", depth);
+            case "subtract" -> arithmeticSummary(node, "-", depth);
+            case "multiply" -> arithmeticSummary(node, "×", depth);
+            case "divide" -> arithmeticSummary(node, "÷", depth);
+            case "min" -> "min(" + valueSummary(node.inputs.get("a"), depth + 1) + ", "
+                    + valueSummary(node.inputs.get("b"), depth + 1) + ")";
+            case "max" -> "max(" + valueSummary(node.inputs.get("a"), depth + 1) + ", "
+                    + valueSummary(node.inputs.get("b"), depth + 1) + ")";
             default -> blockLabel(node.type);
         };
+    }
+
+    private String arithmeticSummary(ScriptNode node, String op, int depth) {
+        return "(" + valueSummary(node.inputs.get("a"), depth + 1) + " " + op + " "
+                + valueSummary(node.inputs.get("b"), depth + 1) + ")";
     }
 
     private String conditionSummary(String id) {
@@ -2135,6 +2354,14 @@ public final class FareScriptScreen extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (Screen.hasControlDown()) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_C && !editingText()) {
+                copySelection();
+                return true;
+            }
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_V && !editingText()) {
+                pasteClipboard();
+                return true;
+            }
             if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_Z) {
                 undo();
                 return true;
@@ -2145,20 +2372,24 @@ public final class FareScriptScreen extends Screen {
             }
         }
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE
-                && popupVisible && this.getFocused() == null) {
+                && popupVisible && !editingText()) {
             popupVisible = false;
             rebuild();
             return true;
         }
         if ((keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_DELETE
                 || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE)
-                && this.getFocused() == null
+                && !editingText()
                 && (selectedStatement != null || selectedValue != null)) {
             deleteSelected();
             rebuild();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private boolean editingText() {
+        return this.getFocused() instanceof EditBox;
     }
 
     @Override
