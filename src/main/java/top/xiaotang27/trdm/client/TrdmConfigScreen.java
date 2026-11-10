@@ -8,6 +8,9 @@ import top.xiaotang27.trdm.TrdmConfig;
 import top.xiaotang27.trdm.render.TrdmHeaderTextures;
 import top.xiaotang27.trdm.render.TrdmPisVideo;
 
+import java.nio.file.Path;
+import java.util.List;
+
 /** 通用设置 / 关于。入口：/trdm config、快捷键、Mod Menu。 */
 public class TrdmConfigScreen extends TrdmScreenBase {
 
@@ -55,6 +58,12 @@ public class TrdmConfigScreen extends TrdmScreenBase {
         } else {
             renderAbout(guiGraphics);
         }
+    }
+
+    @Override
+    public void onFilesDrop(List<Path> paths) {
+        page = PAGE_TICKET;
+        ticketPage.importFiles(paths);
     }
 
     private void toggleRow(GuiGraphics guiGraphics, float top, String titleKey, String subKey, boolean on,

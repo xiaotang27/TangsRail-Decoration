@@ -223,11 +223,25 @@ public final class FareScriptScreen extends Screen {
     private int popupY;
     private int popupW;
     private int popupH;
+    private boolean operatorDropOpen;
+    private int operatorFieldX;
+    private int operatorFieldY;
+    private int operatorFieldW;
+    private int operatorFieldH;
+    private int operatorListX;
+    private int operatorListY;
+    private int operatorListW;
+    private int operatorListH;
 
     private final Deque<FareScript> undoStack = new ArrayDeque<>();
     private final Deque<FareScript> redoStack = new ArrayDeque<>();
     private boolean restoring;
     private boolean dragMoved;
+    private boolean dirty;
+    private boolean confirmCloseOpen;
+    private boolean backspaceHeld;
+    private EditBox backspaceBox;
+    private int backspaceDelay;
 
     private String selectedStatement;
     private String selectedValue;
@@ -534,6 +548,10 @@ public final class FareScriptScreen extends Screen {
             drawGhost(guiGraphics);
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        drawOperatorDropdown(guiGraphics, mouseX, mouseY);
+        if (confirmCloseOpen) {
+            drawConfirmClose(guiGraphics);
+        }
     }
 
     private void drawPalette(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -684,12 +702,8 @@ public final class FareScriptScreen extends Screen {
         fill(guiGraphics, x + 3, y + 4, w, h, 0x28000000);
         fill(guiGraphics, x - 1, y - 1, 1, h + 2, 0xFF2A2A2A);
         fill(guiGraphics, x + w, y - 1, 1, h + 2, 0xFF2A2A2A);
-        if (!above) {
-            fill(guiGraphics, x - 1, y - 1, w + 2, 1, 0xFF2A2A2A);
-        }
-        if (!below) {
-            fill(guiGraphics, x - 1, y + h, w + 2, 1, 0xFF2A2A2A);
-        }
+        fill(guiGraphics, x - 1, y - 1, w + 2, 1, 0xFF2A2A2A);
+        fill(guiGraphics, x - 1, y + h, w + 2, 1, 0xFF2A2A2A);
         fill(guiGraphics, x, y, w, h, color);
         if (!above) {
             fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
@@ -782,7 +796,7 @@ public final class FareScriptScreen extends Screen {
         final int top = view.top;
         final int w = view.width;
         drawBlockShape(guiGraphics, x, top, w, view.height, colorFor(node.type), selected, hovered,
-                attachedAbove(view), attachedBelow(view));
+                attachedAbove(view), attachedBelow(view), drawBottomGroove(view));
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
         if (!valueStatement(node.type)) {
             if ("round_fare".equals(node.type)) {
@@ -807,21 +821,17 @@ public final class FareScriptScreen extends Screen {
                 chipTop + Math.max(2, Math.round(4 * zoom)), target ? 0xFF202020 : 0xE8E8E8);
     }
 
-    /** 画带顶部凸起、底部凹槽、阴影的积木块；直接堆叠时省掉接缝处的边框和阴影。 */
+    /** 画带顶部凸起、底部凹槽、阴影的积木块；每块上沿都画分隔线。 */
     private void drawBlockShape(GuiGraphics guiGraphics, int x, int y, int w, int h, int color,
                                 boolean selected, boolean hovered, boolean attachedAbove,
-                                boolean attachedBelow) {
+                                boolean attachedBelow, boolean drawGroove) {
         fill(guiGraphics, x + 3, y + 4, w, h, 0x28000000);
         fill(guiGraphics, x + 11, y - 5, 22, 6, 0xFF2A2A2A);
         fill(guiGraphics, x + 12, y - 4, 20, 4, color);
         fill(guiGraphics, x - 1, y - 1, 1, h + 2, 0xFF2A2A2A);
         fill(guiGraphics, x + w, y - 1, 1, h + 2, 0xFF2A2A2A);
-        if (!attachedAbove) {
-            fill(guiGraphics, x - 1, y - 1, w + 2, 1, 0xFF2A2A2A);
-        }
-        if (!attachedBelow) {
-            fill(guiGraphics, x - 1, y + h, w + 2, 1, 0xFF2A2A2A);
-        }
+        fill(guiGraphics, x - 1, y - 1, w + 2, 1, 0xFF2A2A2A);
+        fill(guiGraphics, x - 1, y + h, w + 2, 1, 0xFF2A2A2A);
         fill(guiGraphics, x, y, w, h, hovered ? brighten(color) : color);
         if (!attachedAbove) {
             fill(guiGraphics, x, y, w, 3, 0x45FFFFFF);
@@ -829,8 +839,10 @@ public final class FareScriptScreen extends Screen {
         if (!attachedBelow) {
             fill(guiGraphics, x, y + h - 3, w, 3, 0x30000000);
         }
-        fill(guiGraphics, x + 12, y + h - 5, 20, 5, CANVAS_BG);
-        fill(guiGraphics, x + 12, y + h - 5, 20, 1, 0xFF2A2A2A);
+        if (drawGroove) {
+            fill(guiGraphics, x + 12, y + h - 5, 20, 5, CANVAS_BG);
+            fill(guiGraphics, x + 12, y + h - 5, 20, 1, 0xFF2A2A2A);
+        }
         if (selected) {
             fill(guiGraphics, x - 2, y - 2, w + 4, 2, 0xFFFFD45A);
             fill(guiGraphics, x - 2, y + h, w + 4, 2, 0xFFFFD45A);
@@ -910,7 +922,7 @@ public final class FareScriptScreen extends Screen {
             return;
         }
         if ("number".equals(value.type)) {
-            drawString(guiGraphics, Component.translatable("gui.trdm.script.value_yuan").getString(),
+            drawString(guiGraphics, Component.translatable(numberFieldLabel(value)).getString(),
                     popupX + 10, popupY + 28, TEXT_MUTED);
         }
         if (isTable(value.type)) {
@@ -924,6 +936,7 @@ public final class FareScriptScreen extends Screen {
         if ("compare".equals(value.type)) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.operator").getString(),
                     popupX + 10, popupY + 33, TEXT_MUTED);
+            drawOperatorField(guiGraphics, value);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_left").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_right").getString(),
@@ -954,6 +967,107 @@ public final class FareScriptScreen extends Screen {
             final boolean target = valueTarget != null && chip.ownerId().equals(valueTarget.ownerId())
                     && chip.slot().equals(valueTarget.slot());
             drawValueChip(guiGraphics, chip, child, target);
+        }
+    }
+
+    private void drawOperatorField(GuiGraphics guiGraphics, ScriptNode compare) {
+        final int x = operatorFieldX;
+        final int y = operatorFieldY;
+        final int w = operatorFieldW;
+        final int h = operatorFieldH;
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, PANEL_BORDER);
+        fill(guiGraphics, x, y, w, h, 0xFF202020);
+        drawString(guiGraphics, compare.fields.getOrDefault("op", ">="), x + 7,
+                y + Math.max(2, (h - 8) / 2), 0xE8E8E8);
+        final int tx = x + w - 13;
+        final int ty = y + h / 2 - 2;
+        for (int row = 0; row < 4; row++) {
+            fill(guiGraphics, tx + row, ty + row, 8 - row * 2, 1, 0xFFB0B0B0);
+        }
+    }
+
+    private boolean isCompareSelected() {
+        final ScriptNode selected = selectedValueNode();
+        return popupVisible && selected != null && "compare".equals(selected.type);
+    }
+
+    private boolean inOperatorField(double mx, double my) {
+        return isCompareSelected() && mx >= operatorFieldX && mx < operatorFieldX + operatorFieldW
+                && my >= operatorFieldY && my < operatorFieldY + operatorFieldH;
+    }
+
+    private boolean handleOperatorClick(double mx, double my) {
+        if (operatorDropOpen) {
+            final String chosen = operatorOptionAt(mx, my);
+            if (chosen != null) {
+                final ScriptNode compare = selectedValueNode();
+                if (compare != null) {
+                    pushUndo();
+                    compare.fields.put("op", chosen);
+                }
+                operatorDropOpen = false;
+                rebuild();
+                return true;
+            }
+            operatorDropOpen = false;
+            return insidePopup(mx, my) || inOperatorField(mx, my);
+        }
+        if (inOperatorField(mx, my)) {
+            operatorDropOpen = true;
+            return true;
+        }
+        return false;
+    }
+
+    private String operatorOptionAt(double mx, double my) {
+        if (!operatorDropOpen || operatorListW <= 0 || operatorListH <= 0) {
+            return null;
+        }
+        if (mx < operatorListX || mx >= operatorListX + operatorListW
+                || my < operatorListY || my >= operatorListY + operatorListH) {
+            return null;
+        }
+        for (int index = 0; index < OPS.length; index++) {
+            final int top = operatorListY + 2 + index * 18;
+            if (my >= top && my < top + 18) {
+                return OPS[index];
+            }
+        }
+        return null;
+    }
+
+    private void drawOperatorDropdown(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!operatorDropOpen || !isCompareSelected()) {
+            return;
+        }
+        final ScriptNode compare = selectedValueNode();
+        if (compare == null) {
+            return;
+        }
+        operatorListX = operatorFieldX;
+        operatorListW = Math.max(operatorFieldW, 84);
+        operatorListY = operatorFieldY + operatorFieldH + 2;
+        operatorListH = OPS.length * 18 + 4;
+        if (operatorListY + operatorListH > this.height - 8) {
+            operatorListY = Math.max(44, operatorFieldY - operatorListH - 2);
+        }
+        fill(guiGraphics, operatorListX - 1, operatorListY - 1, operatorListW + 2,
+                operatorListH + 2, PANEL_BORDER);
+        fill(guiGraphics, operatorListX, operatorListY, operatorListW, operatorListH, 0xF0161616);
+        for (int index = 0; index < OPS.length; index++) {
+            final int top = operatorListY + 2 + index * 18;
+            final boolean hovered = mouseX >= operatorListX && mouseX < operatorListX + operatorListW
+                    && mouseY >= top && mouseY < top + 18;
+            if (OPS[index].equals(compare.fields.getOrDefault("op", ">="))) {
+                fill(guiGraphics, operatorListX + 1, top, operatorListW - 2, 18, 0x3345B35A);
+            } else if (hovered) {
+                fill(guiGraphics, operatorListX + 1, top, operatorListW - 2, 18, 0x33FFFFFF);
+            }
+            drawString(guiGraphics, OPS[index], operatorListX + 8, top + 5,
+                    hovered ? 0xFFFFFFFF : 0xFFD0D0D0);
         }
     }
 
@@ -1017,6 +1131,12 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (confirmCloseOpen) {
+            return handleConfirmClick(mouseX, mouseY);
+        }
+        if (handleOperatorClick(mouseX, mouseY)) {
+            return true;
+        }
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
@@ -1693,6 +1813,7 @@ public final class FareScriptScreen extends Screen {
 
     private void computePopup() {
         popupChips.clear();
+        operatorDropOpen = false;
         if (!popupVisible || selectedStatement == null || selectedStatementNode() == null) {
             popupVisible = false;
             popupW = 0;
@@ -1736,6 +1857,12 @@ public final class FareScriptScreen extends Screen {
         }
         popupX = clamp(px, 8, Math.max(8, this.width - popupW - 8));
         popupY = clamp(py, 44, Math.max(44, this.height - popupH - 40));
+        if (selected != null && "compare".equals(selected.type)) {
+            operatorFieldX = popupX + 60;
+            operatorFieldY = popupY + 22;
+            operatorFieldW = 70;
+            operatorFieldH = 18;
+        }
 
         if (selected == null && (value == null || !isArithmetic(value.type))) {
             return;
@@ -1821,9 +1948,12 @@ public final class FareScriptScreen extends Screen {
 
         if (value != null && "number".equals(value.type)) {
             final EditBox box = editBox(x + 60, y + 22, 90, 18,
-                    Component.translatable("gui.trdm.script.unit"));
+                    Component.translatable(numberFieldLabel(value)));
             box.setValue(value.fields.getOrDefault("value", "0"));
-            box.setResponder(text -> value.fields.put("value", text));
+            box.setResponder(text -> {
+                value.fields.put("value", text);
+                dirty = true;
+            });
             addRenderableWidget(box);
         }
         if (value != null && isTable(value.type)) {
@@ -1843,19 +1973,14 @@ public final class FareScriptScreen extends Screen {
             final EditBox unit = editBox(x + 136, y + 22, 70, 18,
                     Component.translatable("gui.trdm.script.unit"));
             unit.setValue(statement.fields.getOrDefault("unit", "0.1"));
-            unit.setResponder(text -> statement.fields.put("unit", text));
+            unit.setResponder(text -> {
+                statement.fields.put("unit", text);
+                dirty = true;
+            });
             addRenderableWidget(unit);
         }
         if (selected != null && "compare".equals(selected.type)) {
-            addRenderableWidget(Button.builder(
-                            Component.literal(selected.fields.getOrDefault("op", ">=")),
-                            button -> {
-                                pushUndo();
-                                selected.fields.put("op",
-                                        nextOp(selected.fields.getOrDefault("op", ">=")));
-                                rebuild();
-                            })
-                    .bounds(x + 60, y + 22, 70, 18).build());
+            // 运算符用和线路选择一样的下拉框绘制，不在这里放按钮。
         }
 
         int bx = x;
@@ -1938,6 +2063,7 @@ public final class FareScriptScreen extends Screen {
                     final ScriptTier current = table.tiers.get(row);
                     table.tiers.set(row, new ScriptTier(text.isBlank() ? null
                             : Double.parseDouble(text.trim()), current.fareYuan()));
+                    dirty = true;
                 } catch (NumberFormatException ignored) {
                     // 继续输入
                 }
@@ -1950,6 +2076,7 @@ public final class FareScriptScreen extends Screen {
                 try {
                     final ScriptTier current = table.tiers.get(row);
                     table.tiers.set(row, new ScriptTier(current.upTo(), Double.parseDouble(text.trim())));
+                    dirty = true;
                 } catch (NumberFormatException ignored) {
                     // 继续输入
                 }
@@ -2160,6 +2287,22 @@ public final class FareScriptScreen extends Screen {
         return "and".equals(owner.type) || "or".equals(owner.type) || "not".equals(owner.type);
     }
 
+    /** 数字块的字段标题：金额、系数还是普通数值。 */
+    private String numberFieldLabel(ScriptNode number) {
+        final ValueOwner owner = ownerOfValue(number.id);
+        final ScriptNode ownerNode = owner == null ? null : script.node(owner.ownerId());
+        if (ownerNode != null && "value".equals(owner.slot())) {
+            if ("multiply_fare".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_factor";
+            }
+            if ("set_fare".equals(ownerNode.type) || "add_fare".equals(ownerNode.type)
+                    || "cap_fare".equals(ownerNode.type) || "floor_fare".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_amount";
+            }
+        }
+        return "gui.trdm.script.value_number";
+    }
+
     private void save() {
         final ScriptCompiler.Result result = ScriptCompiler.compile(script);
         if (result.compiled() == null) {
@@ -2171,6 +2314,7 @@ public final class FareScriptScreen extends Screen {
         final FareRule target = current != null ? current : rule;
         target.script = script.copy();
         FareRuntime.get().save();
+        dirty = false;
         minecraft.setScreen(parent);
     }
 
@@ -2178,6 +2322,7 @@ public final class FareScriptScreen extends Screen {
         if (restoring) {
             return;
         }
+        dirty = true;
         undoStack.push(script.copy());
         while (undoStack.size() > 50) {
             undoStack.removeLast();
@@ -2213,6 +2358,7 @@ public final class FareScriptScreen extends Screen {
         selectedValue = null;
         popupVisible = false;
         error = "";
+        dirty = true;
         restoring = false;
         rebuild();
     }
@@ -2339,15 +2485,6 @@ public final class FareScriptScreen extends Screen {
         return cut + "…";
     }
 
-    private static String nextOp(String op) {
-        for (int index = 0; index < OPS.length; index++) {
-            if (OPS[index].equals(op)) {
-                return OPS[(index + 1) % OPS.length];
-            }
-        }
-        return OPS[0];
-    }
-
     private static String nextMode(String mode) {
         return switch (mode) {
             case "UP" -> "DOWN";
@@ -2380,6 +2517,31 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (confirmCloseOpen) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+                confirmCloseOpen = false;
+                rebuild();
+            }
+            return true;
+        }
+        if (backspaceHeld && keyCode != org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE) {
+            backspaceHeld = false;
+            backspaceBox = null;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE
+                && this.getFocused() instanceof EditBox box) {
+            if (!backspaceHeld || backspaceBox != box) {
+                backspaceBox = box;
+                backspaceHeld = true;
+                backspaceDelay = 5;
+                deleteBackspace(box);
+            }
+            return true;
+        }
+        if (operatorDropOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            operatorDropOpen = false;
+            return true;
+        }
         if (Screen.hasControlDown()) {
             if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_C && !editingText()) {
                 copySelection();
@@ -2415,15 +2577,146 @@ public final class FareScriptScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    @Override
+    public void tick() {
+        super.tick();
+        if (!backspaceHeld) {
+            return;
+        }
+        if (!(this.getFocused() instanceof EditBox box) || box != backspaceBox) {
+            backspaceHeld = false;
+            backspaceBox = null;
+            return;
+        }
+        if (minecraft == null || minecraft.getWindow() == null
+                || !com.mojang.blaze3d.platform.InputConstants.isKeyDown(
+                minecraft.getWindow().getWindow(), org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE)) {
+            backspaceHeld = false;
+            backspaceBox = null;
+            return;
+        }
+        if (backspaceDelay > 0) {
+            backspaceDelay--;
+            return;
+        }
+        deleteBackspace(box);
+        backspaceDelay = 2;
+    }
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE) {
+            backspaceHeld = false;
+            backspaceBox = null;
+        }
+        return super.keyReleased(keyCode, scanCode, modifiers);
+    }
+
+    /** 长按退格：手动删除一个字符，随后由 {@link #tick()} 连续触发。 */
+    private void deleteBackspace(EditBox box) {
+        final String value = box.getValue();
+        final int cursor = box.getCursorPosition();
+        if (cursor <= 0 || value.isEmpty()) {
+            return;
+        }
+        final int end = Math.min(cursor, value.length());
+        box.setValue(value.substring(0, end - 1) + value.substring(end));
+        box.setCursorPosition(Math.max(0, end - 1));
+        dirty = true;
+    }
+
     private boolean editingText() {
         return this.getFocused() instanceof EditBox;
     }
 
     @Override
     public void onClose() {
+        if (confirmCloseOpen) {
+            confirmCloseOpen = false;
+            rebuild();
+            return;
+        }
+        if (dirty) {
+            confirmCloseOpen = true;
+            operatorDropOpen = false;
+            rebuild();
+            return;
+        }
         if (minecraft != null) {
             minecraft.setScreen(parent);
         }
+    }
+
+    private int confirmPanelX() {
+        return (this.width - 420) / 2;
+    }
+
+    private int confirmPanelY() {
+        return (this.height - 174) / 2;
+    }
+
+    private int confirmButtonY() {
+        return confirmPanelY() + 124;
+    }
+
+    private int confirmSaveX() {
+        return confirmPanelX() + 50;
+    }
+
+    private int confirmDiscardX() {
+        return confirmSaveX() + 110;
+    }
+
+    private int confirmCancelX() {
+        return confirmSaveX() + 220;
+    }
+
+    private boolean handleConfirmClick(double mx, double my) {
+        final int y = confirmButtonY();
+        if (mx >= confirmSaveX() && mx < confirmSaveX() + 100 && my >= y && my < y + 24) {
+            confirmCloseOpen = false;
+            save();
+            return true;
+        }
+        if (mx >= confirmDiscardX() && mx < confirmDiscardX() + 100 && my >= y && my < y + 24) {
+            dirty = false;
+            confirmCloseOpen = false;
+            if (minecraft != null) {
+                minecraft.setScreen(parent);
+            }
+            return true;
+        }
+        if (mx >= confirmCancelX() && mx < confirmCancelX() + 100 && my >= y && my < y + 24) {
+            confirmCloseOpen = false;
+            rebuild();
+            return true;
+        }
+        return true;
+    }
+
+    private void drawConfirmClose(GuiGraphics guiGraphics) {
+        final int x = confirmPanelX();
+        final int y = confirmPanelY();
+        fill(guiGraphics, 0, 0, this.width, this.height, 0xA0000000);
+        fill(guiGraphics, x - 1, y - 1, 422, 176, PANEL_BORDER);
+        fill(guiGraphics, x, y, 420, 174, 0xFFFFFDF8);
+        final String title = Component.translatable("gui.trdm.script.unsaved_title").getString();
+        final String text = Component.translatable("gui.trdm.script.unsaved_text").getString();
+        drawString(guiGraphics, title, x + (420 - font.width(title)) / 2, y + 24, TEXT_DARK);
+        drawString(guiGraphics, text, x + (420 - font.width(text)) / 2, y + 52, TEXT_MUTED);
+        final int by = confirmButtonY();
+        drawConfirmButton(guiGraphics, confirmSaveX(), by,
+                Component.translatable("gui.trdm.ticket.editor.save").getString(), false);
+        drawConfirmButton(guiGraphics, confirmDiscardX(), by,
+                Component.translatable("gui.trdm.script.discard").getString(), false);
+        drawConfirmButton(guiGraphics, confirmCancelX(), by,
+                Component.translatable("gui.trdm.script.cancel").getString(), false);
+    }
+
+    private void drawConfirmButton(GuiGraphics guiGraphics, int x, int y, String label, boolean hovered) {
+        fill(guiGraphics, x, y, 100, 24, hovered ? 0xFFB0B0B0 : 0xFF8A8A8A);
+        fill(guiGraphics, x, y, 100, 2, 0x40FFFFFF);
+        drawString(guiGraphics, label, x + (100 - font.width(label)) / 2, y + 8, 0xFFFFFFFF);
     }
 
     private void rebuild() {

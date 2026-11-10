@@ -1,5 +1,9 @@
 package top.xiaotang27.trdm.client;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import mtr.client.ClientData;
 import mtr.data.Route;
 import net.fabricmc.loader.api.FabricLoader;
@@ -11,6 +15,7 @@ import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareRule;
 
+import java.awt.Desktop;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -147,6 +152,11 @@ final class TicketConfigPage {
     private long lastClickAt;
     private float ruleScroll;
 
+    private boolean exportDialogOpen;
+    private String exportedFileName = "";
+    private Path exportedFile;
+    private boolean confirmDeleteOpen;
+
     TicketConfigPage(TrdmScreenBase host) {
         this.host = host;
         this.config = FareRuntime.get().config();
@@ -273,6 +283,47 @@ final class TicketConfigPage {
         if (dropKind != DROP_NONE) {
             renderDropdown(guiGraphics, mx, my);
         }
+        if (confirmDeleteOpen) {
+            renderDeleteConfirm(guiGraphics, mx, my);
+        } else if (exportDialogOpen) {
+            renderExportDialog(guiGraphics, mx, my);
+        }
+    }
+
+    private void renderConfirmPanel(GuiGraphics guiGraphics) {
+        host.rect(guiGraphics, 0F, 0F, TrdmScreenBase.DESIGN_W, TrdmScreenBase.DESIGN_H, 0x90000000);
+        host.rect(guiGraphics, 219F, 219F, 522F, 152F, 0xFF9A9A9A);
+        host.rect(guiGraphics, 220F, 220F, 520F, 150F, 0xF0202020);
+    }
+
+    private void renderDeleteConfirm(GuiGraphics guiGraphics, float mx, float my) {
+        renderConfirmPanel(guiGraphics);
+        final String name = detailRuleIndex >= 0 && detailRuleIndex < rules.size()
+                ? rules.get(detailRuleIndex).name : "";
+        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_confirm", name),
+                TrdmScreenBase.DESIGN_W / 2F, 262F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
+        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_confirm_hint"),
+                TrdmScreenBase.DESIGN_W / 2F, 290F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        final float deleteX = 350F;
+        final float cancelX = 490F;
+        host.buttonText(guiGraphics, deleteX, 320F, 120F, 28F,
+                Component.translatable("gui.trdm.ticket.delete_rule"), false,
+                host.hit(mx, my, deleteX, 320F, 120F, 28F), TrdmScreenBase.FONT_ROW);
+        host.buttonText(guiGraphics, cancelX, 320F, 120F, 28F,
+                Component.translatable("gui.trdm.script.cancel"), false,
+                host.hit(mx, my, cancelX, 320F, 120F, 28F), TrdmScreenBase.FONT_ROW);
+    }
+
+    private void renderExportDialog(GuiGraphics guiGraphics, float mx, float my) {
+        renderConfirmPanel(guiGraphics);
+        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.export_saved", exportedFileName),
+                TrdmScreenBase.DESIGN_W / 2F, 262F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
+        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.export_folder_hint"),
+                TrdmScreenBase.DESIGN_W / 2F, 290F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        final float okX = 420F;
+        host.buttonText(guiGraphics, okX, 320F, 120F, 28F,
+                Component.translatable("gui.trdm.ticket.ok"), false,
+                host.hit(mx, my, okX, 320F, 120F, 28F), TrdmScreenBase.FONT_ROW);
     }
 
     private void renderMain(GuiGraphics guiGraphics, float mx, float my) {
@@ -299,7 +350,7 @@ final class TicketConfigPage {
                     TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         }
         host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F,
-                60F, 18F, Component.translatable("gui.trdm.ticket.export_short"), false,
+                60F, 18F, Component.translatable("gui.trdm.ticket.import_short"), false,
                 host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F),
                 TrdmScreenBase.FONT_SUB);
         host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F,
@@ -484,6 +535,10 @@ final class TicketConfigPage {
         host.section(guiGraphics, "gui.trdm.ticket.rule_content", DETAIL_CONTENT_SECTION_Y);
         renderRuleSummary(guiGraphics, rule);
         renderEditButton(guiGraphics, mx, my);
+        final float exportX = TrdmScreenBase.CONTENT_RIGHT - 380F;
+        host.buttonText(guiGraphics, exportX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
+                Component.translatable("gui.trdm.ticket.export_rule"), false,
+                host.hit(mx, my, exportX, DETAIL_EDIT_BUTTON_Y, 120F, 24F), TrdmScreenBase.FONT_ROW);
         final float deleteX = TrdmScreenBase.CONTENT_RIGHT - 250F;
         host.buttonText(guiGraphics, deleteX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
                 Component.translatable("gui.trdm.ticket.delete_rule"), false,
@@ -830,22 +885,193 @@ final class TicketConfigPage {
         ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
     }
 
-    /** 把当前同步到的配置导出成可分享的 JSON 文件。 */
-    private void exportJson() {
-        final Path path = FabricLoader.getInstance().getConfigDir().resolve("trdm-fares-export.json");
-        final Minecraft minecraft = Minecraft.getInstance();
+    /** 把选中的规则导出成单独的文件；文件名使用规则名。 */
+    private void exportSelectedRule() {
+        if (detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
+            return;
+        }
+        final FareRule rule = rules.get(detailRuleIndex);
+        final FareConfig export = new FareConfig();
+        export.enabled = config.enabled;
+        export.mode = config.mode;
+        export.metric = config.metric;
+        export.transferDiscountCents = config.transferDiscountCents;
+        export.mergeSameRule = config.mergeSameRule;
+        export.rules.add(rule.copy());
+
+        final String fileName = exportFileName(rule.name);
+        final Path dir = FabricLoader.getInstance().getConfigDir().resolve("trdm_exports");
         try {
-            Files.createDirectories(path.getParent());
-            Files.writeString(path, FareJson.write(config), StandardCharsets.UTF_8);
-            if (minecraft.player != null) {
-                minecraft.player.displayClientMessage(Component.translatable(
-                        "gui.trdm.ticket.export_done", "config/trdm-fares-export.json"), false);
-            }
+            Files.createDirectories(dir);
+            final Path file = dir.resolve(fileName);
+            Files.writeString(file, FareJson.write(export), StandardCharsets.UTF_8);
+            exportedFile = file;
+            exportedFileName = fileName;
+            exportDialogOpen = true;
+            confirmDeleteOpen = false;
         } catch (Exception exception) {
-            if (minecraft.player != null) {
-                minecraft.player.displayClientMessage(Component.translatable(
-                        "gui.trdm.ticket.export_failed", String.valueOf(exception.getMessage())), false);
+            showMessage(Component.translatable("gui.trdm.ticket.export_failed",
+                    String.valueOf(exception.getMessage())));
+        }
+    }
+
+    private static String exportFileName(String ruleName) {
+        String safe = ruleName == null ? "" : ruleName.trim().replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (safe.isBlank()) {
+            safe = "rule";
+        }
+        if (safe.length() > 48) {
+            safe = safe.substring(0, 48);
+        }
+        return "trdmfares_" + safe + ".json";
+    }
+
+    private void requestImport() {
+        showMessage(Component.translatable("gui.trdm.ticket.import_hint"));
+    }
+
+    /** 处理拖入窗口的 JSON 文件。 */
+    void importFiles(List<Path> paths) {
+        if (paths == null || paths.isEmpty() || !canEdit()) {
+            return;
+        }
+        confirmDeleteOpen = false;
+        exportDialogOpen = false;
+        int imported = 0;
+        boolean invalid = false;
+        for (final Path path : paths) {
+            if (path == null || !Files.isRegularFile(path)) {
+                continue;
             }
+            final String text;
+            try {
+                text = Files.readString(path, StandardCharsets.UTF_8);
+            } catch (Exception exception) {
+                invalid = true;
+                continue;
+            }
+            if (!looksLikeTrdmRules(text)) {
+                invalid = true;
+                continue;
+            }
+            final FareConfig parsed;
+            try {
+                parsed = FareJson.parse(text);
+            } catch (Exception exception) {
+                invalid = true;
+                continue;
+            }
+            if (parsed.rules.isEmpty()) {
+                invalid = true;
+                continue;
+            }
+            for (final FareRule source : parsed.rules) {
+                final FareRule copy = source.copy();
+                if (copy.id == null || copy.id.isBlank() || findRule(copy.id) != null) {
+                    copy.id = uniqueRuleId();
+                }
+                copy.name = uniqueRuleName(copy.name);
+                config.rules.add(copy);
+                imported++;
+            }
+        }
+        if (imported > 0) {
+            FareRuntime.get().save();
+            detailRuleIndex = config.rules.size() - 1;
+            selectedKind = SELECT_RULE;
+            selectedIndex = detailRuleIndex;
+            view = VIEW_RULE;
+            ruleScroll = Math.max(0F, (rules.size() + 1) * ROW_H - RULES_PANEL_H);
+            rebuildOwners();
+            showMessage(Component.translatable("gui.trdm.ticket.import_done", imported));
+        } else if (invalid) {
+            showMessage(Component.translatable("gui.trdm.ticket.import_invalid"));
+        }
+    }
+
+    private boolean looksLikeTrdmRules(String text) {
+        try {
+            final JsonElement root = JsonParser.parseString(text);
+            if (!root.isJsonObject()) {
+                return false;
+            }
+            final JsonObject object = root.getAsJsonObject();
+            if (!object.has("rules") || !object.get("rules").isJsonArray()) {
+                return false;
+            }
+            final JsonArray array = object.getAsJsonArray("rules");
+            for (final JsonElement element : array) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                final JsonObject rule = element.getAsJsonObject();
+                final boolean hasName = rule.has("name") && rule.get("name").isJsonPrimitive()
+                        && !rule.get("name").getAsString().isBlank();
+                if (!hasName) {
+                    continue;
+                }
+                if (rule.has("script") && rule.get("script").isJsonObject()) {
+                    return true;
+                }
+                if (rule.has("kind") && rule.get("kind").isJsonPrimitive()) {
+                    final String kind = rule.get("kind").getAsString();
+                    if ("MTR_VANILLA".equals(kind) || "FLAT".equals(kind)
+                            || "INTERVAL_TABLE".equals(kind) || "DISTANCE_TABLE".equals(kind)
+                            || "SCRIPT".equals(kind)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } catch (Exception exception) {
+            return false;
+        }
+    }
+
+    private String uniqueRuleName(String name) {
+        String base = name == null || name.isBlank()
+                ? Component.translatable("gui.trdm.ticket.import_default_name").getString()
+                : name.trim();
+        String candidate = base;
+        int index = 2;
+        while (findRuleByName(candidate) != null) {
+            candidate = base + " (" + index + ")";
+            index++;
+        }
+        return candidate;
+    }
+
+    private FareRule findRuleByName(String name) {
+        for (final FareRule rule : config.rules) {
+            if (rule.name.equals(name)) {
+                return rule;
+            }
+        }
+        return null;
+    }
+
+    private void showMessage(Component message) {
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) {
+            minecraft.player.displayClientMessage(message, false);
+        }
+    }
+
+    private void requestDeleteRule() {
+        confirmDeleteOpen = true;
+        exportDialogOpen = false;
+    }
+
+    private void openExportedFolder() {
+        if (exportedFile == null) {
+            return;
+        }
+        try {
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().open(exportedFile.getParent().toFile());
+            }
+        } catch (Exception ignored) {
+            // 打不开文件夹时文件仍然已保存。
         }
     }
 
@@ -1149,6 +1375,22 @@ final class TicketConfigPage {
         if (!inWorld()) {
             return false;
         }
+        if (confirmDeleteOpen) {
+            if (host.hit(mx, my, 350F, 320F, 120F, 28F)) {
+                confirmDeleteOpen = false;
+                deleteRule();
+            } else if (host.hit(mx, my, 490F, 320F, 120F, 28F)) {
+                confirmDeleteOpen = false;
+            }
+            return true;
+        }
+        if (exportDialogOpen) {
+            if (host.hit(mx, my, 420F, 320F, 120F, 28F)) {
+                exportDialogOpen = false;
+                openExportedFolder();
+            }
+            return true;
+        }
         if (!canEdit()) {
             return mx >= TrdmScreenBase.SIDEBAR_W;
         }
@@ -1163,7 +1405,7 @@ final class TicketConfigPage {
 
     private boolean clickMain(float mx, float my) {
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F)) {
-            exportJson();
+            requestImport();
             return true;
         }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F)) {
@@ -1269,9 +1511,15 @@ final class TicketConfigPage {
                     });
             return true;
         }
-        if (view == VIEW_RULE && host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 250F,
+        if (view == VIEW_RULE && detailRuleIndex >= 0
+                && host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 380F,
                 DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
-            deleteRule();
+            exportSelectedRule();
+            return true;
+        }
+        if (view == VIEW_RULE && detailRuleIndex >= 0 && host.hit(mx, my,
+                TrdmScreenBase.CONTENT_RIGHT - 250F, DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
+            requestDeleteRule();
             return true;
         }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 120F, DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
@@ -1310,6 +1558,18 @@ final class TicketConfigPage {
     }
 
     boolean keyPressed(int keyCode) {
+        if (confirmDeleteOpen) {
+            if (keyCode == 256) {
+                confirmDeleteOpen = false;
+            }
+            return true;
+        }
+        if (exportDialogOpen) {
+            if (keyCode == 256) {
+                exportDialogOpen = false;
+            }
+            return true;
+        }
         if (keyCode == 256 && !host.isEditing()) {
             if (view == VIEW_RULE_EDIT) {
                 cancelEditor();
