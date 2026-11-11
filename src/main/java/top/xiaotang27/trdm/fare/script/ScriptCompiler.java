@@ -24,14 +24,14 @@ public final class ScriptCompiler {
 
     private static final Set<String> STATEMENTS = Set.of(
             "on_fare", "set_fare", "add_fare", "multiply_fare", "cap_fare",
-            "floor_fare", "round_fare", "if", "use_rule");
+            "floor_fare", "discount_fare", "round_fare", "if", "use_rule");
     private static final Set<String> NUMBER_VALUES = Set.of(
             "number", "context_intervals", "context_stations", "context_meters",
             "context_zone_diff", "add", "subtract", "multiply", "divide", "min", "max",
             "table_intervals", "table_meters");
-    private static final Set<String> BOOLEAN_VALUES = Set.of("compare", "and", "or", "not");
+    private static final Set<String> BOOLEAN_VALUES = Set.of("compare", "and", "or", "not", "line_is");
     private static final Set<String> VALUE_STATEMENTS = Set.of(
-            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare");
+            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare", "discount_fare");
 
     /** 编译结果：成功时 {@code compiled} 非空，失败时 {@code errors} 非空。 */
     public record Result(CompiledScript compiled, List<String> errors) {
@@ -272,6 +272,18 @@ public final class ScriptCompiler {
                         validateValue(child, true);
                     }
                 }
+                case "line_is" -> {
+                    final String line = node.fields.get("line");
+                    if (line == null || line.isBlank()) {
+                        errors.add("“当前线路”没有选择线路: " + node.id);
+                    } else {
+                        try {
+                            Long.parseLong(line);
+                        } catch (NumberFormatException exception) {
+                            errors.add("“当前线路”的线路 ID 无效: " + node.id);
+                        }
+                    }
+                }
                 default -> {
                 }
             }
@@ -394,6 +406,13 @@ public final class ScriptCompiler {
                         state.hasFare = true;
                         cursor = node.next;
                     }
+                    case "discount_fare" -> {
+                        final double percent = Math.max(0.0,
+                                Math.min(100.0, number(node.inputs.get("value"), context)));
+                        state.fare *= 1.0 - percent / 100.0;
+                        state.hasFare = true;
+                        cursor = node.next;
+                    }
                     case "cap_fare" -> {
                         state.fare = Math.min(state.fare, number(node.inputs.get("value"), context));
                         state.hasFare = true;
@@ -481,6 +500,13 @@ public final class ScriptCompiler {
                 case "and" -> bool(node.inputs.get("a"), context) && bool(node.inputs.get("b"), context);
                 case "or" -> bool(node.inputs.get("a"), context) || bool(node.inputs.get("b"), context);
                 case "not" -> !bool(node.inputs.get("a"), context);
+                case "line_is" -> {
+                    try {
+                        yield context.routeId() == Long.parseLong(node.fields.getOrDefault("line", "0"));
+                    } catch (NumberFormatException exception) {
+                        yield false;
+                    }
+                }
                 default -> throw new ScriptException("这里需要布尔块: " + node.type);
             };
         }

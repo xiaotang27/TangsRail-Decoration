@@ -246,8 +246,36 @@ class FareEngineTest {
     }
 
     @Test
-    void scriptCanReferenceAnotherRule() {
-        final FareRule base = new FareRule("base", "基础规则", FareRule.Kind.FLAT);
+    void lineConditionReceivesCurrentRoute() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "if";
+        final ScriptNode condition = new ScriptNode("if", "if");
+        final ScriptNode line = new ScriptNode("line", "line_is");
+        line.fields.put("line", "10");
+        condition.inputs.put("condition", "line");
+        condition.next = "setA";
+        condition.otherwise = "setB";
+        final ScriptNode setA = new ScriptNode("setA", "set_fare");
+        setA.inputs.put("value", "numA");
+        final ScriptNode numA = new ScriptNode("numA", "number");
+        numA.fields.put("value", "1");
+        final ScriptNode setB = new ScriptNode("setB", "set_fare");
+        setB.inputs.put("value", "numB");
+        final ScriptNode numB = new ScriptNode("numB", "number");
+        numB.fields.put("value", "3");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, condition, line, setA, numA, setB, numB));
+
+        final FareRule rule = new FareRule("route", "Route", FareRule.Kind.SCRIPT);
+        rule.script = script;
+        final FareConfig config = new FareConfig();
+        bind(config, 10L, rule);
+        assertEquals(100L, FareEngine.quote(config, graph(), 1, 2, DIM).totalCents());
+    }
+
+    @Test
+    void scriptCanReferenceAnotherRule() {        final FareRule base = new FareRule("base", "基础规则", FareRule.Kind.FLAT);
         base.flatFareCents = 500L;
         base.maxFareCents = 500L;
 

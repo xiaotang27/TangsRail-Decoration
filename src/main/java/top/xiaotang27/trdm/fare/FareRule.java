@@ -84,6 +84,19 @@ public final class FareRule {
         return kind == Kind.MTR_VANILLA;
     }
 
+    /** 脚本里是否使用了“当前线路”条件；这种规则不能跨线路合并分段。 */
+    public boolean hasLineCondition() {
+        if (script == null) {
+            return false;
+        }
+        for (final ScriptNode node : script.nodes) {
+            if ("line_is".equals(node.type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** 脚本里“使用规则”积木直接引用的规则 ID，按出现顺序去重。 */
     public Set<String> referencedRuleIds() {
         final Set<String> ids = new LinkedHashSet<>();
@@ -104,17 +117,24 @@ public final class FareRule {
 
     /** 未应用 {@code maxFare} 封顶的票价（分）。 */
     public long baseFareCents(long intervals, long meters, int fromZone, int toZone) {
-        return baseFareCents(intervals, meters, fromZone, toZone, null);
+        return baseFareCents(intervals, meters, fromZone, toZone, 0L, "", null);
     }
 
     public long baseFareCents(long intervals, long meters, int fromZone, int toZone,
+                              top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
+        return baseFareCents(intervals, meters, fromZone, toZone, 0L, "", resolver);
+    }
+
+    public long baseFareCents(long intervals, long meters, int fromZone, int toZone,
+                              long routeId, String routeName,
                               top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
         return switch (kind) {
             case MTR_VANILLA -> vanillaFareCents(fromZone, toZone);
             case FLAT -> Math.max(0L, flatFareCents);
             case INTERVAL_TABLE -> tierFareCents(intervals);
             case DISTANCE_TABLE -> tierFareCents(meters);
-            case SCRIPT -> scriptFareCents(intervals, meters, fromZone, toZone, resolver);
+            case SCRIPT -> scriptFareCents(intervals, meters, fromZone, toZone,
+                    routeId, routeName, resolver);
         };
     }
 
@@ -125,13 +145,14 @@ public final class FareRule {
 
     /** 执行积木脚本；脚本缺失/编译失败/运行失败时回退 MTR 原版公式。 */
     private long scriptFareCents(long intervals, long meters, int fromZone, int toZone,
+                                 long routeId, String routeName,
                                  top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
         if (script == null || script.isEmpty()) {
             return vanillaFareCents(fromZone, toZone);
         }
         try {
             final double yuan = ScriptRuntime.evaluate(script,
-                    new ScriptContext(intervals, meters, fromZone, toZone), resolver);
+                    new ScriptContext(intervals, meters, fromZone, toZone, routeId, routeName), resolver);
             if (!Double.isFinite(yuan)) {
                 return vanillaFareCents(fromZone, toZone);
             }

@@ -122,7 +122,8 @@ public final class FareConfig {
                         return null;
                     }
                     long cents = referenced.baseFareCents(context.intervals(), context.meters(),
-                            context.fromZone(), context.toZone(), this);
+                            context.fromZone(), context.toZone(), context.routeId(),
+                            context.routeName(), this);
                     if (referenced.maxFareCents > 0L && cents > referenced.maxFareCents) {
                         cents = referenced.maxFareCents;
                     }

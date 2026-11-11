@@ -19,6 +19,13 @@ class ScriptCompilerTest {
         return result.compiled().run(new ScriptContext(intervals, meters, fromZone, toZone));
     }
 
+    private static double evalRoute(FareScript script, long routeId) {
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        assertNotNull(result.compiled());
+        return result.compiled().run(new ScriptContext(0, 0, 0, 0, routeId, "line"));
+    }
+
     private static FareScript flat(double yuan) {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");
@@ -104,6 +111,44 @@ class ScriptCompilerTest {
                 new ScriptContext(0, 0, 0, 0), resolver), 1e-9);
         assertEquals(1.0, ScriptRuntime.evaluate(script,
                 new ScriptContext(0, 0, 0, 0), (ruleId, context) -> null), 1e-9);
+    }
+
+    @Test
+    void discountAndCurrentLineCondition() {
+        final FareScript discounted = flat(10.0);
+        final ScriptNode set = discounted.node("set");
+        final ScriptNode discount = new ScriptNode("discount", "discount_fare");
+        discount.inputs.put("value", "percent");
+        discount.next = set.next;
+        set.next = "discount";
+        final ScriptNode percent = new ScriptNode("percent", "number");
+        percent.fields.put("value", "20");
+        discounted.nodes.add(discount);
+        discounted.nodes.add(percent);
+        assertEquals(8.0, eval(discounted, 0, 0, 0, 0), 1e-9);
+
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "if";
+        final ScriptNode condition = new ScriptNode("if", "if");
+        final ScriptNode line = new ScriptNode("line", "line_is");
+        line.fields.put("line", "10");
+        line.fields.put("line_name", "A");
+        condition.inputs.put("condition", "line");
+        condition.next = "setA";
+        condition.otherwise = "setB";
+        final ScriptNode setA = new ScriptNode("setA", "set_fare");
+        setA.inputs.put("value", "numA");
+        final ScriptNode numA = new ScriptNode("numA", "number");
+        numA.fields.put("value", "1");
+        final ScriptNode setB = new ScriptNode("setB", "set_fare");
+        setB.inputs.put("value", "numB");
+        final ScriptNode numB = new ScriptNode("numB", "number");
+        numB.fields.put("value", "3");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, condition, line, setA, numA, setB, numB));
+        assertEquals(1.0, evalRoute(script, 10L), 1e-9);
+        assertEquals(3.0, evalRoute(script, 20L), 1e-9);
     }
 
     @Test

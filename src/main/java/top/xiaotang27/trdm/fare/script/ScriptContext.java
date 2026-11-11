@@ -1,7 +1,12 @@
 package top.xiaotang27.trdm.fare.script;
 
 /** 报价时暴露给脚本的只读上下文。 */
-public record ScriptContext(long intervals, long meters, int fromZone, int toZone) {
+public record ScriptContext(long intervals, long meters, int fromZone, int toZone,
+                            long routeId, String routeName) {
+
+    public ScriptContext(long intervals, long meters, int fromZone, int toZone) {
+        this(intervals, meters, fromZone, toZone, 0L, "");
+    }
 
     public long stations() {
         return intervals + 1L;

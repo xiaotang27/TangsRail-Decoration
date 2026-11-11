@@ -58,7 +58,8 @@ public final class FareEngine {
             final Set<String> visiting = new HashSet<>();
             visiting.add(leg.rule.id);
             final RuleResolver resolver = config.ruleResolver(visiting);
-            long fare = leg.rule.baseFareCents(leg.intervals, leg.meters, startZone, endZone, resolver);
+            long fare = leg.rule.baseFareCents(leg.intervals, leg.meters, startZone, endZone,
+                    leg.routeId, leg.routeName, resolver);
             boolean capped = false;
             if (leg.rule.maxFareCents > 0L && fare > leg.rule.maxFareCents) {
                 fare = leg.rule.maxFareCents;
@@ -98,7 +99,8 @@ public final class FareEngine {
         final List<Leg> merged = new ArrayList<>();
         for (final Leg leg : legs) {
             final Leg last = merged.isEmpty() ? null : merged.get(merged.size() - 1);
-            if (last != null && last.rule.id.equals(leg.rule.id)) {
+            if (last != null && last.rule.id.equals(leg.rule.id)
+                    && (!last.rule.hasLineCondition() || last.routeId == leg.routeId)) {
                 last.absorb(leg);
             } else {
                 merged.add(leg);

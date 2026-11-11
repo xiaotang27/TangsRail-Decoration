@@ -1,5 +1,7 @@
 package top.xiaotang27.trdm.client;
 
+import mtr.client.ClientData;
+import mtr.data.Route;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -35,7 +37,8 @@ import java.util.Set;
 public final class FareScriptScreen extends Screen {
 
     private static final String[] STATEMENT_TYPES = {
-            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare", "round_fare"};    private static final String[] NUMERIC_VALUE_TYPES = {
+            "set_fare", "add_fare", "multiply_fare", "discount_fare",
+            "cap_fare", "floor_fare", "round_fare"};    private static final String[] NUMERIC_VALUE_TYPES = {
             "number", "context_intervals", "context_meters", "context_stations",
             "context_zone_diff", "table_intervals", "table_meters"};
     private static final String[] ARITHMETIC_VALUE_TYPES = {
@@ -78,11 +81,12 @@ public final class FareScriptScreen extends Screen {
         list.add(new PaletteEntry("gui.trdm.script.block.if_else", "if_else", true, false,
                 colorFor("if")));
         list.add(new PaletteEntry("gui.trdm.script.category.conditions", null, false, true, 0xFF2F6E45));
-        for (final String type : List.of("compare", "and", "or", "not")) {
+        for (final String type : List.of("compare", "and", "or", "not", "line_is")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.category.fare", null, false, true, 0xFF2F7D4F));
-        for (final String type : List.of("set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare")) {
+        for (final String type : List.of("set_fare", "add_fare", "multiply_fare",
+                "discount_fare", "cap_fare", "floor_fare")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, true, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.block.use_rule", "use_rule", true, false,
@@ -153,6 +157,9 @@ public final class FareScriptScreen extends Screen {
     }
 
     private record ValueTarget(String ownerId, String slot, boolean booleanSlot) {
+    }
+
+    private record LineOption(long id, String name) {
     }
 
     private record DropTarget(DropKind kind, String nodeId, BranchKey branch) {
@@ -241,6 +248,16 @@ public final class FareScriptScreen extends Screen {
     private int ruleListW;
     private int ruleListH;
     private int ruleDropScroll;
+    private boolean lineDropOpen;
+    private int lineFieldX;
+    private int lineFieldY;
+    private int lineFieldW;
+    private int lineFieldH;
+    private int lineListX;
+    private int lineListY;
+    private int lineListW;
+    private int lineListH;
+    private int lineDropScroll;
     private final List<String> missingRules = new ArrayList<>();
     private boolean warningsDismissed;
     private int noticeX;
@@ -562,6 +579,7 @@ public final class FareScriptScreen extends Screen {
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         drawRuleDropdown(guiGraphics, mouseX, mouseY);
+        drawLineDropdown(guiGraphics, mouseX, mouseY);
         drawOperatorDropdown(guiGraphics, mouseX, mouseY);
         drawNotice(guiGraphics);
         if (confirmCloseOpen) {
@@ -833,9 +851,15 @@ public final class FareScriptScreen extends Screen {
             return;
         }
         final ScriptNode value = script.node(node.inputs.get("value"));
-        final String chip = Component.translatable("gui.trdm.script.value_chip",
-                value == null ? Component.translatable("gui.trdm.script.none")
-                        : Component.literal(valueSummary(value.id))).getString();
+        final String chip;
+        if ("discount_fare".equals(node.type)) {
+            chip = Component.translatable("gui.trdm.script.discount_chip",
+                    value == null ? "?" : valueSummary(value.id)).getString();
+        } else {
+            chip = Component.translatable("gui.trdm.script.value_chip",
+                    value == null ? Component.translatable("gui.trdm.script.none")
+                            : Component.literal(valueSummary(value.id))).getString();
+        }
         final int chipTop = top + Math.round(30 * zoom);
         final int chipH = Math.max(12, Math.round(20 * zoom));
         final boolean target = valueTarget != null && !valueTarget.booleanSlot()
@@ -853,8 +877,144 @@ public final class FareScriptScreen extends Screen {
                 Math.max(40, view.width - 20), h};
     }
 
-    private void drawRuleField(GuiGraphics guiGraphics, View view) {
-        final int[] rect = ruleFieldRect(view);
+    private boolean isLineSelected() {
+        final ScriptNode selected = selectedValueNode();
+        return popupVisible && selected != null && "line_is".equals(selected.type);
+    }
+
+    private boolean inLineField(double mx, double my) {
+        return isLineSelected() && mx >= lineFieldX && mx < lineFieldX + lineFieldW
+                && my >= lineFieldY && my < lineFieldY + lineFieldH;
+    }
+
+    private void drawLineField(GuiGraphics guiGraphics, ScriptNode node) {
+        final int x = lineFieldX;
+        final int y = lineFieldY;
+        final int w = lineFieldW;
+        final int h = lineFieldH;
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, PANEL_BORDER);
+        fill(guiGraphics, x, y, w, h, 0xFF202020);
+        final String selected = node.fields.get("line_name");
+        final String label = selected == null || selected.isBlank()
+                ? Component.translatable("gui.trdm.script.choose_line").getString() : selected;
+        drawString(guiGraphics, fit(label, w - 24), x + 7,
+                y + Math.max(2, (h - 8) / 2),
+                selected == null || selected.isBlank() ? 0xFFB0B0B0 : 0xE8E8E8);
+        final int tx = x + w - 13;
+        final int ty = y + h / 2 - 2;
+        for (int row = 0; row < 4; row++) {
+            fill(guiGraphics, tx + row, ty + row, 8 - row * 2, 1, 0xFFB0B0B0);
+        }
+    }
+
+    private boolean handleLineClick(double mx, double my) {
+        if (lineDropOpen) {
+            final LineOption chosen = lineOptionAt(mx, my);
+            if (chosen != null) {
+                final ScriptNode selected = selectedValueNode();
+                if (selected != null && "line_is".equals(selected.type)) {
+                    pushUndo();
+                    selected.fields.put("line", Long.toString(chosen.id()));
+                    selected.fields.put("line_name", chosen.name());
+                    error = "";
+                }
+                lineDropOpen = false;
+                rebuild();
+                return true;
+            }
+            final boolean insideList = mx >= lineListX && mx < lineListX + lineListW
+                    && my >= lineListY && my < lineListY + lineListH;
+            lineDropOpen = false;
+            return insideList || inLineField(mx, my);
+        }
+        if (!inLineField(mx, my)) {
+            return false;
+        }
+        if (lineOptions().isEmpty()) {
+            error = Component.translatable("gui.trdm.script.no_lines").getString();
+            return true;
+        }
+        lineDropOpen = true;
+        lineDropScroll = 0;
+        operatorDropOpen = false;
+        ruleDropOpen = false;
+        return true;
+    }
+
+    private LineOption lineOptionAt(double mx, double my) {
+        if (!lineDropOpen || lineListW <= 0 || lineListH <= 0) {
+            return null;
+        }
+        if (mx < lineListX || mx >= lineListX + lineListW
+                || my < lineListY || my >= lineListY + lineListH) {
+            return null;
+        }
+        final int row = (int) ((my - lineListY - 2) / 18);
+        final int visible = Math.min(8, lineOptions().size());
+        if (row < 0 || row >= visible) {
+            return null;
+        }
+        final List<LineOption> options = lineOptions();
+        final int index = row + lineDropScroll;
+        return index >= 0 && index < options.size() ? options.get(index) : null;
+    }
+
+    private void drawLineDropdown(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!lineDropOpen) {
+            return;
+        }
+        final List<LineOption> options = lineOptions();
+        if (options.isEmpty()) {
+            lineDropOpen = false;
+            return;
+        }
+        final int visible = Math.min(8, options.size());
+        lineListX = lineFieldX;
+        lineListW = Math.max(240, lineFieldW);
+        lineListH = visible * 18 + 4;
+        lineListY = lineFieldY + lineFieldH + 2;
+        if (lineListY + lineListH > this.height - 8) {
+            lineListY = Math.max(44, lineFieldY - lineListH - 2);
+        }
+        lineDropScroll = clamp(lineDropScroll, 0, Math.max(0, options.size() - visible));
+        fill(guiGraphics, lineListX - 1, lineListY - 1, lineListW + 2, lineListH + 2, PANEL_BORDER);
+        fill(guiGraphics, lineListX, lineListY, lineListW, lineListH, 0xF0161616);
+        final ScriptNode selected = selectedValueNode();
+        for (int row = 0; row < visible; row++) {
+            final int index = row + lineDropScroll;
+            if (index >= options.size()) {
+                break;
+            }
+            final LineOption option = options.get(index);
+            final int top = lineListY + 2 + row * 18;
+            final boolean hovered = mouseX >= lineListX && mouseX < lineListX + lineListW
+                    && mouseY >= top && mouseY < top + 18;
+            final boolean current = selected != null
+                    && Long.toString(option.id()).equals(selected.fields.get("line"));
+            if (current) {
+                fill(guiGraphics, lineListX + 1, top, lineListW - 2, 18, 0x3345B35A);
+            } else if (hovered) {
+                fill(guiGraphics, lineListX + 1, top, lineListW - 2, 18, 0x33FFFFFF);
+            }
+            drawString(guiGraphics, fit(option.name(), lineListW - 16), lineListX + 8, top + 5,
+                    hovered ? 0xFFFFFFFF : 0xFFD0D0D0);
+        }
+        if (options.size() > visible) {
+            final int trackX = lineListX + lineListW - 5;
+            final int trackH = lineListH - 6;
+            fill(guiGraphics, trackX, lineListY + 3, 3, trackH, 0xFF3A3A3A);
+            final int thumbH = Math.max(10, Math.round(trackH * (float) visible / options.size()));
+            final int maxScroll = options.size() - visible;
+            final int thumbY = lineListY + 3 + Math.round((trackH - thumbH)
+                    * (float) lineDropScroll / maxScroll);
+            fill(guiGraphics, trackX, thumbY, 3, thumbH, 0xFF8A8A8A);
+        }
+    }
+
+    private void drawRuleField(GuiGraphics guiGraphics, View view) {        final int[] rect = ruleFieldRect(view);
         final int x = rect[0];
         final int y = rect[1];
         final int w = rect[2];
@@ -904,6 +1064,17 @@ public final class FareScriptScreen extends Screen {
         for (final FareRule rule : all) {
             if (this.rule.id == null || !this.rule.id.equals(rule.id)) {
                 result.add(rule);
+            }
+        }
+        return result;
+    }
+
+    private List<LineOption> lineOptions() {
+        final List<LineOption> result = new ArrayList<>();
+        final Set<Long> seen = new HashSet<>();
+        for (final Route route : ClientData.ROUTES) {
+            if (route.name != null && !route.name.isBlank() && seen.add(route.id)) {
+                result.add(new LineOption(route.id, route.name));
             }
         }
         return result;
@@ -963,6 +1134,7 @@ public final class FareScriptScreen extends Screen {
         ruleDropNodeId = field.node.id;
         ruleDropScroll = 0;
         operatorDropOpen = false;
+        lineDropOpen = false;
         return true;
     }
 
@@ -1246,6 +1418,10 @@ public final class FareScriptScreen extends Screen {
         } else if ("not".equals(value.type)) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.condition_a").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
+        } else if ("line_is".equals(value.type)) {
+            drawString(guiGraphics, Component.translatable("gui.trdm.script.line_name").getString(),
+                    popupX + 10, popupY + 33, TEXT_MUTED);
+            drawLineField(guiGraphics, value);
         } else if (isArithmetic(value.type)) {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.value_left").getString(),
                     popupX + 10, popupY + 56, TEXT_MUTED);
@@ -1309,6 +1485,7 @@ public final class FareScriptScreen extends Screen {
         if (inOperatorField(mx, my)) {
             operatorDropOpen = true;
             ruleDropOpen = false;
+            lineDropOpen = false;
             return true;
         }
         return false;
@@ -1430,6 +1607,9 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (handleRuleClick(mouseX, mouseY)) {
+            return true;
+        }
+        if (handleLineClick(mouseX, mouseY)) {
             return true;
         }
         if (handleOperatorClick(mouseX, mouseY)) {
@@ -1636,6 +1816,14 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (lineDropOpen && mouseX >= lineListX && mouseX < lineListX + lineListW
+                && mouseY >= lineListY && mouseY < lineListY + lineListH) {
+            final int visible = Math.min(8, lineOptions().size());
+            final int max = Math.max(0, lineOptions().size() - visible);
+            final int direction = delta > 0 ? -1 : 1;
+            lineDropScroll = clamp(lineDropScroll + direction, 0, max);
+            return true;
+        }
         if (ruleDropOpen && mouseX >= ruleListX && mouseX < ruleListX + ruleListW
                 && mouseY >= ruleListY && mouseY < ruleListY + ruleListH) {
             final int visible = Math.min(8, availableRules().size());
@@ -1728,7 +1916,11 @@ public final class FareScriptScreen extends Screen {
                 node.fields.put("else", "1");
             }
         } else if (valueStatement(nodeType)) {
-            node.inputs.put("value", newNumberValue("number").id);
+            final ScriptNode number = newNumberValue("number");
+            if ("discount_fare".equals(nodeType)) {
+                number.fields.put("value", "10");
+            }
+            node.inputs.put("value", number.id);
         } else if ("round_fare".equals(nodeType)) {
             node.fields.put("mode", "HALF");
             node.fields.put("unit", "0.1");
@@ -1873,6 +2065,13 @@ public final class FareScriptScreen extends Screen {
                 value.inputs.put("b", newBooleanValue("compare").id);
             }
             case "not" -> value.inputs.put("a", newBooleanValue("compare").id);
+            case "line_is" -> {
+                final List<LineOption> options = lineOptions();
+                if (!options.isEmpty()) {
+                    value.fields.put("line", Long.toString(options.get(0).id()));
+                    value.fields.put("line_name", options.get(0).name());
+                }
+            }
             default -> {
             }
         }
@@ -2123,6 +2322,7 @@ public final class FareScriptScreen extends Screen {
     private void computePopup() {
         popupChips.clear();
         operatorDropOpen = false;
+        lineDropOpen = false;
         if (!popupVisible || selectedStatement == null || selectedStatementNode() == null) {
             popupVisible = false;
             popupW = 0;
@@ -2171,6 +2371,12 @@ public final class FareScriptScreen extends Screen {
             operatorFieldY = popupY + 22;
             operatorFieldW = 70;
             operatorFieldH = 18;
+        }
+        if (selected != null && "line_is".equals(selected.type)) {
+            lineFieldX = popupX + 60;
+            lineFieldY = popupY + 22;
+            lineFieldW = popupW - 70;
+            lineFieldH = 18;
         }
 
         if (selected == null && (value == null || !isArithmetic(value.type))) {
@@ -2604,6 +2810,9 @@ public final class FareScriptScreen extends Screen {
             if ("multiply_fare".equals(ownerNode.type)) {
                 return "gui.trdm.script.value_factor";
             }
+            if ("discount_fare".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_percent";
+            }
             if ("set_fare".equals(ownerNode.type) || "add_fare".equals(ownerNode.type)
                     || "cap_fare".equals(ownerNode.type) || "floor_fare".equals(ownerNode.type)) {
                 return "gui.trdm.script.value_amount";
@@ -2678,7 +2887,7 @@ public final class FareScriptScreen extends Screen {
 
     private static boolean valueStatement(String type) {
         return "set_fare".equals(type) || "add_fare".equals(type) || "multiply_fare".equals(type)
-                || "cap_fare".equals(type) || "floor_fare".equals(type);
+                || "discount_fare".equals(type) || "cap_fare".equals(type) || "floor_fare".equals(type);
     }
 
     private static boolean statementType(String type) {
@@ -2697,7 +2906,8 @@ public final class FareScriptScreen extends Screen {
     }
 
     private static boolean isBoolean(String type) {
-        return "compare".equals(type) || "and".equals(type) || "or".equals(type) || "not".equals(type);
+        return "compare".equals(type) || "and".equals(type) || "or".equals(type)
+                || "not".equals(type) || "line_is".equals(type);
     }
 
     private static boolean isLiteralNumeric(String type) {
@@ -2719,8 +2929,9 @@ public final class FareScriptScreen extends Screen {
     private static int colorFor(String type) {
         return switch (type) {
             case "if", "if_else" -> 0xFFB06A1F;
-            case "compare", "and", "or", "not" -> 0xFF3E8E5A;
-            case "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare" -> 0xFF2F7D4F;
+            case "compare", "and", "or", "not", "line_is" -> 0xFF3E8E5A;
+            case "set_fare", "add_fare", "multiply_fare", "discount_fare",
+                 "cap_fare", "floor_fare" -> 0xFF2F7D4F;
             case "use_rule" -> 0xFF2F6E7D;
             case "round_fare" -> 0xFF2D6E82;
             case "number", "context_intervals", "context_meters", "context_stations",
@@ -2765,6 +2976,8 @@ public final class FareScriptScreen extends Screen {
             case "or" -> valueSummary(node.inputs.get("a"), depth + 1) + " 或 "
                     + valueSummary(node.inputs.get("b"), depth + 1);
             case "not" -> "非 " + valueSummary(node.inputs.get("a"), depth + 1);
+            case "line_is" -> "当前线路 = " + node.fields.getOrDefault("line_name",
+                    node.fields.getOrDefault("line", "?"));
             case "add" -> arithmeticSummary(node, "+", depth);
             case "subtract" -> arithmeticSummary(node, "-", depth);
             case "multiply" -> arithmeticSummary(node, "×", depth);
@@ -2842,6 +3055,10 @@ public final class FareScriptScreen extends Screen {
         }
         if (ruleDropOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             ruleDropOpen = false;
+            return true;
+        }
+        if (lineDropOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            lineDropOpen = false;
             return true;
         }
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE
