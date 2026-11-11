@@ -210,6 +210,8 @@
   "gui.trdm.script.pass_days_chip": "有效期：%s 天",
   "gui.trdm.script.pass_discount_chip": "折扣：%s%%",
   "gui.trdm.script.pass_daily_chip": "每日：%s 次",
+  "gui.trdm.hud.version": "TangsRail Decoration Version %s",
+  "gui.trdm.hud.test_warning": "测试版本。谨慎用于正式用途。",
   "gui.trdm.script.title": "积木规则",
   "gui.trdm.script.statements": "语句",
   "gui.trdm.script.values": "值",

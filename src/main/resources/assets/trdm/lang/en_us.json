@@ -242,6 +242,8 @@
   "gui.trdm.script.pass_days_chip": "Valid: %s day(s)",
   "gui.trdm.script.pass_discount_chip": "Discount: %s%%",
   "gui.trdm.script.pass_daily_chip": "Daily: %s use(s)",
+  "gui.trdm.hud.version": "TangsRail Decoration Version %s",
+  "gui.trdm.hud.test_warning": "Test build. Use with caution in production.",
   "gui.trdm.script.title": "Block rule",
   "gui.trdm.script.statements": "Statements",
   "gui.trdm.script.values": "Values",

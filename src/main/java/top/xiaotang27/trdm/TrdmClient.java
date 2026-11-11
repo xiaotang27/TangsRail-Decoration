@@ -22,6 +22,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.client.TrdmControlClient;
 import top.xiaotang27.trdm.client.TrdmEndGateDrag;
 import top.xiaotang27.trdm.client.TrdmEndGateHud;
+import top.xiaotang27.trdm.client.TrdmVersionHud;
 import top.xiaotang27.trdm.client.TrdmMtrFonts;
 import top.xiaotang27.trdm.render.RenderTrdmPSDDoor;
 import top.xiaotang27.trdm.render.RenderTrdmPSDEndGate;
@@ -113,6 +114,7 @@ public class TrdmClient implements ClientModInitializer {
 
         // 端门拖动时屏幕右侧的开度指示条（屏幕空间 UI）
         TrdmEndGateHud.register();
+        TrdmVersionHud.register();
 
         // 站名牌：本站 + 下一站 + 线路色带
         BlockEntityRendererRegistry.register(Trdm.STATION_SIGN_BE, context -> new RenderTrdmStationSign<>());
