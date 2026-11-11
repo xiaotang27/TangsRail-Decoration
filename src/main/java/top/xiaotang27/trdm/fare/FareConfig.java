@@ -8,6 +8,7 @@ import top.xiaotang27.trdm.ticket.PassRule;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,6 +69,38 @@ public final class FareConfig {
             }
         }
         return null;
+    }
+
+    /** 直接或间接被 {@code ruleId} 引用的规则，不含自身，按首次出现顺序去重。 */
+    public List<FareRule> transitiveRuleDependencies(String ruleId) {
+        final List<FareRule> result = new ArrayList<>();
+        collectRuleDependencies(ruleId, new LinkedHashSet<>(), result);
+        return result;
+    }
+
+    private void collectRuleDependencies(String ruleId, Set<String> visiting, List<FareRule> result) {
+        final FareRule rule = ruleById(ruleId);
+        if (rule == null || !visiting.add(ruleId)) {
+            return;
+        }
+        for (final String referencedId : rule.referencedRuleIds()) {
+            final FareRule referenced = ruleById(referencedId);
+            if (referenced != null && !result.contains(referenced)) {
+                result.add(referenced);
+                collectRuleDependencies(referencedId, visiting, result);
+            }
+        }
+    }
+
+    /** 直接引用 {@code ruleId} 的其他规则。 */
+    public List<FareRule> rulesReferencing(String ruleId) {
+        final List<FareRule> result = new ArrayList<>();
+        for (final FareRule rule : rules) {
+            if (!rule.id.equals(ruleId) && rule.referencedRuleIds().contains(ruleId)) {
+                result.add(rule);
+            }
+        }
+        return result;
     }
 
     /**

@@ -14,6 +14,7 @@ import top.xiaotang27.trdm.fare.FareConfig;
 import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareRule;
+import top.xiaotang27.trdm.fare.script.ScriptNode;
 
 import java.awt.Desktop;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +22,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -155,7 +158,11 @@ final class TicketConfigPage {
     private boolean exportDialogOpen;
     private String exportedFileName = "";
     private Path exportedFile;
+    private boolean exportChoiceOpen;
+    private String pendingExportRuleId;
+    private List<FareRule> pendingExportDependencies = List.of();
     private boolean confirmDeleteOpen;
+    private int deleteReferenceCount;
     private boolean noticeOpen;
     private boolean noticeError;
     private String noticeText = "";
@@ -290,6 +297,8 @@ final class TicketConfigPage {
             renderDeleteConfirm(guiGraphics, mx, my);
         } else if (exportDialogOpen) {
             renderExportDialog(guiGraphics, mx, my);
+        } else if (exportChoiceOpen) {
+            renderExportChoice(guiGraphics, mx, my);
         } else if (noticeOpen) {
             renderNotice(guiGraphics, mx, my);
         }
@@ -306,9 +315,14 @@ final class TicketConfigPage {
         final String name = detailRuleIndex >= 0 && detailRuleIndex < rules.size()
                 ? rules.get(detailRuleIndex).name : "";
         host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_confirm", name),
-                TrdmScreenBase.DESIGN_W / 2F, 262F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
+                TrdmScreenBase.DESIGN_W / 2F, 252F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
+        if (deleteReferenceCount > 0) {
+            host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_reference_warning",
+                            deleteReferenceCount),
+                    TrdmScreenBase.DESIGN_W / 2F, 278F, TrdmScreenBase.FONT_SUB, 0xFFFFB0B0);
+        }
         host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_confirm_hint"),
-                TrdmScreenBase.DESIGN_W / 2F, 290F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+                TrdmScreenBase.DESIGN_W / 2F, 298F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         final float deleteX = 350F;
         final float cancelX = 490F;
         host.buttonText(guiGraphics, deleteX, 320F, 120F, 28F,
@@ -329,6 +343,42 @@ final class TicketConfigPage {
         host.buttonText(guiGraphics, okX, 320F, 120F, 28F,
                 Component.translatable("gui.trdm.ticket.ok"), false,
                 host.hit(mx, my, okX, 320F, 120F, 28F), TrdmScreenBase.FONT_ROW);
+    }
+
+    private void renderExportChoice(GuiGraphics guiGraphics, float mx, float my) {
+        host.rect(guiGraphics, 0F, 0F, TrdmScreenBase.DESIGN_W, TrdmScreenBase.DESIGN_H, 0x90000000);
+        host.rect(guiGraphics, 199F, 109F, 562F, 282F, 0xFF9A9A9A);
+        host.rect(guiGraphics, 200F, 110F, 560F, 280F, 0xF0202020);
+        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.export_choice_question"),
+                TrdmScreenBase.DESIGN_W / 2F, 132F, TrdmScreenBase.FONT_BODY,
+                TrdmScreenBase.COLOR_TEXT);
+        int line = 0;
+        for (final FareRule dependency : pendingExportDependencies) {
+            if (line >= 8) {
+                host.text(guiGraphics, Component.literal("…"),
+                        250F, 214F + line * 15F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+                break;
+            }
+            host.text(guiGraphics, Component.literal("· " + dependency.name),
+                    250F, 214F + line * 15F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_TEXT);
+            line++;
+        }
+        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.export_choice_count",
+                        pendingExportDependencies.size()),
+                TrdmScreenBase.DESIGN_W / 2F, 338F, TrdmScreenBase.FONT_SUB,
+                TrdmScreenBase.COLOR_SUB);
+        final float includeX = 300F;
+        final float onlyX = 440F;
+        final float cancelX = 610F;
+        host.buttonText(guiGraphics, includeX, 356F, 120F, 26F,
+                Component.translatable("gui.trdm.ticket.export_include_dependencies"), false,
+                host.hit(mx, my, includeX, 356F, 120F, 26F), TrdmScreenBase.FONT_SUB);
+        host.buttonText(guiGraphics, onlyX, 356F, 150F, 26F,
+                Component.translatable("gui.trdm.ticket.export_only_rule"), false,
+                host.hit(mx, my, onlyX, 356F, 150F, 26F), TrdmScreenBase.FONT_SUB);
+        host.buttonText(guiGraphics, cancelX, 356F, 90F, 26F,
+                Component.translatable("gui.trdm.script.cancel"), false,
+                host.hit(mx, my, cancelX, 356F, 90F, 26F), TrdmScreenBase.FONT_SUB);
     }
 
     private void renderNotice(GuiGraphics guiGraphics, float mx, float my) {
@@ -939,12 +989,38 @@ final class TicketConfigPage {
         rebuildOwners();
     }
 
-    /** 把选中的规则导出成单独的文件；文件名使用规则名。 */
+    /** 导出选中规则；若有被引用规则，先让玩家选择是否一起导出。 */
     private void exportSelectedRule() {
         if (detailRuleIndex < 0 || detailRuleIndex >= rules.size()) {
             return;
         }
         final FareRule rule = rules.get(detailRuleIndex);
+        final List<FareRule> dependencies = config.transitiveRuleDependencies(rule.id);
+        if (dependencies.isEmpty()) {
+            writeRuleExport(rule, List.of());
+            return;
+        }
+        pendingExportRuleId = rule.id;
+        pendingExportDependencies = dependencies;
+        exportChoiceOpen = true;
+        confirmDeleteOpen = false;
+        exportDialogOpen = false;
+        noticeOpen = false;
+    }
+
+    private void confirmExportWithDependencies(boolean includeDependencies) {
+        final FareRule rule = pendingExportRuleId == null ? null : config.ruleById(pendingExportRuleId);
+        if (rule == null) {
+            exportChoiceOpen = false;
+            return;
+        }
+        final List<FareRule> dependencies = includeDependencies
+                ? pendingExportDependencies : List.of();
+        exportChoiceOpen = false;
+        writeRuleExport(rule, dependencies);
+    }
+
+    private void writeRuleExport(FareRule rule, List<FareRule> dependencies) {
         final FareConfig export = new FareConfig();
         export.enabled = config.enabled;
         export.mode = config.mode;
@@ -952,6 +1028,9 @@ final class TicketConfigPage {
         export.transferDiscountCents = config.transferDiscountCents;
         export.mergeSameRule = config.mergeSameRule;
         export.rules.add(rule.copy());
+        for (final FareRule dependency : dependencies) {
+            export.rules.add(dependency.copy());
+        }
 
         final String fileName = exportFileName(rule.name);
         final Path dir = FabricLoader.getInstance().getConfigDir().resolve("trdm_exports");
@@ -962,6 +1041,7 @@ final class TicketConfigPage {
             exportedFile = file;
             exportedFileName = fileName;
             exportDialogOpen = true;
+            exportChoiceOpen = false;
             confirmDeleteOpen = false;
             noticeOpen = false;
         } catch (Exception exception) {
@@ -992,6 +1072,7 @@ final class TicketConfigPage {
         }
         confirmDeleteOpen = false;
         exportDialogOpen = false;
+        exportChoiceOpen = false;
         int imported = 0;
         boolean invalid = false;
         for (final Path path : paths) {
@@ -1020,10 +1101,38 @@ final class TicketConfigPage {
                 invalid = true;
                 continue;
             }
+            final Map<String, String> idMap = new LinkedHashMap<>();
+            final Set<String> usedIds = new HashSet<>();
+            for (final FareRule rule : config.rules) {
+                usedIds.add(rule.id);
+            }
+            for (final FareRule source : parsed.rules) {
+                final String oldId = source.id;
+                String newId = oldId;
+                if (newId == null || newId.isBlank() || usedIds.contains(newId)) {
+                    newId = uniqueRuleId(usedIds);
+                }
+                if (oldId != null && !oldId.isBlank() && !idMap.containsKey(oldId)) {
+                    idMap.put(oldId, newId);
+                }
+                usedIds.add(newId);
+            }
             for (final FareRule source : parsed.rules) {
                 final FareRule copy = source.copy();
-                if (copy.id == null || copy.id.isBlank() || findRule(copy.id) != null) {
-                    copy.id = uniqueRuleId();
+                copy.id = idMap.getOrDefault(source.id, source.id);
+                if (copy.id == null || copy.id.isBlank()) {
+                    copy.id = uniqueRuleId(usedIds);
+                }
+                usedIds.add(copy.id);
+                for (final ScriptNode node : copy.script == null
+                        ? List.<ScriptNode>of() : copy.script.nodes) {
+                    if (!"use_rule".equals(node.type)) {
+                        continue;
+                    }
+                    final String referenced = node.fields.get("rule");
+                    if (referenced != null && idMap.containsKey(referenced)) {
+                        node.fields.put("rule", idMap.get(referenced));
+                    }
                 }
                 copy.name = uniqueRuleName(copy.name);
                 config.rules.add(copy);
@@ -1111,6 +1220,7 @@ final class TicketConfigPage {
         noticeOpen = true;
         confirmDeleteOpen = false;
         exportDialogOpen = false;
+        exportChoiceOpen = false;
     }
 
     private void showError(Component message) {
@@ -1119,11 +1229,15 @@ final class TicketConfigPage {
         noticeOpen = true;
         confirmDeleteOpen = false;
         exportDialogOpen = false;
+        exportChoiceOpen = false;
     }
 
     private void requestDeleteRule() {
+        deleteReferenceCount = detailRuleIndex >= 0 && detailRuleIndex < rules.size()
+                ? config.rulesReferencing(rules.get(detailRuleIndex).id).size() : 0;
         confirmDeleteOpen = true;
         exportDialogOpen = false;
+        exportChoiceOpen = false;
         noticeOpen = false;
     }
 
@@ -1175,6 +1289,14 @@ final class TicketConfigPage {
     private String uniqueRuleId() {
         int index = 1;
         while (findRule("rule_" + index) != null) {
+            index++;
+        }
+        return "rule_" + index;
+    }
+
+    private String uniqueRuleId(Set<String> reserved) {
+        int index = 1;
+        while (reserved.contains("rule_" + index) || findRule("rule_" + index) != null) {
             index++;
         }
         return "rule_" + index;
@@ -1461,6 +1583,16 @@ final class TicketConfigPage {
         if (!inWorld()) {
             return false;
         }
+        if (exportChoiceOpen) {
+            if (host.hit(mx, my, 300F, 356F, 120F, 26F)) {
+                confirmExportWithDependencies(true);
+            } else if (host.hit(mx, my, 440F, 356F, 150F, 26F)) {
+                confirmExportWithDependencies(false);
+            } else if (host.hit(mx, my, 610F, 356F, 90F, 26F)) {
+                exportChoiceOpen = false;
+            }
+            return true;
+        }
         if (noticeOpen) {
             if (host.hit(mx, my, 420F, 320F, 120F, 28F)) {
                 noticeOpen = false;
@@ -1664,6 +1796,12 @@ final class TicketConfigPage {
     }
 
     boolean keyPressed(int keyCode) {
+        if (exportChoiceOpen) {
+            if (keyCode == 256) {
+                exportChoiceOpen = false;
+            }
+            return true;
+        }
         if (noticeOpen) {
             if (keyCode == 256 || keyCode == 257) {
                 noticeOpen = false;

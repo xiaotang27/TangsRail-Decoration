@@ -1,8 +1,10 @@
 package top.xiaotang27.trdm.fare;
 
 import org.junit.jupiter.api.Test;
+import top.xiaotang27.trdm.fare.script.FareScript;
 import top.xiaotang27.trdm.fare.script.RuleResolver;
 import top.xiaotang27.trdm.fare.script.ScriptContext;
+import top.xiaotang27.trdm.fare.script.ScriptNode;
 
 import java.util.HashSet;
 import java.util.List;
@@ -70,6 +72,34 @@ class FareConfigTest {
         assertEquals(1, target.rules.size());
         assertEquals("x", target.rules.get(0).id);
         assertEquals("x", target.routeRules.get("minecraft:overworld|7"));
+    }
+
+    @Test
+    void dependencyClosureContainsTransitiveReferences() {
+        final FareConfig config = new FareConfig();
+        config.rules.add(referencing("a", "b"));
+        config.rules.add(referencing("b", "c"));
+        final FareRule c = new FareRule("c", "C", FareRule.Kind.FLAT);
+        config.rules.add(c);
+
+        assertEquals(List.of("b", "c"), config.transitiveRuleDependencies("a").stream()
+                .map(rule -> rule.id).toList());
+        assertEquals(List.of("a"), config.rulesReferencing("b").stream()
+                .map(rule -> rule.id).toList());
+    }
+
+    private static FareRule referencing(String id, String referencedId) {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "use";
+        final ScriptNode use = new ScriptNode("use", "use_rule");
+        use.fields.put("rule", referencedId);
+        script.hat = "hat";
+        script.nodes.add(hat);
+        script.nodes.add(use);
+        final FareRule rule = new FareRule(id, id, FareRule.Kind.SCRIPT);
+        rule.script = script;
+        return rule;
     }
 
     @Test

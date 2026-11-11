@@ -8,7 +8,9 @@ import top.xiaotang27.trdm.fare.script.ScriptTier;
 import top.xiaotang27.trdm.fare.script.Scripts;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 一条计费规则。
@@ -80,6 +82,24 @@ public final class FareRule {
 
     public boolean isVanilla() {
         return kind == Kind.MTR_VANILLA;
+    }
+
+    /** 脚本里“使用规则”积木直接引用的规则 ID，按出现顺序去重。 */
+    public Set<String> referencedRuleIds() {
+        final Set<String> ids = new LinkedHashSet<>();
+        if (script == null) {
+            return ids;
+        }
+        for (final ScriptNode node : script.nodes) {
+            if (!"use_rule".equals(node.type)) {
+                continue;
+            }
+            final String id = node.fields.get("rule");
+            if (id != null && !id.isBlank()) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 
     /** 未应用 {@code maxFare} 封顶的票价（分）。 */
