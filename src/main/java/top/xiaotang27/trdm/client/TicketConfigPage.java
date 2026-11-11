@@ -412,7 +412,9 @@ final class TicketConfigPage {
                 ? "gui.trdm.config.on" : "gui.trdm.config.off");
         host.textRight(guiGraphics, state, toggleX - 10F, ENABLE_LABEL_Y + 4F,
                 TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
-        host.toggle(guiGraphics, toggleX, ENABLE_TOGGLE_Y, config.enabled);
+        if (canEdit()) {
+            host.toggle(guiGraphics, toggleX, ENABLE_TOGGLE_Y, config.enabled);
+        }
 
         host.section(guiGraphics, "gui.trdm.ticket.rules", RULES_SECTION_Y);
         if (lines.isEmpty()) {
@@ -424,18 +426,20 @@ final class TicketConfigPage {
                     TrdmScreenBase.CONTENT_RIGHT - 230F, RULES_SECTION_Y + 5F,
                     TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         }
-        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F,
-                60F, 18F, Component.translatable("gui.trdm.ticket.import_short"), false,
-                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F),
-                TrdmScreenBase.FONT_SUB);
-        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F,
-                50F, 18F, Component.translatable("gui.trdm.ticket.add_rule_short"), false,
-                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F),
-                TrdmScreenBase.FONT_SUB);
-        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F,
-                50F, 18F, Component.translatable("gui.trdm.ticket.add_script_short"), false,
-                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F, 50F, 18F),
-                TrdmScreenBase.FONT_SUB);
+        if (canEdit()) {
+            host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F,
+                    60F, 18F, Component.translatable("gui.trdm.ticket.import_short"), false,
+                    host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F),
+                    TrdmScreenBase.FONT_SUB);
+            host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F,
+                    50F, 18F, Component.translatable("gui.trdm.ticket.add_rule_short"), false,
+                    host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 112F, RULES_SECTION_Y - 3F, 50F, 18F),
+                    TrdmScreenBase.FONT_SUB);
+            host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F,
+                    50F, 18F, Component.translatable("gui.trdm.ticket.add_script_short"), false,
+                    host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 58F, RULES_SECTION_Y - 3F, 50F, 18F),
+                    TrdmScreenBase.FONT_SUB);
+        }
 
         renderRulesPanel(guiGraphics, mx, my);
 
@@ -443,11 +447,12 @@ final class TicketConfigPage {
         host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
                 TrdmScreenBase.CONTENT_RIGHT - 84F, TEMPLATES_SECTION_Y + 5F,
                 TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
-        host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F,
-                80F, 18F, Component.translatable("gui.trdm.ticket.pass_settings"), false,
-                host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F),
-                TrdmScreenBase.FONT_SUB);
-        for (int index = 0; index < templates.size(); index++) {
+        if (canEdit()) {
+            host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F,
+                    80F, 18F, Component.translatable("gui.trdm.ticket.pass_settings"), false,
+                    host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F),
+                    TrdmScreenBase.FONT_SUB);
+        }        for (int index = 0; index < templates.size(); index++) {
             renderTemplateRow(guiGraphics, index, mx, my);
         }
     }
@@ -612,6 +617,9 @@ final class TicketConfigPage {
 
         host.section(guiGraphics, "gui.trdm.ticket.rule_content", DETAIL_CONTENT_SECTION_Y);
         renderRuleSummary(guiGraphics, rule);
+        if (!canEdit()) {
+            return;
+        }
         renderEditButton(guiGraphics, mx, my);
         host.text(guiGraphics, Component.translatable("gui.trdm.ticket.rule_enable"),
                 TrdmScreenBase.CONTENT_X, DETAIL_EDIT_BUTTON_Y + 8F,
@@ -704,6 +712,9 @@ final class TicketConfigPage {
                 TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_SECTION_Y + 20F);
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint2"),
                 TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_SECTION_Y + 34F);
+        if (!canEdit()) {
+            return;
+        }
         renderEditButton(guiGraphics, mx, my);
     }
 
@@ -1567,14 +1578,11 @@ final class TicketConfigPage {
 
 
     private void renderOverlay(GuiGraphics guiGraphics) {
-        host.rect(guiGraphics, TrdmScreenBase.SIDEBAR_W, 0F,
-                TrdmScreenBase.DESIGN_W - TrdmScreenBase.SIDEBAR_W, TrdmScreenBase.DESIGN_H, 0xB4000000);
-        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.no_permission1"),
-                TrdmScreenBase.DESIGN_W / 2F, 228F, 20F, TrdmScreenBase.COLOR_TEXT);
-        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.no_permission2"),
-                TrdmScreenBase.DESIGN_W / 2F, 258F, TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_SUB);
-        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.no_permission3"),
-                TrdmScreenBase.DESIGN_W / 2F, 278F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
+        // 非 OP 仍可查看规则和线路绑定，但所有编辑动作在 click 中被禁用。
+        host.rect(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 86F, 44F, 78F, 18F, 0x66000000);
+        host.text(guiGraphics, Component.translatable("gui.trdm.ticket.read_only"),
+                TrdmScreenBase.CONTENT_RIGHT - 80F, 49F, TrdmScreenBase.FONT_SUB,
+                TrdmScreenBase.COLOR_TEXT);
     }
 
     // ===== 点击 / 滚轮 / 键盘 =====
@@ -1616,6 +1624,20 @@ final class TicketConfigPage {
             return true;
         }
         if (!canEdit()) {
+            if (view == VIEW_MAIN) {
+                final int row = readOnlyRuleRow(mx, my);
+                if (row != Integer.MIN_VALUE) {
+                    detailRuleIndex = row;
+                    selectedKind = row < 0 ? SELECT_SYSTEM : SELECT_RULE;
+                    selectedIndex = row;
+                    view = VIEW_RULE;
+                    return true;
+                }
+            } else if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - BACK_W,
+                    TrdmScreenBase.TITLE_Y, BACK_W, BACK_H)) {
+                backToMain();
+                return true;
+            }
             return mx >= TrdmScreenBase.SIDEBAR_W;
         }
         if (dropKind != DROP_NONE) {
@@ -2037,6 +2059,20 @@ final class TicketConfigPage {
 
     private boolean hoveredRuleRow(float top, float mx, float my) {
         return my >= RULES_TOP && my < RULES_TOP + RULES_PANEL_H && hoveredRow(top, mx, my);
+    }
+
+    /** 只读查看：返回点击到的规则索引（-1 为 MTR 原版行），没有命中返回 Integer.MIN_VALUE。 */
+    private int readOnlyRuleRow(float mx, float my) {
+        if (mx < TrdmScreenBase.CONTENT_X || mx >= TrdmScreenBase.CONTENT_RIGHT
+                || my < RULES_TOP || my >= RULES_TOP + RULES_PANEL_H) {
+            return Integer.MIN_VALUE;
+        }
+        final int visual = (int) ((my - RULES_TOP + ruleScroll) / ROW_H);
+        final int index = visual - 1;
+        if (index == -1) {
+            return -1;
+        }
+        return index >= 0 && index < rules.size() ? index : Integer.MIN_VALUE;
     }
 
     private boolean inWorld() {

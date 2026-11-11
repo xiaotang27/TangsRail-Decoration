@@ -164,6 +164,7 @@
   "gui.trdm.ticket.export_done": "Fare config exported: %s",
   "gui.trdm.ticket.export_failed": "Failed to export fare config: %s",
   "gui.trdm.ticket.import_short": "Import",
+  "gui.trdm.ticket.read_only": "Read only",
   "gui.trdm.ticket.export_rule": "Export rule",
   "gui.trdm.ticket.export_saved": "Saved as (%s)",
   "gui.trdm.ticket.export_folder_hint": "Click OK to open the containing folder",

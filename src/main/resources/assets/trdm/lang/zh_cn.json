@@ -132,6 +132,7 @@
   "gui.trdm.ticket.export_done": "已导出票务配置：%s",
   "gui.trdm.ticket.export_failed": "导出票务配置失败：%s",
   "gui.trdm.ticket.import_short": "导入",
+  "gui.trdm.ticket.read_only": "只读查看",
   "gui.trdm.ticket.export_rule": "导出规则",
   "gui.trdm.ticket.export_saved": "已保存为（%s）",
   "gui.trdm.ticket.export_folder_hint": "点击确定打开文件所在文件夹",
