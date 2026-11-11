@@ -15,6 +15,8 @@ import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareRule;
 import top.xiaotang27.trdm.fare.script.ScriptNode;
+import top.xiaotang27.trdm.ticket.PassRule;
+import top.xiaotang27.trdm.ticket.PassRules;
 import top.xiaotang27.trdm.ticket.TimeBasis;
 import top.xiaotang27.trdm.ticket.TrdmClock;
 
@@ -34,24 +36,24 @@ import java.util.Set;
  * 通用设置里的“票务系统”页：票务规则列表 + 通用车票模板列表、规则/模板详情、非管理员遮罩。
  * <p>
  * 规则和线路绑定来自 {@link FareRuntime} 的 {@link FareConfig}（{@code config/trdm-fares.json}）；
- * 车票模板仍是界面骨架，等通票系统接入后替换。
+ * 车票模板与计费规则共用列表/详情/积木编辑逻辑，只是积木类型不同。
  */
 final class TicketConfigPage {
 
     // ===== 布局 =====
-    private static final float ENABLE_LABEL_Y = 64F;
-    private static final float ENABLE_SUB_Y = 82F;
-    private static final float ENABLE_TOGGLE_Y = 60F;
+    private static final float ENABLE_LABEL_Y = 58F;
+    private static final float ENABLE_SUB_Y = 74F;
+    private static final float ENABLE_TOGGLE_Y = 54F;
 
-    private static final float TIME_LABEL_Y = 96F;
-    private static final float TIME_SUB_Y = 110F;
-    private static final float TIME_TOGGLE_Y = 92F;
+    private static final float TIME_LABEL_Y = 90F;
+    private static final float TIME_SUB_Y = 104F;
+    private static final float TIME_TOGGLE_Y = 86F;
 
-    private static final float RULES_SECTION_Y = 132F;
-    private static final float RULES_TOP = 156F;
+    private static final float RULES_SECTION_Y = 122F;
+    private static final float RULES_TOP = 144F;
     private static final float RULES_PANEL_H = 136F;
-    private static final float TEMPLATES_SECTION_Y = 300F;
-    private static final float TEMPLATES_TOP = 324F;
+    private static final float TEMPLATES_SECTION_Y = 286F;
+    private static final float TEMPLATES_TOP = 308F;
     private static final float ROW_H = 34F;
 
     private static final float DROP_W = 250F;
@@ -129,11 +131,11 @@ final class TicketConfigPage {
     private final TrdmScreenBase host;
     private final FareConfig config;
     private final List<FareRule> rules;
+    private final List<PassRule> templates;
 
     private final List<String> lines = new ArrayList<>();
     /** 线路名 → MTR 线路 ID；绑定按“维度|线路 ID”落盘。 */
     private final java.util.Map<String, Long> lineIds = new java.util.HashMap<>();
-    private final List<TemplateRow> templates = new ArrayList<>();
     /** 线路名 → 规则下标；不在表里 = 系统行（MTR 原版公式）。 */
     private final java.util.Map<String, Integer> lineOwner = new java.util.HashMap<>();
 
@@ -168,6 +170,7 @@ final class TicketConfigPage {
     private String pendingExportRuleId;
     private List<FareRule> pendingExportDependencies = List.of();
     private boolean confirmDeleteOpen;
+    private boolean deleteTemplatePending;
     private int deleteReferenceCount;
     private boolean noticeOpen;
     private boolean noticeError;
@@ -177,6 +180,7 @@ final class TicketConfigPage {
         this.host = host;
         this.config = FareRuntime.get().config();
         this.rules = config.rules;
+        this.templates = config.passRules;
         seed();
     }
 
@@ -193,15 +197,6 @@ final class TicketConfigPage {
         real.sort(String.CASE_INSENSITIVE_ORDER);
         lines.addAll(real);
         rebuildOwners();
-
-        templates.add(new TemplateRow("一日票"));
-        templates.add(new TemplateRow("三日票"));
-        templates.add(new TemplateRow("青春18券"));
-        templates.add(new TemplateRow("未命名车票"));
-
-        templates.get(1).rules.add(0);
-        templates.get(1).rules.add(1);
-        templates.get(2).rules.add(1);
 
         selectedKind = SELECT_SYSTEM;
         selectedIndex = -1;
@@ -318,11 +313,16 @@ final class TicketConfigPage {
 
     private void renderDeleteConfirm(GuiGraphics guiGraphics, float mx, float my) {
         renderConfirmPanel(guiGraphics);
-        final String name = detailRuleIndex >= 0 && detailRuleIndex < rules.size()
-                ? rules.get(detailRuleIndex).name : "";
-        host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_confirm", name),
+        final String name = deleteTemplatePending
+                ? (detailTemplateIndex >= 0 && detailTemplateIndex < templates.size()
+                ? templates.get(detailTemplateIndex).name : "")
+                : (detailRuleIndex >= 0 && detailRuleIndex < rules.size()
+                ? rules.get(detailRuleIndex).name : "");
+        host.centred(guiGraphics, Component.translatable(deleteTemplatePending
+                        ? "gui.trdm.ticket.delete_template_confirm"
+                        : "gui.trdm.ticket.delete_confirm", name),
                 TrdmScreenBase.DESIGN_W / 2F, 252F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
-        if (deleteReferenceCount > 0) {
+        if (!deleteTemplatePending && deleteReferenceCount > 0) {
             host.centred(guiGraphics, Component.translatable("gui.trdm.ticket.delete_reference_warning",
                             deleteReferenceCount),
                     TrdmScreenBase.DESIGN_W / 2F, 278F, TrdmScreenBase.FONT_SUB, 0xFFFFB0B0);
@@ -332,7 +332,8 @@ final class TicketConfigPage {
         final float deleteX = 350F;
         final float cancelX = 490F;
         host.buttonText(guiGraphics, deleteX, 320F, 120F, 28F,
-                Component.translatable("gui.trdm.ticket.delete_rule"), false,
+                Component.translatable(deleteTemplatePending
+                        ? "gui.trdm.ticket.delete_template" : "gui.trdm.ticket.delete_rule"), false,
                 host.hit(mx, my, deleteX, 320F, 120F, 28F), TrdmScreenBase.FONT_ROW);
         host.buttonText(guiGraphics, cancelX, 320F, 120F, 28F,
                 Component.translatable("gui.trdm.script.cancel"), false,
@@ -468,10 +469,11 @@ final class TicketConfigPage {
                 TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         if (canEdit()) {
             host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F,
-                    80F, 18F, Component.translatable("gui.trdm.ticket.pass_settings"), false,
+                    80F, 18F, Component.translatable("gui.trdm.ticket.add_template_short"), false,
                     host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F),
                     TrdmScreenBase.FONT_SUB);
-        }        for (int index = 0; index < templates.size(); index++) {
+        }
+        for (int index = 0; index < templates.size(); index++) {
             renderTemplateRow(guiGraphics, index, mx, my);
         }
     }
@@ -533,9 +535,9 @@ final class TicketConfigPage {
                         TrdmScreenBase.FONT_ROW)), TrdmScreenBase.CONTENT_X + 9F, top + 10F,
                 TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
 
-        host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.rule_scope"),
+        host.textRight(guiGraphics, Component.translatable("gui.trdm.pass.scope_value_label"),
                 dropX() - 8F, top + 11F, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
-        renderDropBox(guiGraphics, dropX(), top + 6F, ruleSummary(templates.get(index)),
+        renderDropBox(guiGraphics, dropX(), top + 6F, passScopeSummary(templates.get(index)),
                 dropKind == DROP_TEMPLATE && dropIndex == index, mx, my);
     }
 
@@ -601,11 +603,11 @@ final class TicketConfigPage {
 
         final String scope = view == VIEW_RULE
                 ? Component.translatable("gui.trdm.ticket.line_scope").getString()
-                : Component.translatable("gui.trdm.ticket.rule_scope").getString();
+                : Component.translatable("gui.trdm.pass.scope_value_label").getString();
         host.text(guiGraphics, Component.literal(scope), TrdmScreenBase.CONTENT_X,
                 DETAIL_SCOPE_LABEL_Y, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_TEXT);
         final String summary = view == VIEW_RULE
-                ? lineSummary(detailRuleIndex) : ruleSummary(templates.get(detailTemplateIndex));
+                ? lineSummary(detailRuleIndex) : passScopeSummary(templates.get(detailTemplateIndex));
         renderDropBox(guiGraphics, dropX(), DETAIL_SCOPE_Y, summary,
                 (dropKind == DROP_DETAIL_RULE || dropKind == DROP_DETAIL_TEMPLATE), mx, my);
 
@@ -719,22 +721,58 @@ final class TicketConfigPage {
     }
 
     private void renderTemplateDetail(GuiGraphics guiGraphics, float mx, float my) {
-        final TemplateRow template = templates.get(detailTemplateIndex);
+        final PassRule template = templates.get(detailTemplateIndex);
+        top.xiaotang27.trdm.fare.script.PassSettings settings = null;
+        String settingsError = "";
+        try {
+            template.ensureScript();
+            settings = top.xiaotang27.trdm.fare.script.PassScriptCompiler.evaluate(template.script);
+        } catch (RuntimeException exception) {
+            settingsError = Component.translatable("gui.trdm.pass.script_invalid",
+                    template.name, String.valueOf(exception.getMessage())).getString();
+        }
         host.section(guiGraphics, "gui.trdm.ticket.rule_name", DETAIL_NAME_SECTION_Y);
         host.field(guiGraphics, FIELD_NAME, TrdmScreenBase.CONTENT_X, DETAIL_NAME_FIELD_Y,
                 TrdmScreenBase.CONTENT_W * 0.62F, 24F, TrdmScreenBase.FONT_ROW, template.name);
         host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.name_placeholder"),
                 TrdmScreenBase.CONTENT_X, DETAIL_NAME_FIELD_Y + 30F);
 
-        host.section(guiGraphics, "gui.trdm.ticket.edit_template", DETAIL_CONTENT_SECTION_Y);
-        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint"),
-                TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_SECTION_Y + 20F);
-        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.edit_hint2"),
-                TrdmScreenBase.CONTENT_X, DETAIL_CONTENT_SECTION_Y + 34F);
+        host.section(guiGraphics, "gui.trdm.ticket.pass_content", DETAIL_CONTENT_SECTION_Y);
+        if (settings == null) {
+            host.text(guiGraphics, Component.literal(settingsError), TrdmScreenBase.CONTENT_X,
+                    DETAIL_CONTENT_TOP, TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_WARN);
+        } else {
+            float y = DETAIL_CONTENT_TOP;
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.pass.price"),
+                    Component.translatable("gui.trdm.pass.price_value",
+                            settings.priceEmeralds()).getString(), y);
+            y += DETAIL_CONTENT_LINE;
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.pass.days"),
+                    Component.translatable("gui.trdm.pass.days_value", settings.days()).getString(), y);
+            y += DETAIL_CONTENT_LINE;
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.pass.discount"),
+                    settings.discountPercent() + "%", y);
+            y += DETAIL_CONTENT_LINE;
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.pass.daily_limit_label"),
+                    settings.dailyLimit() <= 0
+                            ? Component.translatable("gui.trdm.pass.unlimited").getString()
+                            : Integer.toString(settings.dailyLimit()), y);
+            y += DETAIL_CONTENT_LINE;
+            summaryRow(guiGraphics, Component.translatable("gui.trdm.pass.scope_value_label"),
+                    passScopeSummary(template), y);
+        }
+
         if (!canEdit()) {
             return;
         }
-        renderEditButton(guiGraphics, mx, my);
+        final float editX = TrdmScreenBase.CONTENT_RIGHT - 120F;
+        host.buttonText(guiGraphics, editX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
+                Component.translatable("gui.trdm.ticket.edit_button"), false,
+                host.hit(mx, my, editX, DETAIL_EDIT_BUTTON_Y, 120F, 24F), TrdmScreenBase.FONT_ROW);
+        final float deleteX = TrdmScreenBase.CONTENT_RIGHT - 250F;
+        host.buttonText(guiGraphics, deleteX, DETAIL_EDIT_BUTTON_Y, 120F, 24F,
+                Component.translatable("gui.trdm.ticket.delete_template"), false,
+                host.hit(mx, my, deleteX, DETAIL_EDIT_BUTTON_Y, 120F, 24F), TrdmScreenBase.FONT_ROW);
     }
 
     private void renderEditButton(GuiGraphics guiGraphics, float mx, float my) {
@@ -1264,12 +1302,55 @@ final class TicketConfigPage {
     }
 
     private void requestDeleteRule() {
+        deleteTemplatePending = false;
         deleteReferenceCount = detailRuleIndex >= 0 && detailRuleIndex < rules.size()
                 ? config.rulesReferencing(rules.get(detailRuleIndex).id).size() : 0;
         confirmDeleteOpen = true;
         exportDialogOpen = false;
         exportChoiceOpen = false;
         noticeOpen = false;
+    }
+
+    private void requestDeleteTemplate() {
+        if (detailTemplateIndex < 0 || detailTemplateIndex >= templates.size()) {
+            return;
+        }
+        deleteTemplatePending = true;
+        deleteReferenceCount = 0;
+        confirmDeleteOpen = true;
+        exportDialogOpen = false;
+        exportChoiceOpen = false;
+        noticeOpen = false;
+    }
+
+    private void deleteTemplate() {
+        if (detailTemplateIndex < 0 || detailTemplateIndex >= templates.size()) {
+            return;
+        }
+        templates.remove(detailTemplateIndex);
+        detailTemplateIndex = -1;
+        view = VIEW_MAIN;
+        selectedKind = SELECT_NONE;
+        selectedIndex = -1;
+        deleteTemplatePending = false;
+        confirmDeleteOpen = false;
+        FareRuntime.get().save();
+    }
+
+    private void addTemplate() {
+        if (templates.size() >= 8) {
+            showError(Component.translatable("gui.trdm.pass.limit"));
+            return;
+        }
+        final PassRule template = new PassRule(PassRules.uniqueId(templates, "pass_"),
+                Component.translatable("gui.trdm.pass.new_rule").getString(), 10, 1);
+        templates.add(template);
+        detailTemplateIndex = templates.size() - 1;
+        selectedKind = SELECT_TEMPLATE;
+        selectedIndex = detailTemplateIndex;
+        view = VIEW_TEMPLATE;
+        deleteTemplatePending = false;
+        FareRuntime.get().save();
     }
 
     private void openExportedFolder() {
@@ -1630,9 +1711,14 @@ final class TicketConfigPage {
         if (confirmDeleteOpen) {
             if (host.hit(mx, my, 350F, 320F, 120F, 28F)) {
                 confirmDeleteOpen = false;
-                deleteRule();
+                if (deleteTemplatePending) {
+                    deleteTemplate();
+                } else {
+                    deleteRule();
+                }
             } else if (host.hit(mx, my, 490F, 320F, 120F, 28F)) {
                 confirmDeleteOpen = false;
+                deleteTemplatePending = false;
             }
             return true;
         }
@@ -1704,7 +1790,7 @@ final class TicketConfigPage {
         }
 
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F)) {
-            Minecraft.getInstance().setScreen(new PassRulesScreen(host));
+            addTemplate();
             return true;
         }
         if (clickRuleRow(-1, 0, mx, my)) {
@@ -1781,6 +1867,7 @@ final class TicketConfigPage {
                                 FareRuntime.get().save();
                             } else {
                                 templates.get(detailTemplateIndex).name = trimmed;
+                                FareRuntime.get().save();
                             }
                         }
                     });
@@ -1811,15 +1898,17 @@ final class TicketConfigPage {
             requestDeleteRule();
             return true;
         }
+        if (view == VIEW_TEMPLATE && detailTemplateIndex >= 0 && host.hit(mx, my,
+                TrdmScreenBase.CONTENT_RIGHT - 250F, DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
+            requestDeleteTemplate();
+            return true;
+        }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 120F, DETAIL_EDIT_BUTTON_Y, 120F, 24F)) {
             if (view == VIEW_RULE && detailRuleIndex >= 0) {
                 openEditor();
-            } else {
-                final Minecraft minecraft = Minecraft.getInstance();
-                if (minecraft.player != null) {
-                    minecraft.player.displayClientMessage(
-                            Component.translatable("gui.trdm.ticket.editor_todo"), true);
-                }
+            } else if (view == VIEW_TEMPLATE && detailTemplateIndex >= 0) {
+                final PassRule template = templates.get(detailTemplateIndex);
+                Minecraft.getInstance().setScreen(new FareScriptScreen(host, template));
             }
             return true;
         }
@@ -1952,7 +2041,7 @@ final class TicketConfigPage {
     private List<String> dropOptions() {
         return switch (dropKind) {
             case DROP_RULE, DROP_SYSTEM, DROP_DETAIL_RULE -> lines;
-            case DROP_TEMPLATE, DROP_DETAIL_TEMPLATE -> ruleOptionNames();
+            case DROP_TEMPLATE, DROP_DETAIL_TEMPLATE -> passScopeOptionNames();
             default -> List.of();
         };
     }
@@ -1962,8 +2051,15 @@ final class TicketConfigPage {
             case DROP_SYSTEM -> !lineOwner.containsKey(lines.get(option));
             case DROP_RULE, DROP_DETAIL_RULE -> lineOwner.getOrDefault(lines.get(option), -1)
                     == ruleIndexOfDrop();
-            case DROP_TEMPLATE, DROP_DETAIL_TEMPLATE ->
-                    templateForDrop().rules.contains(ruleOptions().get(option));
+            case DROP_TEMPLATE, DROP_DETAIL_TEMPLATE -> {
+                final PassRule template = templateForDrop();
+                if (option == 0) {
+                    yield template.allRules;
+                }
+                final int ruleIndex = option - 1;
+                yield !template.allRules && ruleIndex >= 0 && ruleIndex < rules.size()
+                        && template.ruleIds.contains(rules.get(ruleIndex).id);
+            }
             default -> false;
         };
     }
@@ -1993,11 +2089,24 @@ final class TicketConfigPage {
                 }
             }
             case DROP_TEMPLATE, DROP_DETAIL_TEMPLATE -> {
-                final int ruleIndex = ruleOptions().get(option);
-                final TemplateRow template = templateForDrop();
-                if (!template.rules.remove(ruleIndex)) {
-                    template.rules.add(ruleIndex);
+                final PassRule template = templateForDrop();
+                if (option == 0) {
+                    template.allRules = true;
+                    template.ruleIds.clear();
+                } else {
+                    final int ruleIndex = option - 1;
+                    if (ruleIndex >= 0 && ruleIndex < rules.size()) {
+                        final String ruleId = rules.get(ruleIndex).id;
+                        if (template.allRules) {
+                            template.allRules = false;
+                            template.ruleIds.clear();
+                            template.ruleIds.add(ruleId);
+                        } else if (!template.ruleIds.remove(ruleId)) {
+                            template.ruleIds.add(ruleId);
+                        }
+                    }
                 }
+                FareRuntime.get().save();
             }
             default -> {
             }
@@ -2009,23 +2118,16 @@ final class TicketConfigPage {
         return dropKind == DROP_DETAIL_RULE ? detailRuleIndex : dropIndex;
     }
 
-    private TemplateRow templateForDrop() {
+    private PassRule templateForDrop() {
         return templates.get(dropKind == DROP_DETAIL_TEMPLATE ? detailTemplateIndex : dropIndex);
     }
 
-    private List<Integer> ruleOptions() {
-        final List<Integer> result = new ArrayList<>();
-        result.add(-1);
-        for (int index = 0; index < rules.size(); index++) {
-            result.add(index);
-        }
-        return result;
-    }
-
-    private List<String> ruleOptionNames() {
+    private List<String> passScopeOptionNames() {
         final List<String> result = new ArrayList<>();
-        for (final int index : ruleOptions()) {
-            result.add(ruleName(index));
+        result.add(Component.translatable("gui.trdm.pass.all_rules").getString());
+        for (final FareRule rule : rules) {
+            result.add(rule.enabled ? rule.name
+                    : rule.name + Component.translatable("gui.trdm.ticket.disabled_suffix").getString());
         }
         return result;
     }
@@ -2054,10 +2156,14 @@ final class TicketConfigPage {
                 assigned.size() - 1).getString();
     }
 
-    private String ruleSummary(TemplateRow template) {
+    private String passScopeSummary(PassRule template) {
+        if (template.allRules) {
+            return Component.translatable("gui.trdm.pass.all_rules").getString();
+        }
         final List<String> names = new ArrayList<>();
-        for (final int index : new LinkedHashSet<>(template.rules)) {
-            names.add(ruleName(index));
+        for (final String ruleId : template.ruleIds) {
+            final FareRule rule = config.ruleById(ruleId);
+            names.add(rule == null ? ruleId : rule.name);
         }
         if (names.isEmpty()) {
             return Component.translatable("gui.trdm.ticket.none_rules").getString();
@@ -2131,12 +2237,4 @@ final class TicketConfigPage {
         return builder + ellipsis;
     }
 
-    private static final class TemplateRow {
-        private String name;
-        private final Set<Integer> rules = new HashSet<>();
-
-        private TemplateRow(String name) {
-            this.name = name;
-        }
-    }
 }
