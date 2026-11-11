@@ -54,6 +54,7 @@ final class TicketConfigPage {
     private static final float RULES_PANEL_H = 136F;
     private static final float TEMPLATES_SECTION_Y = 326F;
     private static final float TEMPLATES_TOP = 350F;
+    private static final float TEMPLATES_PANEL_H = 150F;
     private static final float ROW_H = 34F;
 
     private static final float DROP_W = 250F;
@@ -162,6 +163,7 @@ final class TicketConfigPage {
     private int lastClickIndex = -1;
     private long lastClickAt;
     private float ruleScroll;
+    private float templateScroll;
 
     private boolean exportDialogOpen;
     private String exportedFileName = "";
@@ -277,6 +279,8 @@ final class TicketConfigPage {
                     TrdmScreenBase.DESIGN_W / 2F, 250F, TrdmScreenBase.FONT_BODY, TrdmScreenBase.COLOR_SUB);
             return;
         }
+        final float templateMax = Math.max(0F, templates.size() * ROW_H - TEMPLATES_PANEL_H);
+        templateScroll = Math.max(0F, Math.min(templateMax, templateScroll));
         if (!canEdit()) {
             if (view == VIEW_MAIN) {
                 renderMain(guiGraphics, mx, my);
@@ -473,9 +477,7 @@ final class TicketConfigPage {
                     host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F),
                     TrdmScreenBase.FONT_SUB);
         }
-        for (int index = 0; index < templates.size(); index++) {
-            renderTemplateRow(guiGraphics, index, mx, my);
-        }
+        renderTemplatesPanel(guiGraphics, mx, my);
     }
 
     private void renderRulesPanel(GuiGraphics guiGraphics, float mx, float my) {
@@ -493,6 +495,22 @@ final class TicketConfigPage {
         final float total = (rules.size() + 1) * ROW_H;
         host.scrollbar(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 6F, y, RULES_PANEL_H,
                 total, RULES_PANEL_H, ruleScroll);
+    }
+
+    private void renderTemplatesPanel(GuiGraphics guiGraphics, float mx, float my) {
+        final float x = TrdmScreenBase.CONTENT_X;
+        final float y = TEMPLATES_TOP;
+        final float w = TrdmScreenBase.CONTENT_W;
+        host.rect(guiGraphics, x - 2F, y - 2F, w + 4F, TEMPLATES_PANEL_H + 4F, 0xFF5A5A5A);
+        host.rect(guiGraphics, x, y, w, TEMPLATES_PANEL_H, 0x50000000);
+        host.scissorOn(guiGraphics, x, y, w, TEMPLATES_PANEL_H);
+        for (int index = 0; index < templates.size(); index++) {
+            renderTemplateRow(guiGraphics, index, mx, my);
+        }
+        host.scissorOff(guiGraphics);
+        final float total = templates.size() * ROW_H;
+        host.scrollbar(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 6F, y, TEMPLATES_PANEL_H,
+                total, TEMPLATES_PANEL_H, templateScroll);
     }
 
     private void renderRuleRow(GuiGraphics guiGraphics, int ruleIndex, int visualIndex, float mx, float my) {
@@ -524,8 +542,12 @@ final class TicketConfigPage {
     }
 
     private void renderTemplateRow(GuiGraphics guiGraphics, int index, float mx, float my) {
-        final float top = TEMPLATES_TOP + index * ROW_H;
-        final boolean hovered = hoveredRow(top, mx, my);
+        final float top = TEMPLATES_TOP + index * ROW_H - templateScroll;
+        if (top + ROW_H < TEMPLATES_TOP || top > TEMPLATES_TOP + TEMPLATES_PANEL_H) {
+            return;
+        }
+        final boolean hovered = hoveredRow(top, mx, my)
+                && my >= TEMPLATES_TOP && my < TEMPLATES_TOP + TEMPLATES_PANEL_H;
         final boolean selected = selectedKind == SELECT_TEMPLATE && selectedIndex == index;
         host.row(guiGraphics, TrdmScreenBase.CONTENT_X, top, TrdmScreenBase.CONTENT_W, ROW_H - 2F,
                 selected, hovered);
@@ -1334,6 +1356,8 @@ final class TicketConfigPage {
         selectedIndex = -1;
         deleteTemplatePending = false;
         confirmDeleteOpen = false;
+        templateScroll = Math.max(0F, Math.min(templateScroll,
+                Math.max(0F, templates.size() * ROW_H - TEMPLATES_PANEL_H)));
         FareRuntime.get().save();
     }
 
@@ -1350,6 +1374,7 @@ final class TicketConfigPage {
         selectedIndex = detailTemplateIndex;
         view = VIEW_TEMPLATE;
         deleteTemplatePending = false;
+        templateScroll = Math.max(0F, templates.size() * ROW_H - TEMPLATES_PANEL_H);
         FareRuntime.get().save();
     }
 
@@ -1826,7 +1851,10 @@ final class TicketConfigPage {
     }
 
     private boolean clickTemplateRow(int index, float mx, float my) {
-        final float top = TEMPLATES_TOP + index * ROW_H;
+        if (my < TEMPLATES_TOP || my >= TEMPLATES_TOP + TEMPLATES_PANEL_H) {
+            return false;
+        }
+        final float top = TEMPLATES_TOP + index * ROW_H - templateScroll;
         if (host.hit(mx, my, dropX(), top + 6F, DROP_W, DROP_H)) {
             openDrop(DROP_TEMPLATE, index);
             return true;
@@ -1932,6 +1960,13 @@ final class TicketConfigPage {
             ruleScroll = Math.max(0F, Math.min(max, ruleScroll - (float) delta * 20F));
             return true;
         }
+        if (view == VIEW_MAIN && mx >= TrdmScreenBase.CONTENT_X && mx < TrdmScreenBase.CONTENT_RIGHT
+                && my >= TEMPLATES_TOP && my < TEMPLATES_TOP + TEMPLATES_PANEL_H) {
+            final float total = templates.size() * ROW_H;
+            final float max = Math.max(0F, total - TEMPLATES_PANEL_H);
+            templateScroll = Math.max(0F, Math.min(max, templateScroll - (float) delta * 20F));
+            return true;
+        }
         return false;
     }
 
@@ -2024,7 +2059,7 @@ final class TicketConfigPage {
         return switch (dropKind) {
             case DROP_RULE -> RULES_TOP + (dropIndex + 1) * ROW_H - ruleScroll + 6F;
             case DROP_SYSTEM -> RULES_TOP - ruleScroll + 6F;
-            case DROP_TEMPLATE -> TEMPLATES_TOP + dropIndex * ROW_H + 6F;
+            case DROP_TEMPLATE -> TEMPLATES_TOP + dropIndex * ROW_H - templateScroll + 6F;
             default -> DETAIL_SCOPE_Y;
         };
     }
