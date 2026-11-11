@@ -41,19 +41,19 @@ import java.util.Set;
 final class TicketConfigPage {
 
     // ===== 布局 =====
-    private static final float ENABLE_LABEL_Y = 58F;
-    private static final float ENABLE_SUB_Y = 74F;
-    private static final float ENABLE_TOGGLE_Y = 54F;
+    private static final float ENABLE_LABEL_Y = 64F;
+    private static final float ENABLE_SUB_Y = 84F;
+    private static final float ENABLE_TOGGLE_Y = 60F;
 
-    private static final float TIME_LABEL_Y = 90F;
-    private static final float TIME_SUB_Y = 104F;
-    private static final float TIME_TOGGLE_Y = 86F;
+    private static final float TIME_LABEL_Y = 106F;
+    private static final float TIME_SUB_Y = 126F;
+    private static final float TIME_TOGGLE_Y = 102F;
 
-    private static final float RULES_SECTION_Y = 122F;
-    private static final float RULES_TOP = 144F;
+    private static final float RULES_SECTION_Y = 150F;
+    private static final float RULES_TOP = 174F;
     private static final float RULES_PANEL_H = 136F;
-    private static final float TEMPLATES_SECTION_Y = 286F;
-    private static final float TEMPLATES_TOP = 308F;
+    private static final float TEMPLATES_SECTION_Y = 326F;
+    private static final float TEMPLATES_TOP = 350F;
     private static final float ROW_H = 34F;
 
     private static final float DROP_W = 250F;
