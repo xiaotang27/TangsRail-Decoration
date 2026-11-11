@@ -275,8 +275,9 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
             final float top = 92F + index * 34F;
             rect(guiGraphics, LIST_X - 4F, top, LIST_W + 8F, 32F,
                     hit(mx, my, LIST_X, top, LIST_W, 32F) ? TicketUi.ROW_HOVER : TicketUi.ROW);
-            text(guiGraphics, Component.literal(pass.name), LIST_X + 4F, top + 10F,
-                    FONT_ROW, TicketUi.TEXT_DARK);
+            text(guiGraphics, Component.literal(
+                            ellipsize(pass.name, LIST_W - 120F, FONT_ROW)),
+                    LIST_X + 4F, top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
             textRight(guiGraphics, Component.literal(FareMoney.yuan(pass.settings().priceEmeralds() * 100L)),
                     LIST_X + LIST_W - 4F, top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
         }
@@ -284,7 +285,8 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
             text(guiGraphics, Component.translatable("gui.trdm.ticket_machine.no_passes"),
                     LIST_X + 4F, 96F, FONT_ROW, TicketUi.TEXT_MUTED);
         }
-        hintDark(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, 244F);
+        final float hintY = Math.max(244F, 92F + passes.size() * 34F + 10F);
+        hintDark(guiGraphics, "gui.trdm.ticket_machine.pass_hint", LIST_X, hintY);
     }
 
     // ===== 交通卡 =====
