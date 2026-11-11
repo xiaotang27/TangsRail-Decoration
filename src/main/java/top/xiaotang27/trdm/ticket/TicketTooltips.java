@@ -68,7 +68,7 @@ public final class TicketTooltips {
         if (!TicketData.passActive(stack)) {
             tooltip.add(Component.translatable("item.trdm.pass.tooltip.inactive"));
         } else {
-            if (PassValidity.expired(TicketData.passUntil(stack), System.currentTimeMillis())) {
+            if (PassValidity.expired(TicketData.passUntil(stack), TrdmClock.now())) {
                 tooltip.add(Component.translatable("item.trdm.pass.tooltip.expired"));
             } else {
                 tooltip.add(Component.translatable("item.trdm.pass.tooltip.valid_until",
@@ -84,9 +84,7 @@ public final class TicketTooltips {
     }
 
     private static String formatTime(long epochMillis) {
-        return java.time.Instant.ofEpochMilli(epochMillis)
-                .atZone(java.time.ZoneId.systemDefault())
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        return TrdmClock.format(epochMillis);
     }
 
     private static Component stateLine(ItemStack stack) {

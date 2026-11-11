@@ -82,6 +82,10 @@ public class TrdmClient implements ClientModInitializer {
             }
             // 端门「按住右键拖动调开度」的状态机
             TrdmEndGateDrag.tick(client);
+            // 票务系统若使用游戏内时间，每 tick 同步一次
+            if (client.level != null) {
+                top.xiaotang27.trdm.ticket.TrdmClock.updateGameTime(client.level);
+            }
             // 把 TRDM 字体灌进 MTR 的牌面缓存（MTR 初始化好 / 资源重载之后各来一次）
             TrdmMtrFonts.tick();
         });

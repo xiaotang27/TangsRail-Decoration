@@ -90,7 +90,7 @@ public final class TicketData {
         root.putString(KEY_TYPE, TYPE_SINGLE);
         root.putLong(KEY_FACE, Math.max(0L, faceCents));
         root.putString(KEY_STATE, State.EMPTY.name());
-        root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
+        root.putLong(KEY_ISSUED_AT, TrdmClock.now());
         putSold(root, sold, soldDimension);
         commit(stack, root);
     }
@@ -103,7 +103,7 @@ public final class TicketData {
         root.putLong(KEY_BALANCE, Math.max(0L, balanceCents));
         root.putInt(KEY_DEPOSIT, Math.max(0, depositEmeralds));
         root.putString(KEY_STATE, State.EMPTY.name());
-        root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
+        root.putLong(KEY_ISSUED_AT, TrdmClock.now());
         root.put(KEY_TX, new ListTag());
         putSold(root, sold, soldDimension);
         commit(stack, root);
@@ -118,7 +118,7 @@ public final class TicketData {
         root.putString(KEY_EXIT_NAME, stationName(station));
         root.putString(KEY_EXIT_DIM, dimension == null ? "" : dimension);
         root.putLong(KEY_EXIT_EXPIRES, expiresAt);
-        root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
+        root.putLong(KEY_ISSUED_AT, TrdmClock.now());
         commit(stack, root);
     }
 
@@ -139,7 +139,7 @@ public final class TicketData {
         root.putInt(KEY_PASS_DAYS, Math.max(1, days));
         root.putBoolean(KEY_PASS_ACTIVE, false);
         root.putString(KEY_STATE, State.EMPTY.name());
-        root.putLong(KEY_ISSUED_AT, System.currentTimeMillis());
+        root.putLong(KEY_ISSUED_AT, TrdmClock.now());
         putSold(root, sold, soldDimension);
         commit(stack, root);
     }
@@ -149,20 +149,20 @@ public final class TicketData {
     /** 写入入站记录并切到 {@link State#ENTERED}。 */
     public static void enter(ItemStack stack, Station station, String dimension) {
         final CompoundTag root = copyRoot(stack);
-        applyEntry(root, station, dimension, System.currentTimeMillis());
+        applyEntry(root, station, dimension, TrdmClock.now());
         commit(stack, root);
     }
 
     /** 交通卡出站：写 lastExit、扣费记录、切到 {@link State#EXITED}。 */
     public static void markExit(ItemStack stack, Station exit, String dimension, long fareCents,
-                                long chargedCents, long gameTime) {
+                                long chargedCents, long exitMillis) {
         final CompoundTag root = copyRoot(stack);
-        final long now = System.currentTimeMillis();
+        final long now = exitMillis > 0L ? exitMillis : TrdmClock.now();
         root.putString(KEY_STATE, State.EXITED.name());
         root.putLong(KEY_LAST_EXIT_STATION, exit.id);
         root.putString(KEY_LAST_EXIT_NAME, stationName(exit));
         root.putString(KEY_LAST_EXIT_DIM, dimension);
-        root.putLong(KEY_LAST_EXIT_TIME, gameTime);
+        root.putLong(KEY_LAST_EXIT_TIME, now);
         root.putInt(KEY_LAST_EXIT_ZONE, exit.zone);
         root.putLong(KEY_LAST_EXIT_PAID, Math.max(0L, fareCents));
         addTx(root, now, "fare", -chargedCents, root.getLong(KEY_BALANCE));
@@ -177,7 +177,7 @@ public final class TicketData {
         root.putString(KEY_JOURNEY_ENTRY_DIM, dimension == null ? "" : dimension);
         root.putLong(KEY_JOURNEY_PAID, 0L);
         root.putBoolean(KEY_JOURNEY_CONTINUING, false);
-        applyEntry(root, station, dimension, System.currentTimeMillis());
+        applyEntry(root, station, dimension, TrdmClock.now());
         commit(stack, root);
     }
 

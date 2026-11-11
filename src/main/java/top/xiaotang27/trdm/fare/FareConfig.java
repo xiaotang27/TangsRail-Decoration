@@ -4,6 +4,7 @@ import top.xiaotang27.trdm.fare.script.RuleResolver;
 import top.xiaotang27.trdm.fare.script.ScriptContext;
 import top.xiaotang27.trdm.fare.script.ScriptRuntime;
 import top.xiaotang27.trdm.ticket.PassRule;
+import top.xiaotang27.trdm.ticket.TimeBasis;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,6 +46,8 @@ public final class FareConfig {
     public boolean enabled = true;
     public Mode mode = Mode.CUSTOM;
     public Metric metric = Metric.INTERVALS;
+    /** 票务时间依据：系统时间或游戏内时间。 */
+    public TimeBasis timeBasis = TimeBasis.SYSTEM;
     /** 每次换乘减多少钱（分）；0 = 不优惠。 */
     public long transferDiscountCents;
     /** 相邻分段使用同一规则时合并后再算，避免重复收起步价。 */
@@ -215,6 +218,7 @@ public final class FareConfig {
         enabled = other.enabled;
         mode = other.mode;
         metric = other.metric;
+        timeBasis = other.timeBasis;
         transferDiscountCents = other.transferDiscountCents;
         mergeSameRule = other.mergeSameRule;
         rules.clear();

@@ -7,6 +7,7 @@ import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.fare.FareConfig;
 import top.xiaotang27.trdm.fare.FareDefaults;
 import top.xiaotang27.trdm.fare.FareJson;
+import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,12 +51,14 @@ public final class ServerFareConfig {
             loaded = FareDefaults.config();
         }
         config = loaded;
+        TrdmClock.setBasis(config.timeBasis);
         save();
     }
 
     public static synchronized FareConfig config() {
         if (config == null) {
             config = FareDefaults.config();
+            TrdmClock.setBasis(config.timeBasis);
         }
         return config;
     }
@@ -64,6 +67,7 @@ public final class ServerFareConfig {
     public static synchronized void replace(FareConfig incoming) {
         config().copyFrom(incoming);
         config().revision++;
+        TrdmClock.setBasis(config().timeBasis);
         save();
     }
 

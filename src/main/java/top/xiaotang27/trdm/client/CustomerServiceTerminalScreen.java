@@ -13,6 +13,7 @@ import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.ticket.PassValidity;
 import top.xiaotang27.trdm.ticket.TicketData;
+import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -506,9 +507,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     }
 
     private static String formatTime(long epochMillis) {
-        return java.time.Instant.ofEpochMilli(epochMillis)
-                .atZone(java.time.ZoneId.systemDefault())
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        return TrdmClock.format(epochMillis);
     }
 
     private static ItemStack heldItem() {
@@ -732,7 +731,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                     return true;
                 }
                 if (TicketData.passActive(held)
-                        && (PassValidity.expired(TicketData.passUntil(held), System.currentTimeMillis())
+                        && (PassValidity.expired(TicketData.passUntil(held), TrdmClock.now())
                         || !passOwnedByPlayer(held))) {
                     showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
                     return true;
@@ -772,7 +771,7 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                     showMessage(Component.translatable("gui.trdm.ticket.error.no_entry"));
                     return true;
                 }
-                if (PassValidity.expired(TicketData.passUntil(held), System.currentTimeMillis())
+                if (PassValidity.expired(TicketData.passUntil(held), TrdmClock.now())
                         || !passOwnedByPlayer(held)) {
                     showMessage(Component.translatable("gui.trdm.ticket.error.invalid_ticket"));
                     return true;

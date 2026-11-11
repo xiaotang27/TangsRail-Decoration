@@ -125,7 +125,7 @@ public final class TicketGateHandler {
                 message(player, "gui.trdm.ticket.gate.entry_no_balance");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
-            final long now = level.getGameTime();
+            final long now = TrdmClock.now();
             final boolean continuous = JourneyRules.canContinue(
                     TicketData.lastExitStation(card), TicketData.lastExitName(card),
                     TicketData.lastExitZone(card), TicketData.lastExitTime(card),
@@ -167,7 +167,7 @@ public final class TicketGateHandler {
         }
         final long newBalance = balance - remainingFare;
         TicketData.setBalance(card, newBalance);
-        TicketData.markExit(card, station, dimension, fare, remainingFare, level.getGameTime());
+        TicketData.markExit(card, station, dimension, fare, remainingFare, TrdmClock.now());
         TicketData.setJourneyPaid(card, fare);
         message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.exit_card",
                 stationName(station), FareMoney.yuan(fare), FareMoney.yuan(newBalance)), newBalance));
@@ -187,7 +187,7 @@ public final class TicketGateHandler {
             message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
-        if (TicketData.exitExpires(ticket) < System.currentTimeMillis()) {
+        if (TicketData.exitExpires(ticket) < TrdmClock.now()) {
             message(player, "gui.trdm.ticket.gate.exit_ticket_expired");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
@@ -204,7 +204,7 @@ public final class TicketGateHandler {
             message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
-        final long now = System.currentTimeMillis();
+        final long now = TrdmClock.now();
         if (!TicketData.passActive(pass)) {
             if (!entrance) {
                 message(player, "gui.trdm.ticket.gate.invalid_ticket");

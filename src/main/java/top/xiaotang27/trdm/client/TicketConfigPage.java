@@ -15,6 +15,8 @@ import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.fare.FareRule;
 import top.xiaotang27.trdm.fare.script.ScriptNode;
+import top.xiaotang27.trdm.ticket.TimeBasis;
+import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.awt.Desktop;
 import java.nio.charset.StandardCharsets;
@@ -41,8 +43,12 @@ final class TicketConfigPage {
     private static final float ENABLE_SUB_Y = 82F;
     private static final float ENABLE_TOGGLE_Y = 60F;
 
-    private static final float RULES_SECTION_Y = 112F;
-    private static final float RULES_TOP = 136F;
+    private static final float TIME_LABEL_Y = 96F;
+    private static final float TIME_SUB_Y = 110F;
+    private static final float TIME_TOGGLE_Y = 92F;
+
+    private static final float RULES_SECTION_Y = 132F;
+    private static final float RULES_TOP = 156F;
     private static final float RULES_PANEL_H = 136F;
     private static final float TEMPLATES_SECTION_Y = 300F;
     private static final float TEMPLATES_TOP = 324F;
@@ -414,6 +420,19 @@ final class TicketConfigPage {
                 TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
         if (canEdit()) {
             host.toggle(guiGraphics, toggleX, ENABLE_TOGGLE_Y, config.enabled);
+        }
+
+        final TimeBasis basis = config.timeBasis == null ? TimeBasis.SYSTEM : config.timeBasis;
+        host.text(guiGraphics, Component.translatable("gui.trdm.ticket.time_basis"),
+                TrdmScreenBase.CONTENT_X, TIME_LABEL_Y, TrdmScreenBase.FONT_BODY,
+                TrdmScreenBase.COLOR_TEXT);
+        host.hint(guiGraphics, Component.translatable("gui.trdm.ticket.time_basis.sub"),
+                TrdmScreenBase.CONTENT_X, TIME_SUB_Y);
+        host.textRight(guiGraphics, Component.translatable(basis == TimeBasis.GAME
+                        ? "gui.trdm.ticket.time_basis.game" : "gui.trdm.ticket.time_basis.system"),
+                toggleX - 10F, TIME_LABEL_Y + 4F, TrdmScreenBase.FONT_ROW, TrdmScreenBase.COLOR_TEXT);
+        if (canEdit()) {
+            host.toggle(guiGraphics, toggleX, TIME_TOGGLE_Y, basis == TimeBasis.GAME);
         }
 
         host.section(guiGraphics, "gui.trdm.ticket.rules", RULES_SECTION_Y);
@@ -1036,6 +1055,7 @@ final class TicketConfigPage {
         export.enabled = config.enabled;
         export.mode = config.mode;
         export.metric = config.metric;
+        export.timeBasis = config.timeBasis;
         export.transferDiscountCents = config.transferDiscountCents;
         export.mergeSameRule = config.mergeSameRule;
         export.rules.add(rule.copy());
@@ -1650,6 +1670,15 @@ final class TicketConfigPage {
     }
 
     private boolean clickMain(float mx, float my) {
+        final float timeToggleX = TrdmScreenBase.CONTENT_RIGHT - TrdmScreenBase.TOGGLE_W;
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_X, TIME_TOGGLE_Y, TrdmScreenBase.CONTENT_W, 28F)
+                || host.hit(mx, my, timeToggleX, TIME_TOGGLE_Y,
+                TrdmScreenBase.TOGGLE_W, TrdmScreenBase.TOGGLE_H)) {
+            config.timeBasis = config.timeBasis == TimeBasis.GAME ? TimeBasis.SYSTEM : TimeBasis.GAME;
+            TrdmClock.setBasis(config.timeBasis);
+            FareRuntime.get().save();
+            return true;
+        }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 178F, RULES_SECTION_Y - 3F, 60F, 18F)) {
             requestImport();
             return true;

@@ -16,10 +16,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FareJsonTest {
 
     @Test
+    void timeBasisRoundTrip() {
+        final FareConfig config = FareDefaults.config();
+        config.timeBasis = top.xiaotang27.trdm.ticket.TimeBasis.GAME;
+        final FareConfig parsed = FareJson.parse(FareJson.write(config));
+        assertEquals(top.xiaotang27.trdm.ticket.TimeBasis.GAME, parsed.timeBasis);
+    }
+
+    @Test
     void defaultsRoundTrip() {
         final FareConfig parsed = FareJson.parse(FareJson.write(FareDefaults.config()));
         assertEquals(FareConfig.Mode.CUSTOM, parsed.mode);
         assertEquals(FareConfig.Metric.INTERVALS, parsed.metric);
+        assertEquals(top.xiaotang27.trdm.ticket.TimeBasis.SYSTEM, parsed.timeBasis);
         assertEquals(3, parsed.rules.size());
         assertEquals(FareRule.Kind.SCRIPT, parsed.rules.get(0).kind);
         assertNotNull(parsed.rules.get(0).script);

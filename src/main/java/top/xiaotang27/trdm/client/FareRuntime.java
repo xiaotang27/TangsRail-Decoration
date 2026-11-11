@@ -11,6 +11,7 @@ import top.xiaotang27.trdm.fare.FareEngine;
 import top.xiaotang27.trdm.fare.FareGraph;
 import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareQuote;
+import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -37,6 +38,7 @@ public final class FareRuntime {
     private FareRuntime(Path path, FareConfig config) {
         this.path = path;
         this.config = config;
+        TrdmClock.setBasis(config.timeBasis);
     }
 
     public static synchronized FareRuntime get() {
@@ -69,6 +71,7 @@ public final class FareRuntime {
         try {
             final FareConfig parsed = FareJson.parse(json);
             config.copyFrom(parsed);
+            TrdmClock.setBasis(config.timeBasis);
             serverCanEdit = canEdit;
             synced = true;
         } catch (Exception exception) {

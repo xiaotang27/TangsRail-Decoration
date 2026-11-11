@@ -12,6 +12,7 @@ import top.xiaotang27.trdm.fare.script.ScriptNode;
 import top.xiaotang27.trdm.fare.script.ScriptTier;
 import top.xiaotang27.trdm.ticket.PassRule;
 import top.xiaotang27.trdm.ticket.PassRules;
+import top.xiaotang27.trdm.ticket.TimeBasis;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -70,6 +71,7 @@ public final class FareJson {
         config.enabled = bool(root, "enabled", true);
         config.mode = enumValue(root, "mode", FareConfig.Mode.class, FareConfig.Mode.CUSTOM);
         config.metric = enumValue(root, "pathMetric", FareConfig.Metric.class, FareConfig.Metric.INTERVALS);
+        config.timeBasis = enumValue(root, "timeBasis", TimeBasis.class, TimeBasis.SYSTEM);
         config.transferDiscountCents = money(root, "transferDiscount", 0L);
         config.mergeSameRule = bool(root, "mergeSameRule", true);
 
@@ -114,6 +116,7 @@ public final class FareJson {
         root.addProperty("enabled", config.enabled);
         root.addProperty("mode", config.mode.name());
         root.addProperty("pathMetric", config.metric.name());
+        root.addProperty("timeBasis", (config.timeBasis == null ? TimeBasis.SYSTEM : config.timeBasis).name());
         addMoney(root, "transferDiscount", config.transferDiscountCents);
         root.addProperty("mergeSameRule", config.mergeSameRule);
 

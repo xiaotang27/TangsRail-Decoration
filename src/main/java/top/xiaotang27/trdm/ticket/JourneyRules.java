@@ -3,25 +3,25 @@ package top.xiaotang27.trdm.ticket;
 /**
  * 交通卡连续计费判定。
  * <p>
- * 上一段出站后 10 分钟（12000 tick）内，在“同名但不同付费区”的另一个车站再次入闸，
- * 视为同一段连续行程。
+ * 上一段出站后 10 分钟内，在“同名但不同付费区”的另一个车站再次入闸，
+ * 视为同一段连续行程。10 分钟按 {@link TrdmClock} 当前的时间依据计算。
  */
 public final class JourneyRules {
 
-    /** 10 分钟（20 tick/秒）。 */
-    public static final long WINDOW_TICKS = 12_000L;
+    /** 10 分钟。 */
+    public static final long WINDOW_MILLIS = 10L * 60L * 1000L;
 
     private JourneyRules() {
     }
 
     public static boolean canContinue(long lastExitStation, String lastName, int lastExitZone,
-                                      long lastExitTick, String lastDimension,
+                                      long lastExitMillis, String lastDimension,
                                       long currentStation, String currentName, int currentZone,
-                                      String currentDimension, long nowTick) {
-        if (lastExitStation == 0L || lastExitTick <= 0L) {
+                                      String currentDimension, long nowMillis) {
+        if (lastExitStation == 0L || lastExitMillis <= 0L) {
             return false;
         }
-        if (nowTick < lastExitTick || nowTick - lastExitTick > WINDOW_TICKS) {
+        if (nowMillis < lastExitMillis || nowMillis - lastExitMillis > WINDOW_MILLIS) {
             return false;
         }
         if (lastExitStation == currentStation) {

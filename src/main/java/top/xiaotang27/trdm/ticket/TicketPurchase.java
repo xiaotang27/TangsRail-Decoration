@@ -117,7 +117,7 @@ public final class TicketPurchase {
         final long added = amount * 100L;
         final long balance = TicketData.balance(held) + added;
         TicketData.setBalance(held, balance);
-        TicketData.addTx(held, System.currentTimeMillis(), "topup", added, balance);
+        TicketData.addTx(held, TrdmClock.now(), "topup", added, balance);
         TicketSync.sync(player);
         return new Result(true, "gui.trdm.ticket.topup.success", amount);
     }
@@ -197,7 +197,7 @@ public final class TicketPurchase {
         }
         final long updated = balance + due;
         TicketData.setBalance(card, updated);
-        TicketData.addTx(card, System.currentTimeMillis(), "topup", due, updated);
+        TicketData.addTx(card, TrdmClock.now(), "topup", due, updated);
         TicketSync.sync(player);
         return new Result(true, "gui.trdm.ticket.fare.paid", emeralds);
     }
@@ -254,7 +254,7 @@ public final class TicketPurchase {
             if (TicketData.state(held) == TicketData.State.ENTERED) {
                 return error("gui.trdm.ticket.error.already_entry");
             }
-            TicketData.setEntry(held, station, dimension, System.currentTimeMillis());
+            TicketData.setEntry(held, station, dimension, TrdmClock.now());
             TicketSync.sync(player);
             return new Result(true, "gui.trdm.terminal.record_entry_success", 0L);
         }
@@ -271,7 +271,7 @@ public final class TicketPurchase {
             if (!TicketData.isPass(held)) {
                 return error("gui.trdm.ticket.error.invalid_ticket");
             }
-            final long now = System.currentTimeMillis();
+            final long now = TrdmClock.now();
             if (TicketData.passActive(held)) {
                 if (PassValidity.expired(TicketData.passUntil(held), now)) {
                     return error("gui.trdm.ticket.error.invalid_ticket");
@@ -331,7 +331,7 @@ public final class TicketPurchase {
         if (!TicketData.passActive(pass)) {
             return error("gui.trdm.ticket.error.no_entry");
         }
-        if (PassValidity.expired(TicketData.passUntil(pass), System.currentTimeMillis())) {
+        if (PassValidity.expired(TicketData.passUntil(pass), TrdmClock.now())) {
             return error("gui.trdm.ticket.error.invalid_ticket");
         }
         final String owner = TicketData.passOwner(pass);
@@ -405,7 +405,7 @@ public final class TicketPurchase {
         }
         final long newBalance = balance - remainingFare;
         TicketData.setBalance(card, newBalance);
-        TicketData.markExit(card, station, dimension, fare, remainingFare, level.getGameTime());
+        TicketData.markExit(card, station, dimension, fare, remainingFare, TrdmClock.now());
         TicketData.setJourneyPaid(card, fare);
         TicketSync.sync(player);
         return new Result(true, "gui.trdm.terminal.record_exit_success", 0L);
@@ -431,7 +431,7 @@ public final class TicketPurchase {
         }
         final ItemStack exitTicket = new ItemStack(Trdm.EXIT_TICKET_ITEM);
         TicketData.issueExitTicket(exitTicket, station, ServerFareRuntime.dimensionId(level),
-                System.currentTimeMillis() + 10L * 60L * 1000L);
+                TrdmClock.now() + 10L * 60L * 1000L);
         give(player, exitTicket);
         TicketSync.sync(player);
         return new Result(true, "gui.trdm.ticket.exit_ticket.success", 0L);

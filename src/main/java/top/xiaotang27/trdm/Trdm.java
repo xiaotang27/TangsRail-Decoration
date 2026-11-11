@@ -135,6 +135,11 @@ public class Trdm implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (server.overworld() != null) {
+                top.xiaotang27.trdm.ticket.TrdmClock.updateGameTime(server.overworld());
+            }
+        });
         registerBlock("psd_door_1", PSD_DOOR_1);
         registerBlock("psd_glass_1", PSD_GLASS_1);
         registerBlock("psd_glass_end_1", PSD_GLASS_END_1);
