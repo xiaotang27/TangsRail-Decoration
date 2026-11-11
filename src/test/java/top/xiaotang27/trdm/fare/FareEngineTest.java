@@ -5,6 +5,7 @@ import top.xiaotang27.trdm.fare.script.FareScript;
 import top.xiaotang27.trdm.fare.script.ScriptNode;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -103,6 +104,29 @@ class FareEngineTest {
 
         assertEquals(300L, FareEngine.quote(config, graph(), 1, 5, DIM).totalCents());
         assertEquals(300L, FareEngine.quote(config, graph(), 1, 3, DIM).totalCents());
+    }
+
+    @Test
+    void cardRuleStatsFeedScript() {
+        final FareConfig config = new FareConfig();
+        final FareRule rule = new FareRule("loyalty", "常客规则", FareRule.Kind.SCRIPT);
+        rule.maxFareCents = 5000L;
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "rides");
+        script.hat = "hat";
+        script.nodes.add(hat);
+        script.nodes.add(set);
+        script.nodes.add(new ScriptNode("rides", "card_rule_rides"));
+        rule.script = script;
+        bind(config, 10L, rule);
+        bind(config, 20L, rule);
+
+        final FareQuote quote = FareEngine.quote(config, graph(), 1, 3, DIM,
+                Map.of("loyalty", new CardRuleStats(2, 0L, 0L)));
+        assertEquals(200L, quote.totalCents());
     }
 
     @Test

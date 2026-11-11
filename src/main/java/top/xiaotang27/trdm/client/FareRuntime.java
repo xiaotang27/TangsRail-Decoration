@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import top.xiaotang27.trdm.Trdm;
+import top.xiaotang27.trdm.fare.CardRuleStats;
 import top.xiaotang27.trdm.fare.FareConfig;
 import top.xiaotang27.trdm.fare.FareDefaults;
 import top.xiaotang27.trdm.fare.FareEngine;
@@ -15,6 +16,7 @@ import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * 客户端计费运行时：服务端配置快照、站点图缓存、统一报价入口。
@@ -114,6 +116,11 @@ public final class FareRuntime {
     public FareQuote quote(long fromStationId, long toStationId) {
         sync();
         return FareEngine.quote(config, graph, fromStationId, toStationId, dimensionId());
+    }
+
+    public FareQuote quote(long fromStationId, long toStationId, Map<String, CardRuleStats> cardStats) {
+        sync();
+        return FareEngine.quote(config, graph, fromStationId, toStationId, dimensionId(), cardStats);
     }
 
     /** 保存配置：已联网时交给服务端；否则写本地文件（回退）。 */

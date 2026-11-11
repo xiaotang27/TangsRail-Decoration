@@ -5,6 +5,7 @@ import mtr.data.Station;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import top.xiaotang27.trdm.fare.CardRuleStats;
 import top.xiaotang27.trdm.fare.FareConfig;
 import top.xiaotang27.trdm.fare.FareEngine;
 import top.xiaotang27.trdm.fare.FareGraph;
@@ -47,6 +48,11 @@ public final class ServerFareRuntime {
 
     public static FareQuote quote(net.minecraft.server.level.ServerLevel level, long from, long to) {
         return FareEngine.quote(config(), graph(level), from, to, dimensionId(level));
+    }
+
+    public static FareQuote quote(net.minecraft.server.level.ServerLevel level, long from, long to,
+                                  Map<String, CardRuleStats> cardStats) {
+        return FareEngine.quote(config(), graph(level), from, to, dimensionId(level), cardStats);
     }
 
     public static String dimensionId(Level level) {

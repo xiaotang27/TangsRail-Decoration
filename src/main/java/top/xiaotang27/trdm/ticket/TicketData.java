@@ -7,9 +7,13 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
+import top.xiaotang27.trdm.fare.CardRuleStats;
+
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -49,6 +53,7 @@ public final class TicketData {
     private static final String KEY_FACE = "face";
     private static final String KEY_BALANCE = "balance";
     private static final String KEY_DEPOSIT = "deposit";
+    private static final String KEY_CARD_RULE_STATS = "card_rule_stats";
     private static final String KEY_STATE = "state";
     private static final String KEY_SOLD_STATION = "sold_station";
     private static final String KEY_SOLD_NAME = "sold_name";
@@ -273,6 +278,61 @@ public final class TicketData {
     public static long balance(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? 0L : Math.max(0L, root.getLong(KEY_BALANCE));
+    }
+
+    /** 读取交通卡在各计费规则下的累计乘车统计。 */
+    public static Map<String, CardRuleStats> cardRuleStats(ItemStack stack) {
+        final Map<String, CardRuleStats> result = new LinkedHashMap<>();
+        final CompoundTag root = root(stack);
+        if (root == null || !root.contains(KEY_CARD_RULE_STATS, Tag.TAG_LIST)) {
+            return result;
+        }
+        final ListTag list = root.getList(KEY_CARD_RULE_STATS, Tag.TAG_COMPOUND);
+        for (int index = 0; index < list.size(); index++) {
+            final CompoundTag entry = list.getCompound(index);
+            final String ruleId = entry.getString("rule");
+            if (ruleId.isBlank()) {
+                continue;
+            }
+            result.put(ruleId, new CardRuleStats(entry.getInt("rides"),
+                    entry.getLong("amount"), entry.getLong("meters")));
+        }
+        return result;
+    }
+
+    public static CardRuleStats cardRuleStats(ItemStack stack, String ruleId) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return CardRuleStats.ZERO;
+        }
+        return cardRuleStats(stack).getOrDefault(ruleId, CardRuleStats.ZERO);
+    }
+
+    /** 出站扣费成功后累加：乘车次数 +1、金额 +实际本段票价、里程 +本段米数。 */
+    public static void addCardRuleTrip(ItemStack stack, String ruleId, long fareCents, long meters) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return;
+        }
+        final Map<String, CardRuleStats> stats = cardRuleStats(stack);
+        final CardRuleStats current = stats.getOrDefault(ruleId, CardRuleStats.ZERO);
+        stats.put(ruleId, new CardRuleStats(current.rides() + 1,
+                current.amountCents() + Math.max(0L, fareCents),
+                current.meters() + Math.max(0L, meters)));
+        final ListTag list = new ListTag();
+        int count = 0;
+        for (final Map.Entry<String, CardRuleStats> entry : stats.entrySet()) {
+            if (count++ >= 64) {
+                break;
+            }
+            final CompoundTag tag = new CompoundTag();
+            tag.putString("rule", entry.getKey());
+            tag.putInt("rides", entry.getValue().rides());
+            tag.putLong("amount", entry.getValue().amountCents());
+            tag.putLong("meters", entry.getValue().meters());
+            list.add(tag);
+        }
+        final CompoundTag root = copyRoot(stack);
+        root.put(KEY_CARD_RULE_STATS, list);
+        commit(stack, root);
     }
 
     public static int deposit(ItemStack stack) {

@@ -103,6 +103,22 @@ class TicketDataTest {
     }
 
     @Test
+    void cardRuleStatsAccumulatePerRule() {
+        final ItemStack card = new ItemStack(Items.PAPER);
+        TicketData.addCardRuleTrip(card, "rule_a", 250L, 1200L);
+        TicketData.addCardRuleTrip(card, "rule_a", 300L, 800L);
+        TicketData.addCardRuleTrip(card, "rule_b", 100L, 300L);
+
+        final top.xiaotang27.trdm.fare.CardRuleStats a =
+                TicketData.cardRuleStats(card, "rule_a");
+        assertEquals(2, a.rides());
+        assertEquals(550L, a.amountCents());
+        assertEquals(2000L, a.meters());
+        assertEquals(1, TicketData.cardRuleStats(card, "rule_b").rides());
+        assertEquals(2, TicketData.cardRuleStats(card).size());
+    }
+
+    @Test
     void passLifecycle() {
         final ItemStack pass = new ItemStack(Items.PAPER);
         TicketData.issuePass(pass, "day3", 3, "三日票", station, "minecraft:overworld");

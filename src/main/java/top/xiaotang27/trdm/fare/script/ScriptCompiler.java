@@ -27,7 +27,8 @@ public final class ScriptCompiler {
             "floor_fare", "discount_fare", "round_fare", "if", "use_rule");
     private static final Set<String> NUMBER_VALUES = Set.of(
             "number", "context_intervals", "context_stations", "context_meters",
-            "context_zone_diff", "add", "subtract", "multiply", "divide", "min", "max",
+            "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
+            "add", "subtract", "multiply", "divide", "min", "max",
             "table_intervals", "table_meters");
     private static final Set<String> BOOLEAN_VALUES = Set.of("compare", "and", "or", "not", "line_is");
     private static final Set<String> VALUE_STATEMENTS = Set.of(
@@ -467,6 +468,9 @@ public final class ScriptCompiler {
                 case "context_stations" -> context.stations();
                 case "context_meters" -> context.kilometers();
                 case "context_zone_diff" -> context.zoneDiff();
+                case "card_rule_rides" -> context.cardRides();
+                case "card_rule_amount" -> context.cardAmountYuan();
+                case "card_rule_distance" -> context.cardKilometers();
                 case "add" -> number(node.inputs.get("a"), context) + number(node.inputs.get("b"), context);
                 case "subtract" -> number(node.inputs.get("a"), context)
                         - number(node.inputs.get("b"), context);

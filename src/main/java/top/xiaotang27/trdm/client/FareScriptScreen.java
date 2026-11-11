@@ -46,9 +46,11 @@ public final class FareScriptScreen extends Screen {
             "set_fare", "add_fare", "multiply_fare", "discount_fare",
             "cap_fare", "floor_fare", "round_fare"};
     private static final String[] PASS_STATEMENT_TYPES = {
-            "pass_price", "pass_days", "pass_discount", "pass_daily_limit"};    private static final String[] NUMERIC_VALUE_TYPES = {
+            "pass_price", "pass_days", "pass_discount", "pass_daily_limit"};
+    private static final String[] NUMERIC_VALUE_TYPES = {
             "number", "context_intervals", "context_meters", "context_stations",
-            "context_zone_diff", "table_intervals", "table_meters"};
+            "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
+            "table_intervals", "table_meters"};
     private static final String[] ARITHMETIC_VALUE_TYPES = {
             "add", "subtract", "multiply", "divide", "min", "max"};
     private static final String[] OPS = {"<", "<=", ">", ">=", "==", "!="};
@@ -106,6 +108,11 @@ public final class FareScriptScreen extends Screen {
         list.add(new PaletteEntry("gui.trdm.script.category.values", null, false, true, 0xFF8A5A2B));
         for (final String type : List.of("number", "context_intervals", "context_meters",
                 "context_stations", "context_zone_diff")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.loyalty", null, false, true, 0xFF9A6428));
+        for (final String type : List.of("card_rule_rides", "card_rule_amount",
+                "card_rule_distance")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.category.math", null, false, true, 0xFF8A5A2B));
@@ -3038,7 +3045,8 @@ public final class FareScriptScreen extends Screen {
             case "use_rule" -> 0xFF2F6E7D;
             case "round_fare" -> 0xFF2D6E82;
             case "number", "context_intervals", "context_meters", "context_stations",
-                 "context_zone_diff", "add", "subtract", "multiply", "divide", "min", "max" ->
+                 "context_zone_diff", "card_rule_rides", "card_rule_amount",
+                 "card_rule_distance", "add", "subtract", "multiply", "divide", "min", "max" ->
                     0xFF8A5A2B;
             case "table_intervals", "table_meters" -> 0xFF6B4A8A;
             default -> 0xFF555555;

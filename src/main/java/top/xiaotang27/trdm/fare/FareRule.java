@@ -128,13 +128,21 @@ public final class FareRule {
     public long baseFareCents(long intervals, long meters, int fromZone, int toZone,
                               long routeId, String routeName,
                               top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
+        return baseFareCents(intervals, meters, fromZone, toZone, routeId, routeName,
+                CardRuleStats.ZERO, resolver);
+    }
+
+    public long baseFareCents(long intervals, long meters, int fromZone, int toZone,
+                              long routeId, String routeName, CardRuleStats cardStats,
+                              top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
+        final CardRuleStats stats = cardStats == null ? CardRuleStats.ZERO : cardStats;
         return switch (kind) {
             case MTR_VANILLA -> vanillaFareCents(fromZone, toZone);
             case FLAT -> Math.max(0L, flatFareCents);
             case INTERVAL_TABLE -> tierFareCents(intervals);
             case DISTANCE_TABLE -> tierFareCents(meters);
             case SCRIPT -> scriptFareCents(intervals, meters, fromZone, toZone,
-                    routeId, routeName, resolver);
+                    routeId, routeName, stats, resolver);
         };
     }
 
@@ -145,14 +153,15 @@ public final class FareRule {
 
     /** 执行积木脚本；脚本缺失/编译失败/运行失败时回退 MTR 原版公式。 */
     private long scriptFareCents(long intervals, long meters, int fromZone, int toZone,
-                                 long routeId, String routeName,
+                                 long routeId, String routeName, CardRuleStats cardStats,
                                  top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
         if (script == null || script.isEmpty()) {
             return vanillaFareCents(fromZone, toZone);
         }
         try {
             final double yuan = ScriptRuntime.evaluate(script,
-                    new ScriptContext(intervals, meters, fromZone, toZone, routeId, routeName), resolver);
+                    new ScriptContext(intervals, meters, fromZone, toZone, routeId, routeName,
+                            cardStats.rides(), cardStats.amountCents(), cardStats.meters()), resolver);
             if (!Double.isFinite(yuan)) {
                 return vanillaFareCents(fromZone, toZone);
             }

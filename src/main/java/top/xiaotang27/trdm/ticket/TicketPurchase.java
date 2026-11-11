@@ -400,7 +400,9 @@ public final class TicketPurchase {
         final long origin = continuous
                 ? TicketData.journeyEntryStation(card) : TicketData.entryStation(card);
         final long paid = continuous ? TicketData.journeyPaid(card) : 0L;
-        final long fare = ServerFareRuntime.quote(level, origin, station.id).totalCents();
+        final FareQuote quote = ServerFareRuntime.quote(level, origin, station.id,
+                TicketData.cardRuleStats(card));
+        final long fare = quote.totalCents();
         long balance = TicketData.balance(card);
         final long remainingFare = fare - paid;
         final long due = Math.max(0L, remainingFare - balance);
@@ -415,6 +417,9 @@ public final class TicketPurchase {
         TicketData.setBalance(card, newBalance);
         TicketData.markExit(card, station, dimension, fare, remainingFare, TrdmClock.now());
         TicketData.setJourneyPaid(card, fare);
+        for (final FareQuote.FareLeg leg : quote.legs()) {
+            TicketData.addCardRuleTrip(card, leg.ruleId(), leg.fareCents(), leg.meters());
+        }
         TicketSync.sync(player);
         return new Result(true, "gui.trdm.terminal.record_exit_success", 0L);
     }

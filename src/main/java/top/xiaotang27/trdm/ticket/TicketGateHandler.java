@@ -154,8 +154,10 @@ public final class TicketGateHandler {
         final long origin = continuous
                 ? TicketData.journeyEntryStation(card) : TicketData.entryStation(card);
         final long paid = continuous ? TicketData.journeyPaid(card) : 0L;
-        final long fare = fareTo(level, origin, station.id);
-        if (fare < 0L) {
+        final FareQuote quote = ServerFareRuntime.quote(level, origin, station.id,
+                TicketData.cardRuleStats(card));
+        final long fare = quote.totalCents();
+        if (!quote.connected() && quote.maxFareCapCents() <= 0L) {
             message(player, "gui.trdm.ticket.gate.no_fare");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
@@ -169,6 +171,9 @@ public final class TicketGateHandler {
         TicketData.setBalance(card, newBalance);
         TicketData.markExit(card, station, dimension, fare, remainingFare, TrdmClock.now());
         TicketData.setJourneyPaid(card, fare);
+        for (final FareQuote.FareLeg leg : quote.legs()) {
+            TicketData.addCardRuleTrip(card, leg.ruleId(), leg.fareCents(), leg.meters());
+        }
         message(player, withLowBalance(Component.translatable("gui.trdm.ticket.gate.exit_card",
                 stationName(station), FareMoney.yuan(fare), FareMoney.yuan(newBalance)), newBalance));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;

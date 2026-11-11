@@ -40,6 +40,23 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void cardLoyaltyValues() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "amount");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, set,
+                new ScriptNode("amount", "card_rule_amount")));
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        assertNotNull(result.compiled());
+        assertEquals(12.5, result.compiled().run(
+                new ScriptContext(0, 0, 0, 0, 0L, "", 7L, 1250L, 3400L)), 1e-9);
+    }
+
+    @Test
     void flatScriptSetsFare() {
         assertEquals(2.0, eval(flat(2.0), 4, 1000, 0, 1), 1e-9);
     }

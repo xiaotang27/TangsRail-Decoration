@@ -5,6 +5,7 @@ import top.xiaotang27.trdm.fare.script.RuleResolver;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -27,6 +28,13 @@ public final class FareEngine {
     }
 
     public static FareQuote quote(FareConfig config, FareGraph graph, long fromId, long toId, String dimension) {
+        return quote(config, graph, fromId, toId, dimension, Map.of());
+    }
+
+    /** 带交通卡常客统计的报价；单程票/通票传空表即可。 */
+    public static FareQuote quote(FareConfig config, FareGraph graph, long fromId, long toId,
+                                  String dimension, Map<String, CardRuleStats> cardStats) {
+        final Map<String, CardRuleStats> stats = cardStats == null ? Map.of() : cardStats;
         final long cap = config.maxFareCapCents();
         final FareStation from = graph.station(fromId);
         final FareStation to = graph.station(toId);
@@ -59,7 +67,8 @@ public final class FareEngine {
             visiting.add(leg.rule.id);
             final RuleResolver resolver = config.ruleResolver(visiting);
             long fare = leg.rule.baseFareCents(leg.intervals, leg.meters, startZone, endZone,
-                    leg.routeId, leg.routeName, resolver);
+                    leg.routeId, leg.routeName,
+                    stats.getOrDefault(leg.rule.id, CardRuleStats.ZERO), resolver);
             boolean capped = false;
             if (leg.rule.maxFareCents > 0L && fare > leg.rule.maxFareCents) {
                 fare = leg.rule.maxFareCents;

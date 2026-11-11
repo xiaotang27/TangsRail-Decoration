@@ -669,7 +669,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         final long origin = continuous
                 ? TicketData.journeyEntryStation(held) : TicketData.entryStation(held);
         final long paid = continuous ? TicketData.journeyPaid(held) : 0L;
-        final long fare = FareRuntime.get().quote(origin, stationId).totalCents();
+        final long fare = FareRuntime.get().quote(origin, stationId,
+                card ? TicketData.cardRuleStats(held) : Map.of()).totalCents();
         final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
         final long due = Math.max(0L, fare - paid - value);
         infoAction = ACTION_PAY_FARE;
