@@ -218,15 +218,17 @@ public final class TicketPurchase {
         if (rule == null) {
             return error("gui.trdm.ticket.error.unknown_pass");
         }
+        final top.xiaotang27.trdm.fare.script.PassSettings settings = rule.settings();
         final int count = Math.max(1, Math.min(64, quantity));
-        final long cost = (long) rule.priceEmeralds * count;
+        final long cost = (long) settings.priceEmeralds() * count;
         if (!takeEmeralds(player, cost)) {
             return new Result(false, "gui.trdm.ticket.error.no_emerald", cost);
         }
         final String dimension = ServerFareRuntime.dimensionId(level);
         for (int index = 0; index < count; index++) {
             final ItemStack pass = new ItemStack(Trdm.VARIABLE_TICKET_ITEM);
-            TicketData.issuePass(pass, rule.id, rule.days, rule.name, station, dimension);
+            TicketData.issuePass(pass, rule.id, settings.days(), rule.name, station, dimension,
+                    settings.discountPercent(), settings.dailyLimit(), rule.allRules, rule.ruleIds);
             give(player, pass);
         }
         TicketSync.sync(player);
@@ -293,6 +295,12 @@ public final class TicketPurchase {
                 final long[] window = PassValidity.window(days, now);
                 TicketData.activatePass(held, player.getUUID(), player.getGameProfile().getName(),
                         window[0], window[1]);
+            }
+            final long dayKey = TrdmClock.dayKey();
+            final int usedToday = TicketData.ensurePassDay(held, dayKey);
+            final int dailyLimit = TicketData.passDailyLimit(held);
+            if (dailyLimit > 0 && usedToday >= dailyLimit) {
+                return error("gui.trdm.terminal.pass_daily_limit");
             }
             TicketData.enter(held, station, dimension);
             TicketSync.sync(player);

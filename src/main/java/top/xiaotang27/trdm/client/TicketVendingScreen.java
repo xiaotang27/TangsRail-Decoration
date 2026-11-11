@@ -277,7 +277,7 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
                     hit(mx, my, LIST_X, top, LIST_W, 32F) ? TicketUi.ROW_HOVER : TicketUi.ROW);
             text(guiGraphics, Component.literal(pass.name), LIST_X + 4F, top + 10F,
                     FONT_ROW, TicketUi.TEXT_DARK);
-            textRight(guiGraphics, Component.literal(FareMoney.yuan(pass.priceEmeralds * 100L)),
+            textRight(guiGraphics, Component.literal(FareMoney.yuan(pass.settings().priceEmeralds() * 100L)),
                     LIST_X + LIST_W - 4F, top + 10F, FONT_ROW, TicketUi.TEXT_DARK);
         }
         if (passes.isEmpty()) {
@@ -499,7 +499,7 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
                 final PassRule pass = passes.get(index);
                 transactionPassId = pass.id;
                 transactionTitle = pass.name;
-                unitPriceCents = pass.priceEmeralds * 100L;
+                unitPriceCents = pass.settings().priceEmeralds() * 100L;
                 quantity = 1;
                 transactionOpen = true;
                 return true;

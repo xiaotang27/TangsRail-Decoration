@@ -99,9 +99,23 @@ public final class FareJson {
                 if (id.isBlank()) {
                     continue;
                 }
-                config.passRules.add(new PassRule(id, string(pass, "name", id),
+                final PassRule rule = new PassRule(id, string(pass, "name", id),
                         integer(pass, "price", 10),
-                        Math.max(1, integer(pass, "days", 1))));
+                        Math.max(1, integer(pass, "days", 1)));
+                rule.allRules = bool(pass, "allRules", true);
+                if (pass.has("ruleIds") && pass.get("ruleIds").isJsonArray()) {
+                    rule.ruleIds.clear();
+                    for (final JsonElement ruleId : pass.getAsJsonArray("ruleIds")) {
+                        if (ruleId.isJsonPrimitive() && !ruleId.getAsString().isBlank()) {
+                            rule.ruleIds.add(ruleId.getAsString());
+                        }
+                    }
+                }
+                if (pass.has("script") && pass.get("script").isJsonObject()) {
+                    rule.script = parseScript(pass.getAsJsonObject("script"));
+                }
+                rule.ensureScript();
+                config.passRules.add(rule);
             }
         } else {
             config.passRules.addAll(PassRules.defaults());
@@ -158,11 +172,19 @@ public final class FareJson {
 
         final JsonArray passes = new JsonArray();
         for (final PassRule pass : config.passRules) {
+            pass.ensureScript();
             final JsonObject item = new JsonObject();
             item.addProperty("id", pass.id);
             item.addProperty("name", pass.name);
             item.addProperty("price", pass.priceEmeralds);
             item.addProperty("days", pass.days);
+            item.addProperty("allRules", pass.allRules);
+            final JsonArray ruleIds = new JsonArray();
+            for (final String ruleId : pass.ruleIds) {
+                ruleIds.add(ruleId);
+            }
+            item.add("ruleIds", ruleIds);
+            item.add("script", writeScript(pass.script));
             passes.add(item);
         }
         root.add("passes", passes);

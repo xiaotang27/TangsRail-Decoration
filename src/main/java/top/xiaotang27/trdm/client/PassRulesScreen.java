@@ -5,31 +5,33 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import top.xiaotang27.trdm.fare.script.PassScriptCompiler;
+import top.xiaotang27.trdm.fare.script.PassSettings;
 import top.xiaotang27.trdm.ticket.PassRule;
 import top.xiaotang27.trdm.ticket.PassRules;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * 通票模板管理：标题行添加，行内删除，名称/售价/天数直接编辑。
- * 保存后写回服务端权威配置并广播。
+ * 通票模板管理：名称、积木设置入口和适用票务规则范围。
+ * 售价/有效期/折扣/每日次数由通票积木决定；范围不属于积木。
  */
 public final class PassRulesScreen extends Screen {
 
+    private static final int ROW_H = 44;
+    private static final int VISIBLE = 8;
+
     private final Screen parent;
-    private final List<PassRule> rules = new ArrayList<>();
+    private final List<PassRule> rules;
     private String error = "";
     private int listTop;
 
     public PassRulesScreen(Screen parent) {
         super(Component.translatable("gui.trdm.pass.title"));
         this.parent = parent;
-        for (final PassRule rule : FareRuntime.get().config().passRules) {
-            rules.add(rule.copy());
-        }
+        this.rules = FareRuntime.get().config().passRules;
     }
 
     @Override
@@ -48,51 +50,39 @@ public final class PassRulesScreen extends Screen {
                 })
                 .bounds(this.width - 130, 14, 110, 20).build());
 
-        final int shown = Math.min(rules.size(), 8);
+        final int nameWidth = Math.max(80, Math.min(150, this.width - 210));
+        final int blockX = 20 + nameWidth + 6;
+        final int scopeX = blockX + 76;
+        final int deleteX = scopeX + 76;
+        final int shown = Math.min(rules.size(), VISIBLE);
         for (int index = 0; index < shown; index++) {
             final int row = index;
-            final int y = listTop + index * 28;
+            final int y = listTop + index * ROW_H;
             final PassRule rule = rules.get(index);
-            final EditBox name = new EditBox(this.font, 20, y, 160, 20,
+            rule.ensureScript();
+
+            final EditBox name = new EditBox(this.font, 20, y, nameWidth, 18,
                     Component.translatable("gui.trdm.pass.name"));
             name.setValue(rule.name == null ? "" : rule.name);
             name.setResponder(text -> rules.get(row).name = text);
             addRenderableWidget(name);
 
-            final EditBox price = new EditBox(this.font, 186, y, 56, 20,
-                    Component.translatable("gui.trdm.pass.price"));
-            price.setValue(Integer.toString(rule.priceEmeralds));
-            price.setResponder(text -> {
-                try {
-                    rules.get(row).priceEmeralds = Integer.parseInt(text.trim());
-                } catch (NumberFormatException ignored) {
-                    // 让玩家把数字打完
-                }
-            });
-            addRenderableWidget(price);
-
-            final EditBox days = new EditBox(this.font, 248, y, 44, 20,
-                    Component.translatable("gui.trdm.pass.days"));
-            days.setValue(Integer.toString(rule.days));
-            days.setResponder(text -> {
-                try {
-                    rules.get(row).days = Integer.parseInt(text.trim());
-                } catch (NumberFormatException ignored) {
-                    // 让玩家把数字打完
-                }
-            });
-            addRenderableWidget(days);
-
+            addRenderableWidget(Button.builder(Component.translatable("gui.trdm.pass.edit_blocks"),
+                            button -> openBlocks(rule))
+                    .bounds(blockX, y, 70, 18).build());
+            addRenderableWidget(Button.builder(Component.translatable("gui.trdm.pass.edit_scope"),
+                            button -> openScope(rule))
+                    .bounds(scopeX, y, 70, 18).build());
             addRenderableWidget(Button.builder(Component.literal("×"), button -> {
                         rules.remove(row);
                         error = "";
                         rebuild();
                     })
-                    .bounds(300, y, 20, 20).build());
+                    .bounds(deleteX, y, 20, 18).build());
         }
-        if (rules.size() > 8) {
+        if (rules.size() > VISIBLE) {
             addRenderableWidget(Button.builder(Component.literal("…"), button -> {
-            }).bounds(20, listTop + 8 * 28, 300, 16).build()).active = false;
+            }).bounds(20, listTop + VISIBLE * ROW_H, Math.min(300, this.width - 40), 16).build()).active = false;
         }
 
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.editor.save"),
@@ -103,6 +93,18 @@ public final class PassRulesScreen extends Screen {
                 .bounds(this.width / 2 + 6, this.height - 28, 100, 20).build());
     }
 
+    private void openBlocks(PassRule rule) {
+        if (minecraft != null) {
+            minecraft.setScreen(new FareScriptScreen(this, rule));
+        }
+    }
+
+    private void openScope(PassRule rule) {
+        if (minecraft != null) {
+            minecraft.setScreen(new PassScopeScreen(this, rule));
+        }
+    }
+
     private void save() {
         if (rules.isEmpty()) {
             error = Component.translatable("gui.trdm.pass.empty").getString();
@@ -111,18 +113,9 @@ public final class PassRulesScreen extends Screen {
         }
         final Set<String> ids = new HashSet<>();
         for (final PassRule rule : rules) {
+            rule.ensureScript();
             if (rule.name == null || rule.name.isBlank()) {
                 error = Component.translatable("gui.trdm.pass.name_required").getString();
-                rebuild();
-                return;
-            }
-            if (rule.priceEmeralds <= 0) {
-                error = Component.translatable("gui.trdm.pass.price_invalid").getString();
-                rebuild();
-                return;
-            }
-            if (rule.days < 1 || rule.days > 30) {
-                error = Component.translatable("gui.trdm.pass.days_invalid").getString();
                 rebuild();
                 return;
             }
@@ -131,10 +124,26 @@ public final class PassRulesScreen extends Screen {
                 rebuild();
                 return;
             }
-        }
-        FareRuntime.get().config().passRules.clear();
-        for (final PassRule rule : rules) {
-            FareRuntime.get().config().passRules.add(rule.copy());
+            try {
+                rule.ensureScript();
+                final PassSettings settings = PassScriptCompiler.evaluate(rule.script);
+                if (settings.priceEmeralds() <= 0) {
+                    error = Component.translatable("gui.trdm.pass.price_invalid").getString();
+                    rebuild();
+                    return;
+                }
+                if (settings.priceEmeralds() > 9999) {
+                    error = Component.translatable("gui.trdm.pass.price_invalid").getString();
+                    rebuild();
+                    return;
+                }
+                rule.applySettings(settings);
+            } catch (RuntimeException exception) {
+                error = Component.translatable("gui.trdm.pass.script_invalid",
+                        rule.name, String.valueOf(exception.getMessage())).getString();
+                rebuild();
+                return;
+            }
         }
         FareRuntime.get().save();
         minecraft.setScreen(parent);
@@ -144,9 +153,32 @@ public final class PassRulesScreen extends Screen {
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics);
         guiGraphics.drawString(this.font, Component.translatable("gui.trdm.pass.title"), 20, 18, 0xFFFFFF, false);
+        final int nameWidth = Math.max(80, Math.min(150, this.width - 210));
+        final int blockX = 20 + nameWidth + 6;
         guiGraphics.drawString(this.font, Component.translatable("gui.trdm.pass.name"), 20, listTop - 12, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, Component.translatable("gui.trdm.pass.price"), 186, listTop - 12, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, Component.translatable("gui.trdm.pass.days"), 248, listTop - 12, 0xA0A0A0, false);
+        guiGraphics.drawString(this.font, Component.translatable("gui.trdm.pass.summary"), blockX, listTop - 12, 0xA0A0A0, false);
+        final int shown = Math.min(rules.size(), VISIBLE);
+        for (int index = 0; index < shown; index++) {
+            final PassRule rule = rules.get(index);
+            final int y = listTop + index * ROW_H;
+            String summary;
+            try {
+                final PassSettings settings = rule.settings();
+                summary = Component.translatable("gui.trdm.pass.summary_value",
+                        settings.priceEmeralds(), settings.days(), settings.discountPercent(),
+                        settings.dailyLimit() <= 0
+                                ? Component.translatable("gui.trdm.pass.unlimited").getString()
+                                : Integer.toString(settings.dailyLimit())).getString();
+            } catch (RuntimeException exception) {
+                summary = Component.translatable("gui.trdm.pass.script_invalid",
+                        rule.name, String.valueOf(exception.getMessage())).getString();
+            }
+            guiGraphics.drawString(this.font, summary, 20, y + 24, 0xB0B0B0, false);
+            guiGraphics.drawString(this.font, Component.translatable("gui.trdm.pass.scope_value",
+                    rule.allRules ? Component.translatable("gui.trdm.pass.all_rules").getString()
+                            : Integer.toString(rule.ruleIds.size())).getString(),
+                    blockX, y + 24, 0xB0B0B0, false);
+        }
         if (!error.isEmpty()) {
             guiGraphics.drawString(this.font, error, 20, this.height - 46, 0xFF5555, false);
         }

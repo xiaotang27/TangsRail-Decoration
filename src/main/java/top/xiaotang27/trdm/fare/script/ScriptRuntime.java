@@ -17,4 +17,8 @@ public final class ScriptRuntime {
         }
         return result.compiled().run(context, resolver);
     }
+
+    public static PassSettings evaluatePass(FareScript script) {
+        return PassScriptCompiler.evaluate(script);
+    }
 }

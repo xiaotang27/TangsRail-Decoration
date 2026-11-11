@@ -9,12 +9,18 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.fare.FareRule;
 import top.xiaotang27.trdm.fare.script.FareScript;
+import top.xiaotang27.trdm.fare.script.PassSettings;
+import top.xiaotang27.trdm.fare.script.PassScriptCompiler;
+import top.xiaotang27.trdm.fare.script.PassScripts;
 import top.xiaotang27.trdm.fare.script.ScriptCompiler;
+import top.xiaotang27.trdm.fare.script.ScriptException;
 import top.xiaotang27.trdm.fare.script.ScriptNode;
 import top.xiaotang27.trdm.fare.script.ScriptTier;
 import top.xiaotang27.trdm.fare.script.ScriptTree;
 import top.xiaotang27.trdm.fare.script.ScriptTree.Branch;
 import top.xiaotang27.trdm.fare.script.Scripts;
+import top.xiaotang27.trdm.ticket.PassRule;
+import top.xiaotang27.trdm.ticket.PassRules;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -38,7 +44,9 @@ public final class FareScriptScreen extends Screen {
 
     private static final String[] STATEMENT_TYPES = {
             "set_fare", "add_fare", "multiply_fare", "discount_fare",
-            "cap_fare", "floor_fare", "round_fare"};    private static final String[] NUMERIC_VALUE_TYPES = {
+            "cap_fare", "floor_fare", "round_fare"};
+    private static final String[] PASS_STATEMENT_TYPES = {
+            "pass_price", "pass_days", "pass_discount", "pass_daily_limit"};    private static final String[] NUMERIC_VALUE_TYPES = {
             "number", "context_intervals", "context_meters", "context_stations",
             "context_zone_diff", "table_intervals", "table_meters"};
     private static final String[] ARITHMETIC_VALUE_TYPES = {
@@ -73,6 +81,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private static final List<PaletteEntry> PALETTE = buildPalette();
+    private static final List<PaletteEntry> PASS_PALETTE = buildPassPalette();
 
     private static List<PaletteEntry> buildPalette() {
         final List<PaletteEntry> list = new ArrayList<>();
@@ -110,16 +119,43 @@ public final class FareScriptScreen extends Screen {
         return list;
     }
 
-    private static int paletteY(int index) {
+    private static List<PaletteEntry> buildPassPalette() {
+        final List<PaletteEntry> list = new ArrayList<>();
+        list.add(new PaletteEntry("gui.trdm.script.category.pass", null, false, true, 0xFF2F7D4F));
+        for (final String type : List.of("pass_price", "pass_days", "pass_discount", "pass_daily_limit")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, true, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.control", null, false, true, 0xFF8C5A20));
+        list.add(new PaletteEntry("gui.trdm.script.block.if", "if", true, false, colorFor("if")));
+        list.add(new PaletteEntry("gui.trdm.script.block.if_else", "if_else", true, false, colorFor("if")));
+        list.add(new PaletteEntry("gui.trdm.script.category.conditions", null, false, true, 0xFF2F6E45));
+        for (final String type : List.of("compare", "and", "or", "not")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.values", null, false, true, 0xFF8A5A2B));
+        list.add(new PaletteEntry("gui.trdm.script.block.number", "number", false, false, colorFor("number")));
+        list.add(new PaletteEntry("gui.trdm.script.category.math", null, false, true, 0xFF8A5A2B));
+        for (final String type : ARITHMETIC_VALUE_TYPES) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        return list;
+    }
+
+    private List<PaletteEntry> palette() {
+        return passRule == null ? PALETTE : PASS_PALETTE;
+    }
+
+    private int paletteY(int index) {
         int y = PALETTE_TOP;
-        for (int i = 0; i < index && i < PALETTE.size(); i++) {
-            y += PALETTE.get(i).header() ? PALETTE_HEADER : PALETTE_ROW;
+        final List<PaletteEntry> entries = palette();
+        for (int i = 0; i < index && i < entries.size(); i++) {
+            y += entries.get(i).header() ? PALETTE_HEADER : PALETTE_ROW;
         }
         return y;
     }
 
-    private static int paletteTotalHeight() {
-        return paletteY(PALETTE.size()) - PALETTE_TOP;
+    private int paletteTotalHeight() {
+        return paletteY(palette().size()) - PALETTE_TOP;
     }
 
     private int paletteViewHeight() {
@@ -135,8 +171,8 @@ public final class FareScriptScreen extends Screen {
                 || my < PALETTE_TOP || my >= PALETTE_TOP + paletteViewHeight()) {
             return null;
         }
-        for (int index = 0; index < PALETTE.size(); index++) {
-            final PaletteEntry entry = PALETTE.get(index);
+        for (int index = 0; index < palette().size(); index++) {
+            final PaletteEntry entry = palette().get(index);
             final float y = paletteY(index) - paletteScroll;
             final int h = entry.header() ? PALETTE_HEADER : 21;
             if (my >= y && my < y + h) {
@@ -201,6 +237,7 @@ public final class FareScriptScreen extends Screen {
 
     private final Screen parent;
     private final FareRule rule;
+    private final PassRule passRule;
     private final FareScript script;
     private String error = "";
 
@@ -294,11 +331,28 @@ public final class FareScriptScreen extends Screen {
     private float paletteScroll;
 
     public FareScriptScreen(Screen parent, FareRule rule) {
-        super(Component.translatable("gui.trdm.script.title"));
+        this(parent, rule, null);
+    }
+
+    public FareScriptScreen(Screen parent, PassRule passRule) {
+        this(parent, null, passRule);
+    }
+
+    private FareScriptScreen(Screen parent, FareRule rule, PassRule passRule) {
+        super(passRule == null
+                ? Component.translatable("gui.trdm.script.title")
+                : Component.translatable("gui.trdm.script.pass_title"));
         this.parent = parent;
         this.rule = rule;
-        this.script = rule.script == null ? Scripts.empty() : rule.script.copy();
-        Scripts.ensureHat(this.script);
+        this.passRule = passRule;
+        if (passRule != null) {
+            passRule.ensureScript();
+            this.script = passRule.script.copy();
+            PassScripts.ensureHat(this.script);
+        } else {
+            this.script = rule.script == null ? Scripts.empty() : rule.script.copy();
+            Scripts.ensureHat(this.script);
+        }
         refreshMissingRules();
         final String first = topLevelFirst();
         if (first != null) {
@@ -596,8 +650,8 @@ public final class FareScriptScreen extends Screen {
         final int viewH = paletteViewHeight();
         guiGraphics.enableScissor(PALETTE_X + 1, PALETTE_TOP, PALETTE_X + PALETTE_W - 1,
                 PALETTE_TOP + viewH);
-        for (int index = 0; index < PALETTE.size(); index++) {
-            final PaletteEntry entry = PALETTE.get(index);
+        for (int index = 0; index < palette().size(); index++) {
+            final PaletteEntry entry = palette().get(index);
             final int y = Math.round(paletteY(index) - paletteScroll);
             final int entryH = entry.header() ? PALETTE_HEADER - 2 : 21;
             if (y + entryH < PALETTE_TOP || y > PALETTE_TOP + viewH) {
@@ -851,14 +905,22 @@ public final class FareScriptScreen extends Screen {
             return;
         }
         final ScriptNode value = script.node(node.inputs.get("value"));
+        final String summary = value == null ? "?" : valueSummary(value.id);
         final String chip;
         if ("discount_fare".equals(node.type)) {
-            chip = Component.translatable("gui.trdm.script.discount_chip",
-                    value == null ? "?" : valueSummary(value.id)).getString();
+            chip = Component.translatable("gui.trdm.script.discount_chip", summary).getString();
+        } else if ("pass_price".equals(node.type)) {
+            chip = Component.translatable("gui.trdm.script.pass_price_chip", summary).getString();
+        } else if ("pass_days".equals(node.type)) {
+            chip = Component.translatable("gui.trdm.script.pass_days_chip", summary).getString();
+        } else if ("pass_discount".equals(node.type)) {
+            chip = Component.translatable("gui.trdm.script.pass_discount_chip", summary).getString();
+        } else if ("pass_daily_limit".equals(node.type)) {
+            chip = Component.translatable("gui.trdm.script.pass_daily_chip", summary).getString();
         } else {
             chip = Component.translatable("gui.trdm.script.value_chip",
                     value == null ? Component.translatable("gui.trdm.script.none")
-                            : Component.literal(valueSummary(value.id))).getString();
+                            : Component.literal(summary)).getString();
         }
         final int chipTop = top + Math.round(30 * zoom);
         final int chipH = Math.max(12, Math.round(20 * zoom));
@@ -1061,9 +1123,9 @@ public final class FareScriptScreen extends Screen {
     private List<FareRule> availableRules() {
         final List<FareRule> all = FareRuntime.get().config().rules;
         final List<FareRule> result = new ArrayList<>();
-        for (final FareRule rule : all) {
-            if (this.rule.id == null || !this.rule.id.equals(rule.id)) {
-                result.add(rule);
+        for (final FareRule candidate : all) {
+            if (rule == null || rule.id == null || !rule.id.equals(candidate.id)) {
+                result.add(candidate);
             }
         }
         return result;
@@ -1917,8 +1979,14 @@ public final class FareScriptScreen extends Screen {
             }
         } else if (valueStatement(nodeType)) {
             final ScriptNode number = newNumberValue("number");
-            if ("discount_fare".equals(nodeType)) {
-                number.fields.put("value", "10");
+            switch (nodeType) {
+                case "discount_fare" -> number.fields.put("value", "10");
+                case "pass_price" -> number.fields.put("value", "10");
+                case "pass_days" -> number.fields.put("value", "1");
+                case "pass_discount" -> number.fields.put("value", "100");
+                case "pass_daily_limit" -> number.fields.put("value", "0");
+                default -> {
+                }
             }
             node.inputs.put("value", number.id);
         } else if ("round_fare".equals(nodeType)) {
@@ -2057,7 +2125,8 @@ public final class FareScriptScreen extends Screen {
         switch (type) {
             case "compare" -> {
                 value.fields.put("op", ">=");
-                value.inputs.put("a", newNumberValue("context_intervals").id);
+                value.inputs.put("a", newNumberValue(passRule == null
+                        ? "context_intervals" : "number").id);
                 value.inputs.put("b", newNumberValue("number").id);
             }
             case "and", "or" -> {
@@ -2211,15 +2280,16 @@ public final class FareScriptScreen extends Screen {
             return;
         }
         pushUndo();
+        final String[] types = passRule == null ? STATEMENT_TYPES : PASS_STATEMENT_TYPES;
         int index = 0;
-        for (int i = 0; i < STATEMENT_TYPES.length; i++) {
-            if (STATEMENT_TYPES[i].equals(node.type)) {
+        for (int i = 0; i < types.length; i++) {
+            if (types[i].equals(node.type)) {
                 index = i;
                 break;
             }
         }
         final String oldType = node.type;
-        node.type = STATEMENT_TYPES[(index + 1) % STATEMENT_TYPES.length];
+        node.type = types[(index + 1) % types.length];
         if (valueStatement(oldType) && !valueStatement(node.type)) {
             node.inputs.remove("value");
         }
@@ -2813,6 +2883,18 @@ public final class FareScriptScreen extends Screen {
             if ("discount_fare".equals(ownerNode.type)) {
                 return "gui.trdm.script.value_percent";
             }
+            if ("pass_price".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_emeralds";
+            }
+            if ("pass_days".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_days";
+            }
+            if ("pass_discount".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_percent";
+            }
+            if ("pass_daily_limit".equals(ownerNode.type)) {
+                return "gui.trdm.script.value_daily_limit";
+            }
             if ("set_fare".equals(ownerNode.type) || "add_fare".equals(ownerNode.type)
                     || "cap_fare".equals(ownerNode.type) || "floor_fare".equals(ownerNode.type)) {
                 return "gui.trdm.script.value_amount";
@@ -2822,6 +2904,24 @@ public final class FareScriptScreen extends Screen {
     }
 
     private void save() {
+        if (passRule != null) {
+            final PassSettings settings;
+            try {
+                settings = PassScriptCompiler.evaluate(script);
+            } catch (ScriptException exception) {
+                error = exception.getMessage();
+                rebuild();
+                return;
+            }
+            final PassRule current = PassRules.byId(FareRuntime.get().config().passRules, passRule.id);
+            final PassRule target = current != null ? current : passRule;
+            target.script = script.copy();
+            target.applySettings(settings);
+            FareRuntime.get().save();
+            dirty = false;
+            minecraft.setScreen(parent);
+            return;
+        }
         final ScriptCompiler.Result result = ScriptCompiler.compile(script);
         if (result.compiled() == null) {
             error = String.join("；", result.errors());
@@ -2887,7 +2987,9 @@ public final class FareScriptScreen extends Screen {
 
     private static boolean valueStatement(String type) {
         return "set_fare".equals(type) || "add_fare".equals(type) || "multiply_fare".equals(type)
-                || "discount_fare".equals(type) || "cap_fare".equals(type) || "floor_fare".equals(type);
+                || "discount_fare".equals(type) || "cap_fare".equals(type) || "floor_fare".equals(type)
+                || "pass_price".equals(type) || "pass_days".equals(type)
+                || "pass_discount".equals(type) || "pass_daily_limit".equals(type);
     }
 
     private static boolean statementType(String type) {
@@ -2932,6 +3034,7 @@ public final class FareScriptScreen extends Screen {
             case "compare", "and", "or", "not", "line_is" -> 0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "discount_fare",
                  "cap_fare", "floor_fare" -> 0xFF2F7D4F;
+            case "pass_price", "pass_days", "pass_discount", "pass_daily_limit" -> 0xFF2F7D4F;
             case "use_rule" -> 0xFF2F6E7D;
             case "round_fare" -> 0xFF2D6E82;
             case "number", "context_intervals", "context_meters", "context_stations",

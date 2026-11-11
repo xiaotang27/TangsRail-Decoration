@@ -219,6 +219,7 @@ public final class TicketGateHandler {
             TicketData.activatePass(pass, player.getUUID(), player.getGameProfile().getName(),
                     window[0], window[1]);
             TicketData.enter(pass, station, ServerFareRuntime.dimensionId(level));
+            TicketSync.sync(player);
             final String storedName = TicketData.passName(pass);
             final Component passName = !storedName.isEmpty()
                     ? Component.literal(storedName) : passName(pass);
@@ -237,12 +238,20 @@ public final class TicketGateHandler {
             message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
+        final long dayKey = TrdmClock.dayKey();
+        final int usedToday = TicketData.ensurePassDay(pass, dayKey);
+        final int dailyLimit = TicketData.passDailyLimit(pass);
+        if (dailyLimit > 0 && usedToday >= dailyLimit) {
+            message(player, "gui.trdm.ticket.gate.pass_daily_limit", dailyLimit);
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
         if (entrance) {
             if (TicketData.state(pass) == TicketData.State.ENTERED) {
                 message(player, "gui.trdm.ticket.gate.invalid_ticket");
                 return TicketSystem.EnumTicketBarrierOpen.CLOSED;
             }
             TicketData.enter(pass, station, ServerFareRuntime.dimensionId(level));
+            TicketSync.sync(player);
             message(player, "gui.trdm.ticket.gate.entry_ticket", stationName(station));
             return TicketSystem.EnumTicketBarrierOpen.OPEN;
         }
@@ -250,9 +259,60 @@ public final class TicketGateHandler {
             message(player, "gui.trdm.ticket.gate.invalid_ticket");
             return TicketSystem.EnumTicketBarrierOpen.CLOSED;
         }
+        final FareQuote quote = ServerFareRuntime.quote(level,
+                TicketData.entryStation(pass), station.id);
+        if (!quote.connected()) {
+            message(player, "gui.trdm.ticket.gate.invalid_ticket");
+            return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+        }
+        if (!TicketData.passAllRules(pass)) {
+            final java.util.List<String> scope = TicketData.passRuleIds(pass);
+            for (final FareQuote.FareLeg leg : quote.legs()) {
+                if (!scope.contains(leg.ruleId())) {
+                    message(player, "gui.trdm.ticket.gate.pass_not_covered");
+                    return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+                }
+            }
+        }
+        final int discount = Math.max(0, Math.min(100, TicketData.passDiscount(pass)));
+        long baseCents = 0L;
+        for (final FareQuote.FareLeg leg : quote.legs()) {
+            baseCents += leg.fareCents();
+        }
+        final long discountedBase = Math.round(baseCents * (100 - discount) / 100.0);
+        final long due = Math.max(0L, discountedBase - quote.transferDiscountCents());
+        if (due > 0L) {
+            final ItemStack card = findCardWithBalance(player, due);
+            if (card == null) {
+                message(player, "gui.trdm.ticket.gate.pass_need_card", FareMoney.yuan(due));
+                return TicketSystem.EnumTicketBarrierOpen.CLOSED;
+            }
+            final long balance = TicketData.balance(card);
+            TicketData.setBalance(card, balance - due);
+            TicketData.addTx(card, TrdmClock.now(), "fare", -due, balance - due);
+            message(player, "gui.trdm.ticket.gate.pass_paid", FareMoney.yuan(due));
+        }
+        TicketData.incrementPassDay(pass, dayKey);
         TicketData.setPassExited(pass);
+        TicketSync.sync(player);
         message(player, "gui.trdm.ticket.gate.exit_ticket", stationName(station));
         return TicketSystem.EnumTicketBarrierOpen.OPEN;
+    }
+
+    private static ItemStack findCardWithBalance(Player player, long due) {
+        for (final ItemStack stack : player.getInventory().items) {
+            if (stack.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.hasData(stack)
+                    && TicketData.balance(stack) >= due) {
+                return stack;
+            }
+        }
+        for (final ItemStack stack : player.getInventory().offhand) {
+            if (stack.is(Trdm.TRANSIT_CARD_ITEM) && TicketData.hasData(stack)
+                    && TicketData.balance(stack) >= due) {
+                return stack;
+            }
+        }
+        return null;
     }
 
     /** 旧通票没有 pass_name 时按定义 ID 回退显示名。 */

@@ -3,9 +3,13 @@ package top.xiaotang27.trdm.ticket;
 import mtr.data.Station;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -78,6 +82,12 @@ public final class TicketData {
     private static final String KEY_PASS_ACTIVE = "pass_active";
     private static final String KEY_PASS_FROM = "pass_from";
     private static final String KEY_PASS_UNTIL = "pass_until";
+    private static final String KEY_PASS_DISCOUNT = "pass_discount";
+    private static final String KEY_PASS_DAILY_LIMIT = "pass_daily_limit";
+    private static final String KEY_PASS_ALL_RULES = "pass_all_rules";
+    private static final String KEY_PASS_RULES = "pass_rules";
+    private static final String KEY_PASS_DAY_KEY = "pass_day_key";
+    private static final String KEY_PASS_DAY_COUNT = "pass_day_count";
 
     private TicketData() {
     }
@@ -131,12 +141,31 @@ public final class TicketData {
     /** 发售一张未激活通票，名字写进 NBT，之后删模板也不影响已售出的票。 */
     public static void issuePass(ItemStack stack, String definitionId, int days, String name,
                                  Station sold, String soldDimension) {
+        issuePass(stack, definitionId, days, name, sold, soldDimension, 100, 0, true, List.of());
+    }
+
+    /** 发售通票并快照折扣、每日次数和适用规则范围。 */
+    public static void issuePass(ItemStack stack, String definitionId, int days, String name,
+                                 Station sold, String soldDimension, int discountPercent,
+                                 int dailyLimit, boolean allRules, Collection<String> ruleIds) {
         final CompoundTag root = new CompoundTag();
         root.putString(KEY_SERIAL, UUID.randomUUID().toString());
         root.putString(KEY_TYPE, TYPE_PASS);
         root.putString(KEY_PASS_DEF, definitionId == null ? "" : definitionId);
         root.putString(KEY_PASS_NAME, name == null ? "" : name);
         root.putInt(KEY_PASS_DAYS, Math.max(1, days));
+        root.putInt(KEY_PASS_DISCOUNT, Math.max(0, Math.min(100, discountPercent)));
+        root.putInt(KEY_PASS_DAILY_LIMIT, Math.max(0, dailyLimit));
+        root.putBoolean(KEY_PASS_ALL_RULES, allRules);
+        final ListTag rules = new ListTag();
+        if (ruleIds != null) {
+            for (final String ruleId : ruleIds) {
+                if (ruleId != null && !ruleId.isBlank()) {
+                    rules.add(StringTag.valueOf(ruleId));
+                }
+            }
+        }
+        root.put(KEY_PASS_RULES, rules);
         root.putBoolean(KEY_PASS_ACTIVE, false);
         root.putString(KEY_STATE, State.EMPTY.name());
         root.putLong(KEY_ISSUED_AT, TrdmClock.now());
@@ -410,6 +439,66 @@ public final class TicketData {
     public static long passUntil(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? 0L : root.getLong(KEY_PASS_UNTIL);
+    }
+
+    public static int passDiscount(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 100 : root.getInt(KEY_PASS_DISCOUNT);
+    }
+
+    public static int passDailyLimit(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0 : root.getInt(KEY_PASS_DAILY_LIMIT);
+    }
+
+    public static boolean passAllRules(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null || !root.contains(KEY_PASS_ALL_RULES) || root.getBoolean(KEY_PASS_ALL_RULES);
+    }
+
+    public static List<String> passRuleIds(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        if (root == null) {
+            return List.of();
+        }
+        final List<String> result = new ArrayList<>();
+        final ListTag list = root.getList(KEY_PASS_RULES, Tag.TAG_STRING);
+        for (int index = 0; index < list.size(); index++) {
+            result.add(list.getString(index));
+        }
+        return result;
+    }
+
+    public static long passDayKey(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0L : root.getLong(KEY_PASS_DAY_KEY);
+    }
+
+    public static int passDayCount(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        return root == null ? 0 : root.getInt(KEY_PASS_DAY_COUNT);
+    }
+
+    /** 跨日时重置每日次数；返回重置后的当日次数。 */
+    public static int ensurePassDay(ItemStack stack, long dayKey) {
+        final CompoundTag root = copyRoot(stack);
+        if (root.getLong(KEY_PASS_DAY_KEY) != dayKey) {
+            root.putLong(KEY_PASS_DAY_KEY, dayKey);
+            root.putInt(KEY_PASS_DAY_COUNT, 0);
+            commit(stack, root);
+            return 0;
+        }
+        return root.getInt(KEY_PASS_DAY_COUNT);
+    }
+
+    public static void incrementPassDay(ItemStack stack, long dayKey) {
+        final CompoundTag root = copyRoot(stack);
+        if (root.getLong(KEY_PASS_DAY_KEY) != dayKey) {
+            root.putLong(KEY_PASS_DAY_KEY, dayKey);
+            root.putInt(KEY_PASS_DAY_COUNT, 0);
+        }
+        root.putInt(KEY_PASS_DAY_COUNT, root.getInt(KEY_PASS_DAY_COUNT) + 1);
+        commit(stack, root);
     }
 
     /** 首次入闸：写入绑定玩家和有效期。 */

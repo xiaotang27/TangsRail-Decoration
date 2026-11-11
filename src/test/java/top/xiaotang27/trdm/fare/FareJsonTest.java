@@ -8,12 +8,34 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 规则 JSON 的读写测试。 */
 class FareJsonTest {
+
+    @Test
+    void passScriptAndScopeRoundTrip() {
+        final FareConfig config = FareDefaults.config();
+        final top.xiaotang27.trdm.ticket.PassRule pass = config.passRules.get(0);
+        pass.script = top.xiaotang27.trdm.fare.script.PassScripts.defaults(12, 2, 75, 3);
+        pass.allRules = false;
+        pass.ruleIds.add("rule_a");
+        pass.ruleIds.add("rule_b");
+
+        final FareConfig parsed = FareJson.parse(FareJson.write(config));
+        final top.xiaotang27.trdm.ticket.PassRule loaded = parsed.passRules.get(0);
+        assertFalse(loaded.allRules);
+        assertTrue(loaded.ruleIds.contains("rule_a"));
+        assertTrue(loaded.ruleIds.contains("rule_b"));
+        final top.xiaotang27.trdm.fare.script.PassSettings settings = loaded.settings();
+        assertEquals(12, settings.priceEmeralds());
+        assertEquals(2, settings.days());
+        assertEquals(75, settings.discountPercent());
+        assertEquals(3, settings.dailyLimit());
+    }
 
     @Test
     void timeBasisRoundTrip() {

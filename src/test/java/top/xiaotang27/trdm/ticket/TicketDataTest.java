@@ -126,6 +126,24 @@ class TicketDataTest {
     }
 
     @Test
+    void passSnapshotsScopeDiscountAndDailyUses() {
+        final ItemStack pass = new ItemStack(Items.PAPER);
+        TicketData.issuePass(pass, "limited", 2, "限定通票", station, "minecraft:overworld",
+                75, 2, false, java.util.List.of("rule_a", "rule_b"));
+        assertEquals(75, TicketData.passDiscount(pass));
+        assertEquals(2, TicketData.passDailyLimit(pass));
+        assertFalse(TicketData.passAllRules(pass));
+        assertEquals(java.util.List.of("rule_a", "rule_b"), TicketData.passRuleIds(pass));
+
+        assertEquals(0, TicketData.ensurePassDay(pass, 10L));
+        TicketData.incrementPassDay(pass, 10L);
+        TicketData.incrementPassDay(pass, 10L);
+        assertEquals(2, TicketData.ensurePassDay(pass, 10L));
+        assertEquals(0, TicketData.ensurePassDay(pass, 11L));
+        assertEquals(0, TicketData.passDayCount(pass));
+    }
+
+    @Test
     void journeyTracksPaidTotal() {
         final ItemStack card = new ItemStack(Items.PAPER);
         TicketData.issueCard(card, 5000L, 18, station, "minecraft:overworld");
