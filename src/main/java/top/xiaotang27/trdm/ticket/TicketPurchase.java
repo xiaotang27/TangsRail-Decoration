@@ -124,6 +124,24 @@ public final class TicketPurchase {
 
     // ===== 补车费 =====
 
+    public static Result setCardPolicies(ServerPlayer player, BlockPos pos,
+                                         java.util.List<String> policies) {
+        final Result invalid = validate(player, pos, Trdm.CUSTOMER_SERVICE_TERMINAL);
+        if (invalid != null) {
+            return invalid;
+        }
+        if (!player.hasPermissions(2)) {
+            return error("gui.trdm.ticket.error.no_permission");
+        }
+        final ItemStack held = player.getMainHandItem();
+        if (!held.is(Trdm.TRANSIT_CARD_ITEM) || !TicketData.hasData(held)) {
+            return error("gui.trdm.ticket.error.no_card");
+        }
+        TicketData.setCardPolicies(held, policies);
+        TicketSync.sync(player);
+        return new Result(true, "gui.trdm.policies.saved", 0L);
+    }
+
     public static Result payFare(ServerPlayer player, BlockPos pos) {
         final ServerLevel level = player.serverLevel();
         final Result invalid = validate(player, pos, Trdm.CUSTOMER_SERVICE_TERMINAL);
@@ -407,7 +425,8 @@ public final class TicketPurchase {
                 new top.xiaotang27.trdm.fare.QuoteEnvironment(
                         TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
                         dayStats.rides(), dayStats.amountCents(),
-                        monthStats.rides(), monthStats.amountCents()));
+                        monthStats.rides(), monthStats.amountCents(),
+                        TicketData.cardPolicies(card)));
         final long fare = quote.totalCents();
         long balance = TicketData.balance(card);
         final long remainingFare = fare - paid;

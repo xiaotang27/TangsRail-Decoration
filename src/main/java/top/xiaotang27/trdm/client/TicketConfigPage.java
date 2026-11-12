@@ -469,9 +469,13 @@ final class TicketConfigPage {
 
         host.section(guiGraphics, "gui.trdm.ticket.templates", TEMPLATES_SECTION_Y);
         host.textRight(guiGraphics, Component.translatable("gui.trdm.ticket.double_click"),
-                TrdmScreenBase.CONTENT_RIGHT - 84F, TEMPLATES_SECTION_Y + 5F,
+                TrdmScreenBase.CONTENT_RIGHT - 260F, TEMPLATES_SECTION_Y + 5F,
                 TrdmScreenBase.FONT_SUB, TrdmScreenBase.COLOR_SUB);
         if (canEdit()) {
+            host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 170F, TEMPLATES_SECTION_Y - 3F,
+                    84F, 18F, Component.translatable("gui.trdm.policies.card_button"), false,
+                    host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 170F, TEMPLATES_SECTION_Y - 3F,
+                            84F, 18F), TrdmScreenBase.FONT_SUB);
             host.buttonText(guiGraphics, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F,
                     80F, 18F, Component.translatable("gui.trdm.ticket.add_template_short"), false,
                     host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F),
@@ -1814,6 +1818,10 @@ final class TicketConfigPage {
             return true;
         }
 
+        if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 170F, TEMPLATES_SECTION_Y - 3F, 84F, 18F)) {
+            Minecraft.getInstance().setScreen(new DiscountPolicyScreen(host));
+            return true;
+        }
         if (host.hit(mx, my, TrdmScreenBase.CONTENT_RIGHT - 80F, TEMPLATES_SECTION_Y - 3F, 80F, 18F)) {
             addTemplate();
             return true;

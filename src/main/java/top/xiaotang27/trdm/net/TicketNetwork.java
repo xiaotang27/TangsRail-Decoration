@@ -41,6 +41,9 @@ public final class TicketNetwork {
     /** C2S：BlockPos（客服终端），无票补票并领取出站票。 */
     public static final ResourceLocation EXIT_TICKET = Trdm.id("ticket_exit_ticket");
 
+    /** C2S：BlockPos + 政策 ID 列表，客服终端给主手交通卡设置政策。 */
+    public static final ResourceLocation SET_CARD_POLICIES = Trdm.id("ticket_card_policies");
+
     /** S2C：成功标志 + 翻译键 + 数值。 */
     public static final ResourceLocation RESULT = Trdm.id("ticket_result");
 
@@ -96,6 +99,17 @@ public final class TicketNetwork {
         ServerPlayNetworking.registerGlobalReceiver(EXIT_TICKET, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();
             server.execute(() -> send(player, TicketPurchase.buyExitTicket(player, pos)));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(SET_CARD_POLICIES,
+                (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final int count = buf.readVarInt();
+            final java.util.List<String> policies = new java.util.ArrayList<>();
+            for (int index = 0; index < count; index++) {
+                policies.add(buf.readUtf(64));
+            }
+            server.execute(() -> send(player,
+                    TicketPurchase.setCardPolicies(player, pos, policies)));
         });
         ServerPlayNetworking.registerGlobalReceiver(CONFIG_UPDATE, (server, player, handler, buf, responseSender) -> {
             final String json = buf.readUtf(1_000_000);

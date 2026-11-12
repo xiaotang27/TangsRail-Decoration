@@ -38,6 +38,17 @@ class FareJsonTest {
     }
 
     @Test
+    void discountPoliciesRoundTrip() {
+        final FareConfig config = FareDefaults.config();
+        config.discountPolicies.add(new DiscountPolicy("senior", "老年优惠"));
+        config.discountPolicies.add(new DiscountPolicy("student", "学生优惠"));
+        final FareConfig parsed = FareJson.parse(FareJson.write(config));
+        assertEquals(2, parsed.discountPolicies.size());
+        assertEquals("senior", parsed.discountPolicies.get(0).id());
+        assertEquals("老年优惠", parsed.discountPolicies.get(0).name());
+    }
+
+    @Test
     void timeBasisRoundTrip() {
         final FareConfig config = FareDefaults.config();
         config.timeBasis = top.xiaotang27.trdm.ticket.TimeBasis.GAME;

@@ -174,7 +174,8 @@ public final class FareRule {
                             cardStats.rides(), cardStats.amountCents(), cardStats.meters(),
                             environment.hour(), environment.minute(), environment.weekday(),
                             environment.cardDayRides(), environment.cardDayAmountCents(),
-                            environment.cardMonthRides(), environment.cardMonthAmountCents()),
+                            environment.cardMonthRides(), environment.cardMonthAmountCents(),
+                            environment.cardPolicies()),
                     resolver);
             if (!Double.isFinite(yuan)) {
                 return vanillaFareCents(fromZone, toZone);

@@ -40,6 +40,38 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void cardPolicyConditionUsesSelectedPolicy() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "if";
+        final ScriptNode condition = new ScriptNode("cond", "card_has_policy");
+        condition.fields.put("policy", "senior");
+        final ScriptNode ifNode = new ScriptNode("if", "if");
+        ifNode.inputs.put("condition", "cond");
+        ifNode.next = "one";
+        ifNode.otherwise = "three";
+        final ScriptNode one = new ScriptNode("one", "set_fare");
+        one.inputs.put("value", "oneValue");
+        final ScriptNode oneValue = new ScriptNode("oneValue", "number");
+        oneValue.fields.put("value", "1");
+        final ScriptNode three = new ScriptNode("three", "set_fare");
+        three.inputs.put("value", "threeValue");
+        final ScriptNode threeValue = new ScriptNode("threeValue", "number");
+        threeValue.fields.put("value", "3");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, condition, ifNode, one, oneValue, three, threeValue));
+
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        assertEquals(1.0, result.compiled().run(new ScriptContext(
+                0, 0, 0, 0, 0L, "", 0L, 0L, 0L,
+                0, 0, 1, 0L, 0L, 0L, 0L, java.util.Set.of("senior"))), 1e-9);
+        assertEquals(3.0, result.compiled().run(new ScriptContext(
+                0, 0, 0, 0, 0L, "", 0L, 0L, 0L,
+                0, 0, 1, 0L, 0L, 0L, 0L, java.util.Set.of())), 1e-9);
+    }
+
+    @Test
     void executionTraceRecordsFareChanges() {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");

@@ -409,6 +409,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 20F, 400F, 150F, 28F,
                 Component.translatable("gui.trdm.terminal.confirm"),
                 hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F), FONT_ROW);
+        if (held.is(Trdm.TRANSIT_CARD_ITEM) && FareRuntime.get().canEdit()) {
+            TicketUi.button(this, guiGraphics, TicketUi.PANEL_X + 184F, 400F, 150F, 28F,
+                    Component.translatable("gui.trdm.policies.card_button"),
+                    hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 150F, 28F), FONT_ROW);
+        }
 
         final float keypadX = 552F;
         text(guiGraphics, Component.translatable("gui.trdm.terminal.enter_amount"),
@@ -678,7 +683,8 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                 new top.xiaotang27.trdm.fare.QuoteEnvironment(
                         TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
                         dayStats.rides(), dayStats.amountCents(),
-                        monthStats.rides(), monthStats.amountCents())).totalCents();
+                        monthStats.rides(), monthStats.amountCents(),
+                        card ? TicketData.cardPolicies(held) : java.util.Set.of())).totalCents();
         final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
         final long due = Math.max(0L, fare - paid - value);
         infoAction = ACTION_PAY_FARE;
@@ -1040,6 +1046,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
             } else if (!"OK".equals(key) && amountInput.length() < 3) {
                 amountInput = amountInput.equals("0") ? key : amountInput + key;
             }
+            return true;
+        }
+        if (hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 150F, 28F)
+                && heldItem().is(Trdm.TRANSIT_CARD_ITEM) && FareRuntime.get().canEdit()) {
+            Minecraft.getInstance().setScreen(new CardPolicyScreen(this, pos, heldItem()));
             return true;
         }
         if (hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F)) {

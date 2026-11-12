@@ -75,6 +75,19 @@ public final class FareJson {
         config.transferDiscountCents = money(root, "transferDiscount", 0L);
         config.mergeSameRule = bool(root, "mergeSameRule", true);
 
+        if (root.has("discountPolicies") && root.get("discountPolicies").isJsonArray()) {
+            for (final JsonElement element : root.getAsJsonArray("discountPolicies")) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                final JsonObject policy = element.getAsJsonObject();
+                final String id = string(policy, "id", "");
+                if (!id.isBlank()) {
+                    config.discountPolicies.add(new DiscountPolicy(id, string(policy, "name", id)));
+                }
+            }
+        }
+
         if (root.has("rules") && root.get("rules").isJsonArray()) {
             for (final JsonElement element : root.getAsJsonArray("rules")) {
                 if (element.isJsonObject()) {
@@ -169,6 +182,15 @@ public final class FareJson {
             bindings.addProperty(entry.getKey(), entry.getValue());
         }
         root.add("routeRules", bindings);
+
+        final JsonArray policies = new JsonArray();
+        for (final DiscountPolicy policy : config.discountPolicies) {
+            final JsonObject item = new JsonObject();
+            item.addProperty("id", policy.id());
+            item.addProperty("name", policy.name());
+            policies.add(item);
+        }
+        root.add("discountPolicies", policies);
 
         final JsonArray passes = new JsonArray();
         for (final PassRule pass : config.passRules) {

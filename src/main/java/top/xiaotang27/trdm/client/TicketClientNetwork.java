@@ -100,4 +100,14 @@ public final class TicketClientNetwork {
         buf.writeBlockPos(pos);
         ClientPlayNetworking.send(TicketNetwork.EXIT_TICKET, buf);
     }
+
+    public static void setCardPolicies(BlockPos pos, java.util.Collection<String> policies) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        buf.writeVarInt(policies.size());
+        for (final String policy : policies) {
+            buf.writeUtf(policy, 64);
+        }
+        ClientPlayNetworking.send(TicketNetwork.SET_CARD_POLICIES, buf);
+    }
 }

@@ -106,7 +106,8 @@ public final class FareScriptScreen extends Screen {
         list.add(new PaletteEntry("gui.trdm.script.block.if_else", "if_else", true, false,
                 colorFor("if")));
         list.add(new PaletteEntry("gui.trdm.script.category.conditions", null, false, true, 0xFF2F6E45));
-        for (final String type : List.of("compare", "and", "or", "not", "line_is", "is_weekend")) {
+        for (final String type : List.of("compare", "and", "or", "not", "line_is",
+                "is_weekend", "card_has_policy")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.category.fare", null, false, true, 0xFF2F7D4F));
@@ -402,11 +403,14 @@ public final class FareScriptScreen extends Screen {
     private boolean trialCollapsed;
     private int trialLineIndex;
     private int trialStartIndex;
+    private int trialPolicyIndex;
     private boolean trialLineDropOpen;
     private boolean trialStartDropOpen;
+    private boolean trialPolicyDropOpen;
     private float trialScroll;
     private float trialLineDropScroll;
     private float trialStartDropScroll;
+    private float trialPolicyDropScroll;
     private boolean trialDirty = true;
     private String trialError = "";
     private final List<TrialLine> trialLines = new ArrayList<>();
@@ -793,7 +797,7 @@ public final class FareScriptScreen extends Screen {
                             from == null ? 0 : from.zone(), to == null ? 0 : to.zone(),
                             line.routeId(), line.name(), 0L, 0L, 0L,
                             TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
-                            0L, 0L, 0L, 0L),
+                            0L, 0L, 0L, 0L, trialPolicyIds()),
                     config.ruleResolver(visiting));
             trace = raw;
             if (rule.maxFareCents > 0L && raw.finalFare() * 100.0 > rule.maxFareCents) {
@@ -835,6 +839,7 @@ public final class FareScriptScreen extends Screen {
         final int controlW = w - 16;
         final int lineY = y + 30;
         final int startY = y + 54;
+        final int policyY = y + 78;
         drawTrialSelector(guiGraphics, controlX, lineY, controlW, 18,
                 Component.translatable("gui.trdm.script.trial.line").getString() + " · "
                         + (trialLines.isEmpty()
@@ -844,11 +849,14 @@ public final class FareScriptScreen extends Screen {
                 Component.translatable("gui.trdm.script.trial.from").getString() + " · "
                         + (trialLines.isEmpty() ? "-" : trialStationName(trialStartStation())),
                 trialStartDropOpen);
+        drawTrialSelector(guiGraphics, controlX, policyY, controlW, 18,
+                Component.translatable("gui.trdm.script.trial.policy").getString() + " · "
+                        + trialPolicyName(), trialPolicyDropOpen);
 
         final int listX = x + 8;
-        final int listY = y + 80;
+        final int listY = y + 104;
         final int listW = w - 16;
-        final int listH = Math.max(40, h - 88);
+        final int listH = Math.max(40, h - 112);
         guiGraphics.enableScissor(listX, listY, listX + listW, listY + listH);
         final List<Long> stations = trialStations();
         final float maxScroll = Math.max(0F, stations.size() * 22F - listH);
@@ -890,6 +898,8 @@ public final class FareScriptScreen extends Screen {
                 trialLineNames(), trialLineIndex, trialLineDropScroll);
         drawTrialDropdown(guiGraphics, trialStartDropOpen, startY + 19, controlW,
                 trialStationNames(), trialStartIndex, trialStartDropScroll);
+        drawTrialDropdown(guiGraphics, trialPolicyDropOpen, policyY + 19, controlW,
+                trialPolicyNames(), trialPolicyIndex, trialPolicyDropScroll);
     }
 
     private void drawTrialSelector(GuiGraphics guiGraphics, int x, int y, int w, int h,
@@ -1002,6 +1012,39 @@ public final class FareScriptScreen extends Screen {
         return result;
     }
 
+    private List<String> trialPolicyNames() {
+        final List<String> result = new ArrayList<>();
+        result.add(Component.translatable("gui.trdm.script.trial.no_policy").getString());
+        for (final top.xiaotang27.trdm.fare.DiscountPolicy policy
+                : FareRuntime.get().config().discountPolicies) {
+            result.add(policy.name());
+        }
+        return result;
+    }
+
+    private String trialPolicyName() {
+        if (trialPolicyIndex <= 0) {
+            return Component.translatable("gui.trdm.script.trial.no_policy").getString();
+        }
+        final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
+                FareRuntime.get().config().discountPolicies;
+        final int index = trialPolicyIndex - 1;
+        return index >= 0 && index < policies.size()
+                ? policies.get(index).name()
+                : Component.translatable("gui.trdm.script.trial.no_policy").getString();
+    }
+
+    private java.util.Set<String> trialPolicyIds() {
+        if (trialPolicyIndex <= 0) {
+            return java.util.Set.of();
+        }
+        final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
+                FareRuntime.get().config().discountPolicies;
+        final int index = trialPolicyIndex - 1;
+        return index >= 0 && index < policies.size()
+                ? java.util.Set.of(policies.get(index).id()) : java.util.Set.of();
+    }
+
     private void rebuildTrialData() {
         trialDirty = false;
         trialFares.clear();
@@ -1042,7 +1085,7 @@ public final class FareScriptScreen extends Screen {
                         from == null ? 0 : from.zone(), to == null ? 0 : to.zone(),
                         line.routeId(), line.name(), 0L, 0L, 0L,
                         TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
-                        0L, 0L, 0L, 0L), config.ruleResolver(visiting));
+                        0L, 0L, 0L, 0L, trialPolicyIds()), config.ruleResolver(visiting));
                 long cents = Math.max(0L, Math.round(fare * 100.0));
                 if (rule.maxFareCents > 0L) {
                     cents = Math.min(cents, rule.maxFareCents);
@@ -1071,6 +1114,7 @@ public final class FareScriptScreen extends Screen {
         if (mx < x || mx >= x + w || my < y || my >= y + h) {
             trialLineDropOpen = false;
             trialStartDropOpen = false;
+            trialPolicyDropOpen = false;
             return false;
         }
         if (trialLineDropOpen) {
@@ -1094,18 +1138,36 @@ public final class FareScriptScreen extends Screen {
                 return true;
             }
         }
+        if (trialPolicyDropOpen) {
+            if (handleTrialDropdownClick(mx, my, y + 97, w, trialPolicyNames().size(),
+                    trialPolicyDropScroll, index -> {
+                        trialPolicyIndex = index;
+                        trialDirty = true;
+                        trialPolicyDropOpen = false;
+                    })) {
+                return true;
+            }
+        }
         if (mx >= x + 8 && mx < x + w - 8 && my >= y + 30 && my < y + 48) {
             trialLineDropOpen = !trialLineDropOpen;
             trialStartDropOpen = false;
+            trialPolicyDropOpen = false;
             return true;
         }
         if (mx >= x + 8 && mx < x + w - 8 && my >= y + 54 && my < y + 72) {
             trialStartDropOpen = !trialStartDropOpen;
             trialLineDropOpen = false;
+            trialPolicyDropOpen = false;
             return true;
         }
-        final int listY = y + 80;
-        final int listH = Math.max(40, h - 88);
+        if (mx >= x + 8 && mx < x + w - 8 && my >= y + 78 && my < y + 96) {
+            trialPolicyDropOpen = !trialPolicyDropOpen;
+            trialLineDropOpen = false;
+            trialStartDropOpen = false;
+            return true;
+        }
+        final int listY = y + 104;
+        final int listH = Math.max(40, h - 112);
         if (mx >= x + 8 && mx < x + w - 8 && my >= listY && my < listY + listH) {
             final int index = (int) Math.floor((my - listY + trialScroll) / 22F);
             if (index >= 0 && index < trialStations().size()) {
@@ -1152,8 +1214,12 @@ public final class FareScriptScreen extends Screen {
             trialStartDropScroll = Math.max(0F, trialStartDropScroll - (float) delta * 16F);
             return true;
         }
-        final int listY = y + 80;
-        final int listH = Math.max(40, h - 88);
+        if (trialPolicyDropOpen) {
+            trialPolicyDropScroll = Math.max(0F, trialPolicyDropScroll - (float) delta * 16F);
+            return true;
+        }
+        final int listY = y + 104;
+        final int listH = Math.max(40, h - 112);
         if (mouseY >= listY) {
             final float max = Math.max(0F, trialStations().size() * 22F - listH);
             trialScroll = Math.max(0F, Math.min(max, trialScroll - (float) delta * 22F));
@@ -3108,6 +3174,12 @@ public final class FareScriptScreen extends Screen {
                 value.inputs.put("b", newBooleanValue("compare").id);
             }
             case "not" -> value.inputs.put("a", newBooleanValue("compare").id);
+            case "card_has_policy" -> {
+                final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
+                        FareRuntime.get().config().discountPolicies;
+                value.fields.put("policy", policies.isEmpty() ? "" : policies.get(0).id());
+                value.fields.put("policy_name", policies.isEmpty() ? "" : policies.get(0).name());
+            }
             case "line_is" -> {
                 final List<LineOption> options = lineOptions();
                 if (!options.isEmpty()) {
@@ -3198,6 +3270,28 @@ public final class FareScriptScreen extends Screen {
             return false;
         }
         return booleanSlot ? isBoolean(type) : isNumeric(type);
+    }
+
+    private void cyclePolicy(ScriptNode node) {
+        if (node == null) {
+            return;
+        }
+        final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
+                FareRuntime.get().config().discountPolicies;
+        if (policies.isEmpty()) {
+            return;
+        }
+        final String current = node.fields.getOrDefault("policy", "");
+        int index = 0;
+        for (int i = 0; i < policies.size(); i++) {
+            if (policies.get(i).id().equals(current)) {
+                index = (i + 1) % policies.size();
+                break;
+            }
+        }
+        node.fields.put("policy", policies.get(index).id());
+        node.fields.put("policy_name", policies.get(index).name());
+        rebuild();
     }
 
     private void cycleValueType() {
@@ -3536,6 +3630,12 @@ public final class FareScriptScreen extends Screen {
         }
         if (selected != null && "compare".equals(selected.type)) {
             // 运算符用和线路选择一样的下拉框绘制，不在这里放按钮。
+        }
+        if (selected != null && "card_has_policy".equals(selected.type)) {
+            final String current = selected.fields.getOrDefault("policy_name", "");
+            button(x, y + 22, 180, 18, Component.literal(current.isBlank()
+                    ? Component.translatable("gui.trdm.script.choose_policy").getString()
+                    : current), () -> cyclePolicy(selected));
         }
 
         int bx = x;
@@ -4017,7 +4117,8 @@ public final class FareScriptScreen extends Screen {
     private static int colorFor(String type) {
         return switch (type) {
             case "if", "if_else" -> 0xFFB06A1F;
-            case "compare", "and", "or", "not", "line_is", "is_weekend" -> 0xFF3E8E5A;
+            case "compare", "and", "or", "not", "line_is", "is_weekend", "card_has_policy" ->
+                    0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "discount_fare",
                  "cap_fare", "floor_fare", "free_ride", "surcharge" -> 0xFF2F7D4F;
             case "pass_price", "pass_days", "pass_discount", "pass_daily_limit" -> 0xFF2F7D4F;
@@ -4071,6 +4172,9 @@ public final class FareScriptScreen extends Screen {
             case "not" -> "非 " + valueSummary(node.inputs.get("a"), depth + 1);
             case "line_is" -> "当前线路 = " + node.fields.getOrDefault("line_name",
                     node.fields.getOrDefault("line", "?"));
+            case "is_weekend" -> "周末";
+            case "card_has_policy" -> "政策：" + node.fields.getOrDefault("policy_name",
+                    node.fields.getOrDefault("policy", "?"));
             case "add" -> arithmeticSummary(node, "+", depth);
             case "subtract" -> arithmeticSummary(node, "-", depth);
             case "multiply" -> arithmeticSummary(node, "×", depth);

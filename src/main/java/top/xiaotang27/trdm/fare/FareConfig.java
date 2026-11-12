@@ -57,6 +57,8 @@ public final class FareConfig {
     public final Map<String, String> routeRules = new LinkedHashMap<>();
     /** 可配置的通票模板（名称/售价/天数）。 */
     public final List<PassRule> passRules = new ArrayList<>();
+    /** 交通卡优惠政策定义，只有 ID + 名称。 */
+    public final List<DiscountPolicy> discountPolicies = new ArrayList<>();
 
     public static String bindingKey(String dimension, long routeId) {
         return (dimension == null || dimension.isBlank() ? DEFAULT_DIMENSION : dimension) + "|" + routeId;
@@ -230,6 +232,10 @@ public final class FareConfig {
         passRules.clear();
         for (final PassRule pass : other.passRules) {
             passRules.add(pass.copy());
+        }
+        discountPolicies.clear();
+        for (final DiscountPolicy policy : other.discountPolicies) {
+            discountPolicies.add(policy.copy());
         }
     }
 }

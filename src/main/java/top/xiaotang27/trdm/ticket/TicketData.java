@@ -12,8 +12,10 @@ import top.xiaotang27.trdm.fare.CardRuleStats;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -54,6 +56,7 @@ public final class TicketData {
     private static final String KEY_BALANCE = "balance";
     private static final String KEY_DEPOSIT = "deposit";
     private static final String KEY_CARD_RULE_STATS = "card_rule_stats";
+    private static final String KEY_CARD_POLICIES = "card_policies";
     private static final String KEY_CARD_DAY_KEY = "card_day_key";
     private static final String KEY_CARD_DAY_RIDES = "card_day_rides";
     private static final String KEY_CARD_DAY_AMOUNT = "card_day_amount";
@@ -332,6 +335,37 @@ public final class TicketData {
         root.putString(KEY_CARD_MONTH_KEY, monthKey);
         root.putLong(KEY_CARD_MONTH_RIDES, monthRides + 1L);
         root.putLong(KEY_CARD_MONTH_AMOUNT, monthAmount + Math.max(0L, paidCents));
+        commit(stack, root);
+    }
+
+    /** 卡上的优惠政策 ID 集合；空集 = 不享受特殊优惠。 */
+    public static Set<String> cardPolicies(ItemStack stack) {
+        final Set<String> result = new LinkedHashSet<>();
+        final CompoundTag root = root(stack);
+        if (root == null || !root.contains(KEY_CARD_POLICIES, Tag.TAG_LIST)) {
+            return result;
+        }
+        final ListTag list = root.getList(KEY_CARD_POLICIES, Tag.TAG_STRING);
+        for (int index = 0; index < list.size(); index++) {
+            final String id = list.getString(index);
+            if (!id.isBlank()) {
+                result.add(id);
+            }
+        }
+        return result;
+    }
+
+    public static void setCardPolicies(ItemStack stack, Collection<String> policies) {
+        final ListTag list = new ListTag();
+        if (policies != null) {
+            for (final String id : policies) {
+                if (id != null && !id.isBlank()) {
+                    list.add(StringTag.valueOf(id));
+                }
+            }
+        }
+        final CompoundTag root = copyRoot(stack);
+        root.put(KEY_CARD_POLICIES, list);
         commit(stack, root);
     }
 

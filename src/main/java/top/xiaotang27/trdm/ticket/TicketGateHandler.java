@@ -161,7 +161,8 @@ public final class TicketGateHandler {
                 new top.xiaotang27.trdm.fare.QuoteEnvironment(
                         TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
                         dayStats.rides(), dayStats.amountCents(),
-                        monthStats.rides(), monthStats.amountCents()));
+                        monthStats.rides(), monthStats.amountCents(),
+                        TicketData.cardPolicies(card)));
         final long fare = quote.totalCents();
         if (!quote.connected() && quote.maxFareCapCents() <= 0L) {
             message(player, "gui.trdm.ticket.gate.no_fare");

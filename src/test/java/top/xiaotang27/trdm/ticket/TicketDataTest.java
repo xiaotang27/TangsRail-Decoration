@@ -103,6 +103,15 @@ class TicketDataTest {
     }
 
     @Test
+    void cardPoliciesRoundTrip() {
+        final ItemStack card = new ItemStack(Items.PAPER);
+        TicketData.setCardPolicies(card, java.util.List.of("senior", "student"));
+        assertEquals(java.util.Set.of("senior", "student"), TicketData.cardPolicies(card));
+        TicketData.setCardPolicies(card, java.util.List.of());
+        assertTrue(TicketData.cardPolicies(card).isEmpty());
+    }
+
+    @Test
     void cardDayAndMonthUsageAccumulate() {
         TrdmClock.setBasis(TimeBasis.SYSTEM);
         final ItemStack card = new ItemStack(Items.PAPER);

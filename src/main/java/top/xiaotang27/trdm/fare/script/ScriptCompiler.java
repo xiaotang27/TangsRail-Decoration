@@ -34,7 +34,7 @@ public final class ScriptCompiler {
             "add", "subtract", "multiply", "divide", "min", "max",
             "table_intervals", "table_meters");
     private static final Set<String> BOOLEAN_VALUES = Set.of(
-            "compare", "and", "or", "not", "line_is", "is_weekend");
+            "compare", "and", "or", "not", "line_is", "is_weekend", "card_has_policy");
     private static final Set<String> VALUE_STATEMENTS = Set.of(
             "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare",
             "discount_fare", "surcharge");
@@ -277,8 +277,12 @@ public final class ScriptCompiler {
                         }
                     }
                 }
-                case "and", "or" -> {
-                    for (final String slot : List.of("a", "b")) {
+                case "card_has_policy" -> {
+                    if (node.fields.getOrDefault("policy", "").isBlank()) {
+                        errors.add("“是否享受政策”没有选择政策: " + node.id);
+                    }
+                }
+                case "and", "or" -> {                    for (final String slot : List.of("a", "b")) {
                         final String child = node.inputs.get(slot);
                         if (child == null || child.isBlank()) {
                             errors.add("逻辑块缺少输入 " + slot + ": " + node.id);
@@ -599,6 +603,8 @@ public final class ScriptCompiler {
                 case "or" -> bool(node.inputs.get("a"), context) || bool(node.inputs.get("b"), context);
                 case "not" -> !bool(node.inputs.get("a"), context);
                 case "is_weekend" -> context.weekend();
+                case "card_has_policy" -> context.hasPolicy(
+                        node.fields.getOrDefault("policy", ""));
                 case "line_is" -> {
                     try {
                         yield context.routeId() == Long.parseLong(node.fields.getOrDefault("line", "0"));

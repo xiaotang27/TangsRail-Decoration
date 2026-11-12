@@ -1,12 +1,26 @@
 package top.xiaotang27.trdm.fare.script;
 
+import java.util.Set;
+
 /** 报价时暴露给脚本的只读上下文。 */
 public record ScriptContext(long intervals, long meters, int fromZone, int toZone,
                             long routeId, String routeName,
                             long cardRides, long cardAmountCents, long cardMeters,
                             int hour, int minute, int weekday,
                             long cardDayRides, long cardDayAmountCents,
-                            long cardMonthRides, long cardMonthAmountCents) {
+                            long cardMonthRides, long cardMonthAmountCents,
+                            Set<String> cardPolicies) {
+
+    public ScriptContext(long intervals, long meters, int fromZone, int toZone,
+                         long routeId, String routeName,
+                         long cardRides, long cardAmountCents, long cardMeters,
+                         int hour, int minute, int weekday,
+                         long cardDayRides, long cardDayAmountCents,
+                         long cardMonthRides, long cardMonthAmountCents) {
+        this(intervals, meters, fromZone, toZone, routeId, routeName,
+                cardRides, cardAmountCents, cardMeters, hour, minute, weekday,
+                cardDayRides, cardDayAmountCents, cardMonthRides, cardMonthAmountCents, Set.of());
+    }
 
     public ScriptContext(long intervals, long meters, int fromZone, int toZone,
                          long routeId, String routeName,
@@ -53,6 +67,10 @@ public record ScriptContext(long intervals, long meters, int fromZone, int toZon
 
     public double cardMonthAmountYuan() {
         return cardMonthAmountCents / 100.0;
+    }
+
+    public boolean hasPolicy(String policyId) {
+        return policyId != null && cardPolicies.contains(policyId);
     }
 
     public int zoneDiff() {
