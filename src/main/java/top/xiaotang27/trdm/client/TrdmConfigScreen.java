@@ -44,6 +44,17 @@ public class TrdmConfigScreen extends TrdmScreenBase {
         return page;
     }
 
+    /** 供子页面（如政策管理）切回通用设置的其他页。 */
+    public void showPage(int index) {
+        if (index < 0 || index >= PAGES.length || index == page) {
+            return;
+        }
+        if (page == PAGE_TICKET) {
+            ticketPage.onLeave();
+        }
+        page = index;
+    }
+
     @Override
     protected void renderPage(GuiGraphics guiGraphics, float mx, float my) {
         drawSidebarIcons(guiGraphics);

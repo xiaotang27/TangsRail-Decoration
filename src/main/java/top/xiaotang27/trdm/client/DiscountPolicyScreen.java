@@ -13,6 +13,8 @@ import java.util.Set;
 /** 通用设置里的交通卡优惠政策定义：沿用票务规则详情页的暗色布局。 */
 public final class DiscountPolicyScreen extends TrdmScreenBase {
 
+    private static final String[] PAGES = {
+            "gui.trdm.config.general", "gui.trdm.config.ticket", "gui.trdm.config.about"};
     private static final float BACK_W = 84F;
     private static final float BACK_H = 24F;
     private static final float ROW_TOP = 104F;
@@ -21,10 +23,12 @@ public final class DiscountPolicyScreen extends TrdmScreenBase {
     private final List<DiscountPolicy> policies = new ArrayList<>();
     private final List<Object> nameFields = new ArrayList<>();
     private final List<Object> idFields = new ArrayList<>();
+    private final Screen parent;
     private String error = "";
 
     public DiscountPolicyScreen(Screen parent) {
         super(parent, Component.translatable("gui.trdm.policies.title"));
+        this.parent = parent;
         for (final DiscountPolicy policy : FareRuntime.get().config().discountPolicies) {
             policies.add(policy.copy());
             nameFields.add(new Object());
@@ -33,7 +37,41 @@ public final class DiscountPolicyScreen extends TrdmScreenBase {
     }
 
     @Override
+    protected String[] pages() {
+        return PAGES;
+    }
+
+    @Override
+    protected int currentPage() {
+        return 1;
+    }
+
+    private void drawSidebarIcons(GuiGraphics guiGraphics) {
+        for (int index = 0; index < PAGES.length; index++) {
+            final float centreX = SIDEBAR_W / 2F;
+            final float centreY = 8F + index * (SIDEBAR_BTN_H + 2F) + SIDEBAR_BTN_H / 2F;
+            final int color = index == 1 ? 0xFFFFFFFF : 0xFF606060;
+            if (index == 0) {
+                rect(guiGraphics, centreX - 5F, centreY - 5F, 10F, 10F, color);
+                rect(guiGraphics, centreX - 2F, centreY - 8F, 4F, 3F, color);
+                rect(guiGraphics, centreX - 2F, centreY + 5F, 4F, 3F, color);
+                rect(guiGraphics, centreX - 8F, centreY - 2F, 3F, 4F, color);
+                rect(guiGraphics, centreX + 5F, centreY - 2F, 3F, 4F, color);
+                rect(guiGraphics, centreX - 2F, centreY - 2F, 4F, 4F, 0xFF000000);
+            } else if (index == 1) {
+                rect(guiGraphics, centreX - 8F, centreY - 5F, 16F, 10F, color);
+                rect(guiGraphics, centreX - 3F, centreY - 2F, 6F, 4F, 0xFF000000);
+                rect(guiGraphics, centreX - 1F, centreY - 2F, 2F, 4F, color);
+            } else {
+                rect(guiGraphics, centreX - 1F, centreY - 7F, 2F, 3F, color);
+                rect(guiGraphics, centreX - 1F, centreY - 3F, 2F, 10F, color);
+            }
+        }
+    }
+
+    @Override
     protected void renderPage(GuiGraphics guiGraphics, float mx, float my) {
+        drawSidebarIcons(guiGraphics);
         title(guiGraphics, this.title);
         final float backX = CONTENT_RIGHT - BACK_W;
         buttonText(guiGraphics, backX, TITLE_Y, BACK_W, BACK_H,
@@ -76,6 +114,20 @@ public final class DiscountPolicyScreen extends TrdmScreenBase {
 
     @Override
     protected boolean clickPage(float mx, float my) {
+        if (mx >= 0 && mx < SIDEBAR_W) {
+            for (int index = 0; index < PAGES.length; index++) {
+                final float top = 8F + index * (SIDEBAR_BTN_H + 2F);
+                if (my >= top && my < top + SIDEBAR_BTN_H) {
+                    if (parent instanceof TrdmConfigScreen config) {
+                        config.showPage(index);
+                        net.minecraft.client.Minecraft.getInstance().setScreen(config);
+                    } else {
+                        onClose();
+                    }
+                    return true;
+                }
+            }
+        }
         final float backX = CONTENT_RIGHT - BACK_W;
         if (hit(mx, my, backX, TITLE_Y, BACK_W, BACK_H)) {
             onClose();
