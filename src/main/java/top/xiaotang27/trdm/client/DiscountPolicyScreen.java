@@ -1,7 +1,6 @@
 package top.xiaotang27.trdm.client;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.fare.DiscountPolicy;
@@ -11,86 +10,124 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** 通用设置里的交通卡优惠政策定义：只有 ID 和名称。 */
-public final class DiscountPolicyScreen extends Screen {
+/** 通用设置里的交通卡优惠政策定义：沿用票务规则详情页的暗色布局。 */
+public final class DiscountPolicyScreen extends TrdmScreenBase {
 
-    private static final int PANEL_W = 700;
-    private static final int PANEL_TOP = 24;
-    private static final int ROW_H = 28;
+    private static final float BACK_W = 84F;
+    private static final float BACK_H = 24F;
+    private static final float ROW_TOP = 104F;
+    private static final float ROW_H = 30F;
 
-    private final Screen parent;
     private final List<DiscountPolicy> policies = new ArrayList<>();
+    private final List<Object> nameFields = new ArrayList<>();
+    private final List<Object> idFields = new ArrayList<>();
     private String error = "";
 
     public DiscountPolicyScreen(Screen parent) {
-        super(Component.translatable("gui.trdm.policies.title"));
-        this.parent = parent;
+        super(parent, Component.translatable("gui.trdm.policies.title"));
         for (final DiscountPolicy policy : FareRuntime.get().config().discountPolicies) {
             policies.add(policy.copy());
+            nameFields.add(new Object());
+            idFields.add(new Object());
         }
-    }
-
-    private int panelX() {
-        return Math.max(12, (this.width - PANEL_W) / 2);
-    }
-
-    private int panelH() {
-        return Math.max(260, this.height - PANEL_TOP - 20);
     }
 
     @Override
-    protected void init() {
-        final int x = panelX();
-        final int nameX = x + 20;
-        final int idX = x + 290;
-        final int removeX = x + PANEL_W - 88;
+    protected void renderPage(GuiGraphics guiGraphics, float mx, float my) {
+        title(guiGraphics, this.title);
+        final float backX = CONTENT_RIGHT - BACK_W;
+        buttonText(guiGraphics, backX, TITLE_Y, BACK_W, BACK_H,
+                Component.translatable("gui.trdm.ticket.back"), false,
+                hit(mx, my, backX, TITLE_Y, BACK_W, BACK_H), FONT_ROW);
+
+        text(guiGraphics, Component.translatable("gui.trdm.policies.name"),
+                CONTENT_X, 78F, FONT_ROW, COLOR_SUB);
+        text(guiGraphics, Component.translatable("gui.trdm.policies.id"),
+                CONTENT_X + 280F, 78F, FONT_ROW, COLOR_SUB);
+
         for (int index = 0; index < policies.size() && index < 9; index++) {
-            final int row = index;
+            final float y = ROW_TOP + index * ROW_H;
+            rect(guiGraphics, CONTENT_X - 8F, y - 3F, CONTENT_W + 16F, ROW_H - 2F, COLOR_ROW);
             final DiscountPolicy policy = policies.get(index);
-            final int y = PANEL_TOP + 70 + index * ROW_H;
-            final EditBox name = new EditBox(this.font, nameX, y, 250, 20,
-                    Component.translatable("gui.trdm.policies.name"));
-            name.setMaxLength(40);
-            name.setValue(policy.name());
-            name.setTextColor(0xFFE8E8E8);
-            name.setResponder(value -> policies.set(row, new DiscountPolicy(
-                    policies.get(row).id(), value == null ? "" : value.trim())));
-            addRenderableWidget(name);
-            final EditBox id = new EditBox(this.font, idX, y, 220, 20,
-                    Component.translatable("gui.trdm.policies.id"));
-            id.setMaxLength(40);
-            id.setValue(policy.id());
-            id.setTextColor(0xFFE8E8E8);
-            id.setResponder(value -> policies.set(row, new DiscountPolicy(
-                    value == null ? "" : value.trim(), policies.get(row).name())));
-            addRenderableWidget(id);
-            addRenderableWidget(new TrdmEditorButton(removeX, y, 68, 20,
-                    Component.translatable("gui.trdm.policies.delete"), button -> {
-                        policies.remove(row);
-                        error = "";
-                        rebuild();
-                    }));
+            field(guiGraphics, nameFields.get(index), CONTENT_X, y, 260F, 22F, FONT_ROW, policy.name());
+            field(guiGraphics, idFields.get(index), CONTENT_X + 280F, y, 220F, 22F, FONT_ROW, policy.id());
+            final float removeX = CONTENT_RIGHT - 80F;
+            buttonText(guiGraphics, removeX, y, 80F, 22F,
+                    Component.translatable("gui.trdm.policies.delete"), false,
+                    hit(mx, my, removeX, y, 80F, 22F), FONT_SUB);
         }
-        final int footerY = PANEL_TOP + panelH() - 36;
-        addRenderableWidget(new TrdmEditorButton(x + 20, footerY, 110, 20,
-                Component.translatable("gui.trdm.policies.add"), button -> {
-                    if (policies.size() >= 9) {
-                        error = Component.translatable("gui.trdm.policies.limit").getString();
-                        return;
-                    }
-                    policies.add(new DiscountPolicy("policy_" + (policies.size() + 1),
-                            Component.translatable("gui.trdm.policies.new").getString()));
-                    rebuild();
-                }));
-        addRenderableWidget(new TrdmEditorButton(x + PANEL_W - 210, footerY, 90, 20,
-                Component.translatable("gui.trdm.ticket.editor.save"), button -> save()));
-        addRenderableWidget(new TrdmEditorButton(x + PANEL_W - 110, footerY, 90, 20,
-                Component.translatable("gui.trdm.ticket.back"), button -> onClose()));
+
+        final float footerY = 476F;
+        buttonText(guiGraphics, CONTENT_X, footerY, 120F, 24F,
+                Component.translatable("gui.trdm.policies.add"), false,
+                hit(mx, my, CONTENT_X, footerY, 120F, 24F), FONT_ROW);
+        buttonText(guiGraphics, CONTENT_RIGHT - 190F, footerY, 90F, 24F,
+                Component.translatable("gui.trdm.ticket.editor.save"), false,
+                hit(mx, my, CONTENT_RIGHT - 190F, footerY, 90F, 24F), FONT_ROW);
+        buttonText(guiGraphics, CONTENT_RIGHT - 90F, footerY, 90F, 24F,
+                Component.translatable("gui.trdm.ticket.back"), false,
+                hit(mx, my, CONTENT_RIGHT - 90F, footerY, 90F, 24F), FONT_ROW);
+        text(guiGraphics, Component.translatable("gui.trdm.policies.hint"),
+                CONTENT_X, 430F, FONT_SUB, COLOR_SUB);
+        if (!error.isEmpty()) {
+            text(guiGraphics, Component.literal(error), CONTENT_X, 446F, FONT_SUB, 0xFFFF8080);
+        }
     }
 
-    private void rebuild() {
-        this.clearWidgets();
-        this.init(this.minecraft, this.width, this.height);
+    @Override
+    protected boolean clickPage(float mx, float my) {
+        final float backX = CONTENT_RIGHT - BACK_W;
+        if (hit(mx, my, backX, TITLE_Y, BACK_W, BACK_H)) {
+            onClose();
+            return true;
+        }
+        for (int index = 0; index < policies.size() && index < 9; index++) {
+            final float y = ROW_TOP + index * ROW_H;
+            final int row = index;
+            if (hit(mx, my, CONTENT_X, y, 260F, 22F)) {
+                beginField(nameFields.get(index), CONTENT_X, y, 260F, 22F,
+                        policies.get(index).name(), 40, FONT_ROW,
+                        value -> policies.set(row, new DiscountPolicy(
+                                policies.get(row).id(), value == null ? "" : value.trim())));
+                return true;
+            }
+            if (hit(mx, my, CONTENT_X + 280F, y, 220F, 22F)) {
+                beginField(idFields.get(index), CONTENT_X + 280F, y, 220F, 22F,
+                        policies.get(index).id(), 40, FONT_ROW,
+                        value -> policies.set(row, new DiscountPolicy(
+                                value == null ? "" : value.trim(), policies.get(row).name())));
+                return true;
+            }
+            final float removeX = CONTENT_RIGHT - 80F;
+            if (hit(mx, my, removeX, y, 80F, 22F)) {
+                policies.remove(index);
+                nameFields.remove(index);
+                idFields.remove(index);
+                error = "";
+                return true;
+            }
+        }
+        final float footerY = 476F;
+        if (hit(mx, my, CONTENT_X, footerY, 120F, 24F)) {
+            if (policies.size() >= 9) {
+                error = Component.translatable("gui.trdm.policies.limit").getString();
+                return true;
+            }
+            policies.add(new DiscountPolicy("policy_" + (policies.size() + 1),
+                    Component.translatable("gui.trdm.policies.new").getString()));
+            nameFields.add(new Object());
+            idFields.add(new Object());
+            return true;
+        }
+        if (hit(mx, my, CONTENT_RIGHT - 190F, footerY, 90F, 24F)) {
+            save();
+            return true;
+        }
+        if (hit(mx, my, CONTENT_RIGHT - 90F, footerY, 90F, 24F)) {
+            onClose();
+            return true;
+        }
+        return false;
     }
 
     private void save() {
@@ -116,38 +153,5 @@ public final class DiscountPolicyScreen extends Screen {
         }
         FareRuntime.get().save();
         onClose();
-    }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics);
-        final int x = panelX();
-        final int h = panelH();
-        graphics.fill(x - 1, PANEL_TOP - 1, x + PANEL_W + 1, PANEL_TOP + h + 1, 0xFF9A9A9A);
-        graphics.fill(x, PANEL_TOP, PANEL_W, h, 0xF0161616);
-        graphics.fill(x, PANEL_TOP, PANEL_W, 34, 0xFF5B4B8A);
-        graphics.drawString(this.font, this.title, x + 20, PANEL_TOP + 12, 0xFFFFFF, false);
-        graphics.drawString(this.font, Component.translatable("gui.trdm.policies.name"),
-                x + 20, PANEL_TOP + 54, 0xFFA0A0A0, false);
-        graphics.drawString(this.font, Component.translatable("gui.trdm.policies.id"),
-                x + 290, PANEL_TOP + 54, 0xFFA0A0A0, false);
-        for (int index = 0; index < policies.size() && index < 9; index++) {
-            final int y = PANEL_TOP + 70 + index * ROW_H;
-            graphics.fill(x + 12, y - 3, x + PANEL_W - 12, y + 23, 0x33FFFFFF);
-            graphics.fill(x + 12, y - 3, x + 15, y + 23, 0xFF0A7A1E);
-        }
-        graphics.drawString(this.font, Component.translatable("gui.trdm.policies.hint"),
-                x + 20, PANEL_TOP + h - 58, 0xFFA0A0A0, false);
-        if (!error.isEmpty()) {
-            graphics.drawString(this.font, error, x + 20, PANEL_TOP + h - 46, 0xFFFF8080, false);
-        }
-        super.render(graphics, mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    public void onClose() {
-        if (this.minecraft != null) {
-            this.minecraft.setScreen(parent);
-        }
     }
 }
