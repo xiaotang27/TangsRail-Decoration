@@ -222,6 +222,8 @@
   "gui.trdm.script.trial.calculate": "计算",
   "gui.trdm.script.trial.result": "区间 %s，里程 %s 米，收费区 %s → %s，票价 %s",
   "gui.trdm.script.trial.unreachable": "这两站之间不可达",
+  "gui.trdm.script.trace.title": "执行轨迹",
+  "gui.trdm.script.trace.final": "最终票价 %s",
   "gui.trdm.script.trial.no_line": "游戏内没有可用线路",
   "gui.trdm.script.trial.no_station": "没有可用车站",
   "gui.trdm.script.trial.invalid": "脚本校验失败：%s",

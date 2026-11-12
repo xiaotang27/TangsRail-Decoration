@@ -254,6 +254,8 @@
   "gui.trdm.script.trial.calculate": "Calculate",
   "gui.trdm.script.trial.result": "%s intervals, %s m, zones %s → %s, fare %s",
   "gui.trdm.script.trial.unreachable": "No path between these stations",
+  "gui.trdm.script.trace.title": "Execution trace",
+  "gui.trdm.script.trace.final": "Final fare %s",
   "gui.trdm.script.trial.no_line": "No line available in this world",
   "gui.trdm.script.trial.no_station": "No station available",
   "gui.trdm.script.trial.invalid": "Script validation failed: %s",

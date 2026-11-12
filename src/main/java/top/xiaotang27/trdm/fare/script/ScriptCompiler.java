@@ -364,6 +364,7 @@ public final class ScriptCompiler {
         private final java.util.Map<String, ScriptNode> nodes;
         private int steps;
         private RuleResolver resolver;
+        private java.util.List<TraceStep> traceSteps;
 
         private CompiledScript(FareScript script, java.util.Map<String, ScriptNode> nodes) {
             this.script = script;
@@ -380,6 +381,22 @@ public final class ScriptCompiler {
         }
 
         public double run(ScriptContext context, RuleResolver resolver) {
+            traceSteps = null;
+            return runInternal(context, resolver);
+        }
+
+        /** 记录每条被执行语句的前后票价；不记录值块的递归。 */
+        public ExecutionTrace runTraced(ScriptContext context, RuleResolver resolver) {
+            traceSteps = new java.util.ArrayList<>();
+            try {
+                final double fare = runInternal(context, resolver);
+                return new ExecutionTrace(traceSteps, fare);
+            } finally {
+                traceSteps = null;
+            }
+        }
+
+        private double runInternal(ScriptContext context, RuleResolver resolver) {
             steps = 0;
             this.resolver = resolver;
             try {
@@ -398,6 +415,17 @@ public final class ScriptCompiler {
             }
         }
 
+        private void record(ScriptNode node, String detail, double before, double after) {
+            if (traceSteps != null) {
+                traceSteps.add(new TraceStep(traceSteps.size(), node.id, node.type, detail,
+                        before, after));
+            }
+        }
+
+        private static String fmt(double value) {
+            return String.format(java.util.Locale.ROOT, "%.2f", value);
+        }
+
         private void execute(String statementId, State state, ScriptContext context, int depth) {
             if (depth > MAX_DEPTH) {
                 throw new ScriptException("脚本递归过深");
@@ -409,25 +437,33 @@ public final class ScriptCompiler {
                 if (node == null) {
                     throw new ScriptException("语句块不存在: " + cursor);
                 }
+                final double before = state.fare;
                 if (node.disabled) {
+                    record(node, "已禁用，跳过", before, before);
                     cursor = "if".equals(node.type) ? node.after : node.next;
                     continue;
                 }
                 switch (node.type) {
                     case "on_fare" -> cursor = node.next;
                     case "set_fare" -> {
-                        state.fare = number(node.inputs.get("value"), context);
+                        final double value = number(node.inputs.get("value"), context);
+                        state.fare = value;
                         state.hasFare = true;
+                        record(node, "票价 = " + fmt(value), before, state.fare);
                         cursor = node.next;
                     }
                     case "add_fare" -> {
-                        state.fare += number(node.inputs.get("value"), context);
+                        final double value = number(node.inputs.get("value"), context);
+                        state.fare += value;
                         state.hasFare = true;
+                        record(node, "票价 + " + fmt(value), before, state.fare);
                         cursor = node.next;
                     }
                     case "multiply_fare" -> {
-                        state.fare *= number(node.inputs.get("value"), context);
+                        final double value = number(node.inputs.get("value"), context);
+                        state.fare *= value;
                         state.hasFare = true;
+                        record(node, "票价 × " + fmt(value), before, state.fare);
                         cursor = node.next;
                     }
                     case "discount_fare" -> {
@@ -435,46 +471,61 @@ public final class ScriptCompiler {
                                 Math.min(100.0, number(node.inputs.get("value"), context)));
                         state.fare *= 1.0 - percent / 100.0;
                         state.hasFare = true;
+                        record(node, "打折 " + fmt(percent) + "%", before, state.fare);
                         cursor = node.next;
                     }
                     case "free_ride" -> {
                         state.fare = 0.0;
                         state.hasFare = true;
+                        record(node, "免费乘车", before, state.fare);
                         cursor = node.next;
                     }
                     case "surcharge" -> {
-                        state.fare += Math.max(0.0, number(node.inputs.get("value"), context));
+                        final double value = Math.max(0.0,
+                                number(node.inputs.get("value"), context));
+                        state.fare += value;
                         state.hasFare = true;
+                        record(node, "附加费 + " + fmt(value), before, state.fare);
                         cursor = node.next;
                     }
                     case "cap_fare" -> {
-                        state.fare = Math.min(state.fare, number(node.inputs.get("value"), context));
+                        final double value = number(node.inputs.get("value"), context);
+                        state.fare = Math.min(state.fare, value);
                         state.hasFare = true;
+                        record(node, "封顶 " + fmt(value), before, state.fare);
                         cursor = node.next;
                     }
                     case "floor_fare" -> {
-                        state.fare = Math.max(state.fare, number(node.inputs.get("value"), context));
+                        final double value = number(node.inputs.get("value"), context);
+                        state.fare = Math.max(state.fare, value);
                         state.hasFare = true;
+                        record(node, "保底 " + fmt(value), before, state.fare);
                         cursor = node.next;
                     }
                     case "round_fare" -> {
                         state.fare = round(state.fare, node);
                         state.hasFare = true;
+                        record(node, "取整 " + node.fields.getOrDefault("mode", "HALF")
+                                + " / " + node.fields.getOrDefault("unit", "0.1"), before, state.fare);
                         cursor = node.next;
                     }
                     case "use_rule" -> {
                         final String ruleId = node.fields.get("rule");
+                        String detail = "使用规则 " + (ruleId == null || ruleId.isBlank() ? "?" : ruleId);
                         if (resolver != null && ruleId != null && !ruleId.isBlank()) {
                             final Double value = resolver.resolve(ruleId, context);
                             if (value != null && Double.isFinite(value)) {
                                 state.fare = Math.max(0.0, value);
                                 state.hasFare = true;
+                                detail += " = " + fmt(state.fare);
                             }
                         }
+                        record(node, detail, before, state.fare);
                         cursor = node.next;
                     }
                     case "if" -> {
                         final boolean condition = bool(node.inputs.get("condition"), context);
+                        record(node, condition ? "条件成立" : "条件不成立", before, before);
                         execute(condition ? node.next : node.otherwise, state, context, depth + 1);
                         cursor = node.after;
                     }

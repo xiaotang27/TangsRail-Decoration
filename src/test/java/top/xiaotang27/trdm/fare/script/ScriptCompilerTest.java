@@ -40,6 +40,40 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void executionTraceRecordsFareChanges() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "three");
+        final ScriptNode three = new ScriptNode("three", "number");
+        three.fields.put("value", "3");
+        set.next = "add";
+        final ScriptNode add = new ScriptNode("add", "add_fare");
+        add.inputs.put("value", "one");
+        final ScriptNode one = new ScriptNode("one", "number");
+        one.fields.put("value", "1");
+        add.next = "half";
+        final ScriptNode half = new ScriptNode("half", "discount_fare");
+        half.inputs.put("value", "fifty");
+        final ScriptNode fifty = new ScriptNode("fifty", "number");
+        fifty.fields.put("value", "50");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, set, three, add, one, half, fifty));
+
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        final ExecutionTrace trace = result.compiled().runTraced(
+                new ScriptContext(0, 0, 0, 0), null);
+        assertEquals(3, trace.steps().size());
+        assertEquals(2.0, trace.finalFare(), 1e-9);
+        assertEquals(0.0, trace.steps().get(0).fareBefore(), 1e-9);
+        assertEquals(3.0, trace.steps().get(0).fareAfter(), 1e-9);
+        assertEquals(4.0, trace.steps().get(1).fareAfter(), 1e-9);
+        assertEquals(2.0, trace.steps().get(2).fareAfter(), 1e-9);
+    }
+
+    @Test
     void freeRideAndSurcharge() {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");

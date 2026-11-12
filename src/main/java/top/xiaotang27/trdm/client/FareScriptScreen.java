@@ -3,10 +3,12 @@ package top.xiaotang27.trdm.client;
 import mtr.client.ClientData;
 import mtr.data.Route;
 import mtr.data.Station;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import top.xiaotang27.trdm.fare.FareConfig;
 import top.xiaotang27.trdm.fare.FareGraph;
 import top.xiaotang27.trdm.fare.FareMoney;
@@ -380,8 +382,9 @@ public final class FareScriptScreen extends Screen {
     private long lastCommentClickAt;
     private boolean commentUndoPushed;
     private ScriptNode editingComment;
-    private EditBox commentEditBox;
-    private String commentEditOriginal = "";
+    private String commentEditBuffer = "";
+    private int commentCaret;
+    private int commentAnchor;
 
     private boolean trialPanelOpen;
     private boolean trialCollapsed;
@@ -396,6 +399,11 @@ public final class FareScriptScreen extends Screen {
     private String trialError = "";
     private final List<TrialLine> trialLines = new ArrayList<>();
     private final List<Long> trialFares = new ArrayList<>();
+    private boolean traceOpen;
+    private int traceStationIndex = -1;
+    private top.xiaotang27.trdm.fare.script.ExecutionTrace trace;
+    private float traceScroll;
+    private String traceError = "";
     private double dragX;
     private double dragY;
     private DropTarget statementDrop;
@@ -463,17 +471,6 @@ public final class FareScriptScreen extends Screen {
             paletteScroll = 0F;
         });
         addRenderableWidget(paletteSearch);
-        if (editingComment != null) {
-            commentEditBox = new EditBox(this.font, commentScreenX(editingComment) + 4,
-                    commentScreenY(editingComment) + 3, commentWidth() - 8, 14,
-                    Component.translatable("gui.trdm.script.comment.title"));
-            commentEditBox.setMaxLength(240);
-            commentEditBox.setValue(editingComment.fields.getOrDefault("text", ""));
-            commentEditBox.setFocused(true);
-            addRenderableWidget(commentEditBox);
-        } else {
-            commentEditBox = null;
-        }
         addRenderableWidget(new TrdmEditorButton(this.width - 164, 6, 64, 20,
                 Component.translatable("gui.trdm.script.undo"), button -> undo()));
         addRenderableWidget(new TrdmEditorButton(this.width - 96, 6, 64, 20,
@@ -738,9 +735,64 @@ public final class FareScriptScreen extends Screen {
         drawRuleDropdown(guiGraphics, mouseX, mouseY);
         drawLineDropdown(guiGraphics, mouseX, mouseY);
         drawOperatorDropdown(guiGraphics, mouseX, mouseY);
+        drawTraceWindow(guiGraphics);
         drawNotice(guiGraphics);
         if (confirmCloseOpen) {
             drawConfirmClose(guiGraphics);
+        }
+    }
+
+    private void openTrace(int stationIndex) {
+        final List<Long> stations = trialStations();
+        if (rule == null || stationIndex < 0 || stationIndex >= stations.size()) {
+            return;
+        }
+        traceStationIndex = stationIndex;
+        traceOpen = true;
+        traceScroll = 0F;
+        traceError = "";
+        trace = null;
+        final FareConfig config = FareRuntime.get().config();
+        final FareGraph graph = FareRuntime.get().graph();
+        final TrialLine line = trialLines.get(trialLineIndex);
+        final long start = trialStartStation();
+        final long target = stations.get(stationIndex);
+        if (start == target) {
+            trace = new top.xiaotang27.trdm.fare.script.ExecutionTrace(List.of(), 0.0);
+            return;
+        }
+        final FareGraph.Path path = graph.shortest(start, target, config.metric);
+        if (path == null || !path.connected()) {
+            traceError = Component.translatable("gui.trdm.script.trial.unreachable").getString();
+            return;
+        }
+        final ScriptCompiler.Result compiled = ScriptCompiler.compile(script);
+        if (!compiled.errors().isEmpty()) {
+            traceError = String.join("；", compiled.errors());
+            return;
+        }
+        final FareStation from = graph.station(start);
+        final FareStation to = graph.station(target);
+        final Set<String> visiting = new HashSet<>();
+        visiting.add(rule.id);
+        try {
+            final top.xiaotang27.trdm.fare.script.ExecutionTrace raw = compiled.compiled().runTraced(
+                    new ScriptContext(path.intervals(), path.meters(),
+                            from == null ? 0 : from.zone(), to == null ? 0 : to.zone(),
+                            line.routeId(), line.name(), 0L, 0L, 0L),
+                    config.ruleResolver(visiting));
+            trace = raw;
+            if (rule.maxFareCents > 0L && raw.finalFare() * 100.0 > rule.maxFareCents) {
+                final java.util.List<top.xiaotang27.trdm.fare.script.TraceStep> steps =
+                        new ArrayList<>(raw.steps());
+                steps.add(new top.xiaotang27.trdm.fare.script.TraceStep(steps.size(),
+                        "cap", "rule_cap", "规则封顶 " + FareMoney.yuan(rule.maxFareCents),
+                        raw.finalFare(), rule.maxFareCents / 100.0));
+                trace = new top.xiaotang27.trdm.fare.script.ExecutionTrace(steps,
+                        rule.maxFareCents / 100.0);
+            }
+        } catch (RuntimeException exception) {
+            traceError = String.valueOf(exception.getMessage());
         }
     }
 
@@ -1036,6 +1088,15 @@ public final class FareScriptScreen extends Screen {
             trialLineDropOpen = false;
             return true;
         }
+        final int listY = y + 80;
+        final int listH = Math.max(40, h - 88);
+        if (mx >= x + 8 && mx < x + w - 8 && my >= listY && my < listY + listH) {
+            final int index = (int) Math.floor((my - listY + trialScroll) / 22F);
+            if (index >= 0 && index < trialStations().size()) {
+                openTrace(index);
+                return true;
+            }
+        }
         return true;
     }
 
@@ -1081,6 +1142,118 @@ public final class FareScriptScreen extends Screen {
             final float max = Math.max(0F, trialStations().size() * 22F - listH);
             trialScroll = Math.max(0F, Math.min(max, trialScroll - (float) delta * 22F));
         }
+        return true;
+    }
+
+    private int traceX() {
+        return canvasLeft + (canvasRight - canvasLeft - 380) / 2;
+    }
+
+    private int traceY() {
+        return canvasTop + (canvasBottom - canvasTop - 286) / 2;
+    }
+
+    private void drawTraceWindow(GuiGraphics guiGraphics) {
+        if (!traceOpen) {
+            return;
+        }
+        final int x = traceX();
+        final int y = traceY();
+        final int w = 380;
+        final int h = 286;
+        fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, 0xFF9A9A9A);
+        fill(guiGraphics, x, y, w, h, 0xF0161616);
+        fill(guiGraphics, x, y, w, 22, 0xD02A2A2A);
+        final String start = trialLines.isEmpty() ? "-" : trialStationName(trialStartStation());
+        final String end = traceStationIndex >= 0 && traceStationIndex < trialStations().size()
+                ? trialStationName(trialStations().get(traceStationIndex)) : "-";
+        drawString(guiGraphics, Component.translatable("gui.trdm.script.trace.title").getString()
+                + "  " + start + " → " + end, x + 8, y + 7, 0xFFFFFF);
+        drawString(guiGraphics, "×", x + w - 16, y + 6, 0xFFFFFF);
+        if (!traceError.isEmpty()) {
+            drawString(guiGraphics, fit(traceError, w - 16), x + 8, y + 34, 0xFFFF9090);
+            return;
+        }
+        if (trace == null) {
+            return;
+        }
+        final int listY = y + 30;
+        final int listW = w - 16;
+        final int listH = h - 62;
+        guiGraphics.enableScissor(x + 8, listY, x + 8 + listW, listY + listH);
+        int rowY = listY + 4 - Math.round(traceScroll);
+        for (final top.xiaotang27.trdm.fare.script.TraceStep step : trace.steps()) {
+            if (rowY + 24 >= listY && rowY <= listY + listH) {
+                final String index = Integer.toString(step.index() + 1);
+                drawString(guiGraphics, index, x + 12, rowY + 7, 0xFF9A9A9A);
+                drawString(guiGraphics, fit(step.detail(), listW - 112), x + 32, rowY + 7,
+                        colorForStep(step.type()));
+                final String fare = String.format(java.util.Locale.ROOT, "%.2f → %.2f",
+                        step.fareBefore(), step.fareAfter());
+                drawString(guiGraphics, fare, x + 8 + listW - this.font.width(fare) - 4,
+                        rowY + 7, 0xFF8DE0A0);
+                fill(guiGraphics, x + 10, rowY + 23, listW - 4, 1, 0x33FFFFFF);
+            }
+            rowY += 24;
+        }
+        guiGraphics.disableScissor();
+        final float total = trace.steps().size() * 24F;
+        final float max = Math.max(0F, total - listH);
+        traceScroll = Math.max(0F, Math.min(max, traceScroll));
+        if (max > 0F) {
+            final int barX = x + w - 10;
+            fill(guiGraphics, barX, listY, 3, listH, 0x66FFFFFF);
+            final int thumbH = Math.max(14, Math.round(listH * listH / total));
+            final int thumbY = listY + Math.round((listH - thumbH) * traceScroll / max);
+            fill(guiGraphics, barX, thumbY, 3, thumbH, 0xFF8DE0A0);
+        }
+        final String finalText = Component.translatable("gui.trdm.script.trace.final",
+                String.format(java.util.Locale.ROOT, "%.2f", trace.finalFare())).getString();
+        drawString(guiGraphics, finalText, x + 12, y + h - 20, 0xFF55E080);
+    }
+
+    private static int colorForStep(String type) {
+        return switch (type) {
+            case "set_fare", "add_fare", "multiply_fare", "discount_fare",
+                 "free_ride", "surcharge", "cap_fare", "floor_fare", "round_fare",
+                 "use_rule", "rule_cap" -> 0xFFE8E8E8;
+            case "if" -> 0xFFFFC85A;
+            default -> 0xFFB8B8B8;
+        };
+    }
+
+    private boolean handleTraceClick(double mx, double my) {
+        if (!traceOpen) {
+            return false;
+        }
+        final int x = traceX();
+        final int y = traceY();
+        final int w = 380;
+        final int h = 286;
+        if (mx >= x + w - 22 && mx < x + w - 4 && my >= y + 4 && my < y + 20) {
+            traceOpen = false;
+            return true;
+        }
+        if (mx < x || mx >= x + w || my < y || my >= y + h) {
+            traceOpen = false;
+            return true;
+        }
+        return true;
+    }
+
+    private boolean handleTraceScroll(double mx, double my, double delta) {
+        if (!traceOpen) {
+            return false;
+        }
+        final int x = traceX();
+        final int y = traceY();
+        if (mx < x || mx >= x + 380 || my < y + 30 || my >= y + 286 - 32) {
+            return false;
+        }
+        final int listH = 286 - 62;
+        final float total = trace == null ? 0F : trace.steps().size() * 24F;
+        final float max = Math.max(0F, total - listH);
+        traceScroll = Math.max(0F, Math.min(max, traceScroll - (float) delta * 24F));
         return true;
     }
 
@@ -1264,15 +1437,17 @@ public final class FareScriptScreen extends Screen {
         return Math.max(100, Math.round(160 * zoom));
     }
 
-    private java.util.List<net.minecraft.util.FormattedCharSequence> commentLines(ScriptNode node) {
-        final String text = node.fields.getOrDefault("text", "");
-        final String display = text.isBlank()
-                ? Component.translatable("gui.trdm.script.comment.empty").getString() : text;
-        return this.font.split(Component.literal(display), commentWidth() - 12);
+    private java.util.List<String> commentTextLines(ScriptNode node) {
+        final String text = node == editingComment
+                ? commentEditBuffer : node.fields.getOrDefault("text", "");
+        if (text.isEmpty() && node != editingComment) {
+            return List.of(Component.translatable("gui.trdm.script.comment.empty").getString());
+        }
+        return List.of(text.split("\\n", -1));
     }
 
     private int commentHeight(ScriptNode node) {
-        return Math.max(26, commentLines(node).size() * 10 + 12);
+        return Math.max(26, commentTextLines(node).size() * 10 + 12);
     }
 
     private ScriptNode commentAt(double mx, double my) {
@@ -1302,18 +1477,110 @@ public final class FareScriptScreen extends Screen {
             if (x + w < canvasLeft || x > canvasRight || y + h < canvasTop || y > canvasBottom) {
                 continue;
             }
-            final boolean active = node.id.equals(dragCommentId);
+            final boolean active = node.id.equals(dragCommentId) || node == editingComment;
             fill(guiGraphics, x + 2, y + 2, w, h, 0x44000000);
             fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, active ? 0xFF9A7420 : 0xFFD6B84A);
             fill(guiGraphics, x, y, w, h, 0xFFFFF3B0);
             fill(guiGraphics, x, y, w, 3, 0xFFE0C05A);
-            int lineY = y + 8;
-            if (node != editingComment) {
-                for (final net.minecraft.util.FormattedCharSequence line : commentLines(node)) {
-                    guiGraphics.drawString(this.font, line, x + 6, lineY, 0xFF4A3A12, false);
-                    lineY += 10;
-                }
+            guiGraphics.enableScissor(x, y + 3, x + w, y + h);
+            final List<String> lines = commentTextLines(node);
+            final int textX = x + 6;
+            final int textY = y + 8;
+            if (node == editingComment) {
+                drawCommentSelection(guiGraphics, x + 6, textY, lines);
             }
+            for (int index = 0; index < lines.size(); index++) {
+                guiGraphics.drawString(this.font, lines.get(index), textX, textY + index * 10,
+                        0xFF4A3A12, false);
+            }
+            if (node == editingComment) {
+                final int caretLine = commentCaretLine();
+                final int caretColumn = commentCaret - commentLineStart(caretLine);
+                final int caretX = textX + this.font.width(commentLine(caretLine)
+                        .substring(0, Math.min(caretColumn, commentLine(caretLine).length())));
+                final int caretY = textY + caretLine * 10;
+                fill(guiGraphics, caretX, caretY - 1, 1, 10, 0xFF2A1E00);
+            }
+            guiGraphics.disableScissor();
+        }
+    }
+
+    private void drawCommentSelection(GuiGraphics guiGraphics, int x, int y, List<String> lines) {
+        final int start = Math.min(commentAnchor, commentCaret);
+        final int end = Math.max(commentAnchor, commentCaret);
+        if (start == end) {
+            return;
+        }
+        int offset = 0;
+        for (int index = 0; index < lines.size(); index++) {
+            final String line = lines.get(index);
+            final int lineStart = offset;
+            final int lineEnd = offset + line.length();
+            final int from = Math.max(start, lineStart) - lineStart;
+            final int to = Math.min(end, lineEnd) - lineStart;
+            if (from < to) {
+                final int left = x + this.font.width(line.substring(0, from));
+                final int right = x + this.font.width(line.substring(0, to));
+                fill(guiGraphics, left, y + index * 10 - 1, Math.max(1, right - left), 10, 0x553B5BDB);
+            }
+            offset = lineEnd + 1;
+        }
+    }
+
+    private List<String> commentEditLines() {
+        if (commentEditBuffer.isEmpty()) {
+            return List.of("");
+        }
+        return List.of(commentEditBuffer.split("\\n", -1));
+    }
+
+    private String commentLine(int line) {
+        final List<String> lines = commentEditLines();
+        return line < 0 || line >= lines.size() ? "" : lines.get(line);
+    }
+
+    private int commentCaretLine() {
+        int line = 0;
+        for (int index = 0; index < Math.min(commentCaret, commentEditBuffer.length()); index++) {
+            if (commentEditBuffer.charAt(index) == '\n') {
+                line++;
+            }
+        }
+        return line;
+    }
+
+    private int commentLineStart(int line) {
+        int start = 0;
+        for (int index = 0; index < line; index++) {
+            final int newline = commentEditBuffer.indexOf('\n', start);
+            if (newline < 0) {
+                return commentEditBuffer.length();
+            }
+            start = newline + 1;
+        }
+        return start;
+    }
+
+    private void setCommentCaretAt(double mouseX, double mouseY, boolean extend) {
+        if (editingComment == null) {
+            return;
+        }
+        final List<String> lines = commentEditLines();
+        final int textX = commentScreenX(editingComment) + 6;
+        final int textY = commentScreenY(editingComment) + 8;
+        int line = Mth.clamp((int) ((mouseY - textY) / 10.0), 0, lines.size() - 1);
+        final String text = lines.get(line);
+        int column = 0;
+        while (column < text.length()) {
+            final int width = this.font.width(text.substring(0, column + 1));
+            if (textX + width > mouseX) {
+                break;
+            }
+            column++;
+        }
+        commentCaret = commentLineStart(line) + column;
+        if (!extend) {
+            commentAnchor = commentCaret;
         }
     }
 
@@ -1329,7 +1596,9 @@ public final class FareScriptScreen extends Screen {
 
     private void openCommentEditor(ScriptNode node) {
         editingComment = node;
-        commentEditOriginal = node.fields.getOrDefault("text", "");
+        commentEditBuffer = node.fields.getOrDefault("text", "");
+        commentCaret = commentEditBuffer.length();
+        commentAnchor = commentCaret;
         rebuild();
     }
 
@@ -1337,22 +1606,24 @@ public final class FareScriptScreen extends Screen {
         if (editingComment == null) {
             return;
         }
-        if (save && commentEditBox != null) {
-            editingComment.fields.put("text", commentEditBox.getValue().trim());
+        if (save) {
+            editingComment.fields.put("text", commentEditBuffer.stripTrailing());
         }
         editingComment = null;
-        commentEditBox = null;
-        commentEditOriginal = "";
+        commentEditBuffer = "";
+        commentCaret = 0;
+        commentAnchor = 0;
         rebuild();
     }
 
     private boolean inCommentEditor(double mx, double my) {
-        if (editingComment == null || commentEditBox == null) {
+        if (editingComment == null) {
             return false;
         }
-        final int x = commentScreenX(editingComment) + 4;
-        final int y = commentScreenY(editingComment) + 3;
-        return mx >= x && mx < x + commentWidth() - 8 && my >= y && my < y + 14;
+        final int x = commentScreenX(editingComment);
+        final int y = commentScreenY(editingComment);
+        return mx >= x && mx < x + commentWidth()
+                && my >= y && my < y + commentHeight(editingComment);
     }
 
     private boolean visible(View view) {
@@ -2256,9 +2527,13 @@ public final class FareScriptScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (editingComment != null) {
             if (inCommentEditor(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
+                setCommentCaretAt(mouseX, mouseY, Screen.hasShiftDown());
+                return true;
             }
             commitCommentEdit(true);
+        }
+        if (handleTraceClick(mouseX, mouseY)) {
+            return true;
         }
         if (confirmCloseOpen) {
             return handleConfirmClick(mouseX, mouseY);
@@ -2554,6 +2829,9 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (handleTraceScroll(mouseX, mouseY, delta)) {
+            return true;
+        }
         if (handleTrialScroll(mouseX, mouseY, delta)) {
             return true;
         }
@@ -3844,18 +4122,150 @@ public final class FareScriptScreen extends Screen {
         guiGraphics.drawString(this.font, text, x, y, color, false);
     }
 
+    private void handleCommentKey(int keyCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            commitCommentEdit(false);
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
+                || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+            replaceCommentSelection("\n");
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE) {
+            if (commentSelectionStart() != commentSelectionEnd()) {
+                replaceCommentSelection("");
+            } else if (commentCaret > 0) {
+                commentEditBuffer = commentEditBuffer.substring(0, commentCaret - 1)
+                        + commentEditBuffer.substring(commentCaret);
+                commentCaret--;
+                commentAnchor = commentCaret;
+            }
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_DELETE) {
+            if (commentSelectionStart() != commentSelectionEnd()) {
+                replaceCommentSelection("");
+            } else if (commentCaret < commentEditBuffer.length()) {
+                commentEditBuffer = commentEditBuffer.substring(0, commentCaret)
+                        + commentEditBuffer.substring(commentCaret + 1);
+                commentAnchor = commentCaret;
+            }
+            return;
+        }
+        final boolean extend = Screen.hasShiftDown();
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT) {
+            setCommentCaret(Math.max(0, commentCaret - 1), extend);
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT) {
+            setCommentCaret(Math.min(commentEditBuffer.length(), commentCaret + 1), extend);
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_UP) {
+            moveCommentLine(-1, extend);
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN) {
+            moveCommentLine(1, extend);
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_HOME) {
+            final int line = commentCaretLine();
+            setCommentCaret(commentLineStart(line), extend);
+            return;
+        }
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_END) {
+            final int line = commentCaretLine();
+            final int start = commentLineStart(line);
+            final int newline = commentEditBuffer.indexOf('\n', start);
+            final int end = newline < 0 ? commentEditBuffer.length() : newline;
+            setCommentCaret(end, extend);
+            return;
+        }
+        if (Screen.hasControlDown()) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_A) {
+                commentAnchor = 0;
+                commentCaret = commentEditBuffer.length();
+                return;
+            }
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_C) {
+                Minecraft.getInstance().keyboardHandler.setClipboard(commentSelectionText());
+                return;
+            }
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_X) {
+                Minecraft.getInstance().keyboardHandler.setClipboard(commentSelectionText());
+                replaceCommentSelection("");
+                return;
+            }
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_V) {
+                replaceCommentSelection(Minecraft.getInstance().keyboardHandler.getClipboard());
+            }
+        }
+    }
+
+    private int commentCaretLineOf(int line) {
+        return Math.max(0, Math.min(line, commentEditLines().size() - 1));
+    }
+
+    private void moveCommentLine(int delta, boolean extend) {
+        final int line = commentCaretLine();
+        final int column = commentCaret - commentLineStart(line);
+        final int target = Mth.clamp(line + delta, 0, commentEditLines().size() - 1);
+        final int start = commentLineStart(target);
+        final int end = target == commentEditLines().size() - 1
+                ? commentEditBuffer.length()
+                : Math.max(start, commentEditBuffer.indexOf('\n', start));
+        setCommentCaret(Math.min(end, start + column), extend);
+    }
+
+    private void setCommentCaret(int position, boolean extend) {
+        commentCaret = Mth.clamp(position, 0, commentEditBuffer.length());
+        if (!extend) {
+            commentAnchor = commentCaret;
+        }
+    }
+
+    private int commentSelectionStart() {
+        return Math.min(commentAnchor, commentCaret);
+    }
+
+    private int commentSelectionEnd() {
+        return Math.max(commentAnchor, commentCaret);
+    }
+
+    private String commentSelectionText() {
+        return commentEditBuffer.substring(commentSelectionStart(), commentSelectionEnd());
+    }
+
+    private void replaceCommentSelection(String replacement) {
+        final int start = commentSelectionStart();
+        final int end = commentSelectionEnd();
+        commentEditBuffer = commentEditBuffer.substring(0, start) + replacement
+                + commentEditBuffer.substring(end);
+        commentCaret = start + replacement.length();
+        commentAnchor = commentCaret;
+    }
+
     @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (editingComment != null) {
+            if (!Screen.hasControlDown() && !Character.isISOControl(codePoint)) {
+                replaceCommentSelection(String.valueOf(codePoint));
+            }
+            return true;
+        }
+        return super.charTyped(codePoint, modifiers);
+    }
+
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (editingComment != null) {
-            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-                commitCommentEdit(false);
-                return true;
-            }
-            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
-                    || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
-                commitCommentEdit(true);
-                return true;
-            }
+            handleCommentKey(keyCode, modifiers);
+            return true;
+        }
+        if (traceOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            traceOpen = false;
+            return true;
         }
         if (confirmCloseOpen) {
             if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
