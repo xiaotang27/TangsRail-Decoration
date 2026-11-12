@@ -4095,7 +4095,8 @@ public final class FareScriptScreen extends Screen {
 
     private static boolean isBoolean(String type) {
         return "compare".equals(type) || "and".equals(type) || "or".equals(type)
-                || "not".equals(type) || "line_is".equals(type);
+                || "not".equals(type) || "line_is".equals(type)
+                || "is_weekend".equals(type) || "card_has_policy".equals(type);
     }
 
     private static boolean isLiteralNumeric(String type) {
