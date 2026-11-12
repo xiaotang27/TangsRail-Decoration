@@ -130,6 +130,29 @@ class FareEngineTest {
     }
 
     @Test
+    void quoteEnvironmentFeedsDayAndTimeBlocks() {
+        final FareConfig config = new FareConfig();
+        final FareRule rule = new FareRule("env", "环境规则", FareRule.Kind.SCRIPT);
+        rule.maxFareCents = 5000L;
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "rides");
+        script.hat = "hat";
+        script.nodes.add(hat);
+        script.nodes.add(set);
+        script.nodes.add(new ScriptNode("rides", "card_day_rides"));
+        rule.script = script;
+        bind(config, 10L, rule);
+        bind(config, 20L, rule);
+
+        final FareQuote quote = FareEngine.quote(config, graph(), 1, 3, DIM, Map.of(),
+                new QuoteEnvironment(9, 30, 6, 3L, 0L, 0L, 0L));
+        assertEquals(300L, quote.totalCents());
+    }
+
+    @Test
     void invalidScriptFallsBackToVanilla() {
         final FareConfig config = new FareConfig();
         final FareRule rule = new FareRule("bad", "坏脚本", FareRule.Kind.SCRIPT);

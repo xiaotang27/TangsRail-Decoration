@@ -28,13 +28,20 @@ public final class FareEngine {
     }
 
     public static FareQuote quote(FareConfig config, FareGraph graph, long fromId, long toId, String dimension) {
-        return quote(config, graph, fromId, toId, dimension, Map.of());
+        return quote(config, graph, fromId, toId, dimension, Map.of(), QuoteEnvironment.ZERO);
     }
 
     /** 带交通卡常客统计的报价；单程票/通票传空表即可。 */
     public static FareQuote quote(FareConfig config, FareGraph graph, long fromId, long toId,
                                   String dimension, Map<String, CardRuleStats> cardStats) {
+        return quote(config, graph, fromId, toId, dimension, cardStats, QuoteEnvironment.ZERO);
+    }
+
+    public static FareQuote quote(FareConfig config, FareGraph graph, long fromId, long toId,
+                                  String dimension, Map<String, CardRuleStats> cardStats,
+                                  QuoteEnvironment environment) {
         final Map<String, CardRuleStats> stats = cardStats == null ? Map.of() : cardStats;
+        final QuoteEnvironment env = environment == null ? QuoteEnvironment.ZERO : environment;
         final long cap = config.maxFareCapCents();
         final FareStation from = graph.station(fromId);
         final FareStation to = graph.station(toId);
@@ -68,7 +75,7 @@ public final class FareEngine {
             final RuleResolver resolver = config.ruleResolver(visiting);
             long fare = leg.rule.baseFareCents(leg.intervals, leg.meters, startZone, endZone,
                     leg.routeId, leg.routeName,
-                    stats.getOrDefault(leg.rule.id, CardRuleStats.ZERO), resolver);
+                    stats.getOrDefault(leg.rule.id, CardRuleStats.ZERO), env, resolver);
             boolean capped = false;
             if (leg.rule.maxFareCents > 0L && fare > leg.rule.maxFareCents) {
                 fare = leg.rule.maxFareCents;

@@ -103,6 +103,20 @@ class TicketDataTest {
     }
 
     @Test
+    void cardDayAndMonthUsageAccumulate() {
+        TrdmClock.setBasis(TimeBasis.SYSTEM);
+        final ItemStack card = new ItemStack(Items.PAPER);
+        TicketData.addCardUsage(card, 250L);
+        TicketData.addCardUsage(card, 300L);
+        final TicketData.CardPeriodStats day = TicketData.cardDayStats(card);
+        final TicketData.CardPeriodStats month = TicketData.cardMonthStats(card);
+        assertEquals(2L, day.rides());
+        assertEquals(550L, day.amountCents());
+        assertEquals(2L, month.rides());
+        assertEquals(550L, month.amountCents());
+    }
+
+    @Test
     void cardRuleStatsAccumulatePerRule() {
         final ItemStack card = new ItemStack(Items.PAPER);
         TicketData.addCardRuleTrip(card, "rule_a", 250L, 1200L);

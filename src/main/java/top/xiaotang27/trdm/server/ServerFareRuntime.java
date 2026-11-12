@@ -10,6 +10,7 @@ import top.xiaotang27.trdm.fare.FareConfig;
 import top.xiaotang27.trdm.fare.FareEngine;
 import top.xiaotang27.trdm.fare.FareGraph;
 import top.xiaotang27.trdm.fare.FareQuote;
+import top.xiaotang27.trdm.fare.QuoteEnvironment;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -53,6 +54,13 @@ public final class ServerFareRuntime {
     public static FareQuote quote(net.minecraft.server.level.ServerLevel level, long from, long to,
                                   Map<String, CardRuleStats> cardStats) {
         return FareEngine.quote(config(), graph(level), from, to, dimensionId(level), cardStats);
+    }
+
+    public static FareQuote quote(net.minecraft.server.level.ServerLevel level, long from, long to,
+                                  Map<String, CardRuleStats> cardStats,
+                                  QuoteEnvironment environment) {
+        return FareEngine.quote(config(), graph(level), from, to, dimensionId(level),
+                cardStats, environment);
     }
 
     public static String dimensionId(Level level) {

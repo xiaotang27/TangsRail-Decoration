@@ -3,7 +3,17 @@ package top.xiaotang27.trdm.fare.script;
 /** 报价时暴露给脚本的只读上下文。 */
 public record ScriptContext(long intervals, long meters, int fromZone, int toZone,
                             long routeId, String routeName,
-                            long cardRides, long cardAmountCents, long cardMeters) {
+                            long cardRides, long cardAmountCents, long cardMeters,
+                            int hour, int minute, int weekday,
+                            long cardDayRides, long cardDayAmountCents,
+                            long cardMonthRides, long cardMonthAmountCents) {
+
+    public ScriptContext(long intervals, long meters, int fromZone, int toZone,
+                         long routeId, String routeName,
+                         long cardRides, long cardAmountCents, long cardMeters) {
+        this(intervals, meters, fromZone, toZone, routeId, routeName,
+                cardRides, cardAmountCents, cardMeters, 0, 0, 1, 0L, 0L, 0L, 0L);
+    }
 
     public ScriptContext(long intervals, long meters, int fromZone, int toZone,
                          long routeId, String routeName) {
@@ -31,6 +41,18 @@ public record ScriptContext(long intervals, long meters, int fromZone, int toZon
     /** 交通卡在本规则下的累计里程，脚本里用公里。 */
     public double cardKilometers() {
         return cardMeters / 1000.0;
+    }
+
+    public boolean weekend() {
+        return weekday >= 6;
+    }
+
+    public double cardDayAmountYuan() {
+        return cardDayAmountCents / 100.0;
+    }
+
+    public double cardMonthAmountYuan() {
+        return cardMonthAmountCents / 100.0;
     }
 
     public int zoneDiff() {

@@ -27,4 +27,18 @@ class TrdmClockTest {
         TrdmClock.setBasis(TimeBasis.SYSTEM);
         assertTrue(TrdmClock.now() > 1_000_000_000_000L);
     }
+
+    @Test
+    void gameTimeExposesHourWeekdayAndThirtyDayMonths() {
+        TrdmClock.setBasis(TimeBasis.GAME);
+        TrdmClock.updateGameTime(0L);
+        assertEquals(6, TrdmClock.hour());
+        assertEquals(0, TrdmClock.minute());
+        assertEquals(1, TrdmClock.weekday());
+        assertEquals("0", TrdmClock.monthKey());
+
+        TrdmClock.updateGameTime(30L * TrdmClock.TICKS_PER_DAY);
+        assertEquals("1", TrdmClock.monthKey());
+        assertEquals(3, TrdmClock.weekday());
+    }
 }

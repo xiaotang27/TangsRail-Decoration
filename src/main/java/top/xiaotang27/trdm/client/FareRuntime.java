@@ -12,6 +12,7 @@ import top.xiaotang27.trdm.fare.FareEngine;
 import top.xiaotang27.trdm.fare.FareGraph;
 import top.xiaotang27.trdm.fare.FareJson;
 import top.xiaotang27.trdm.fare.FareQuote;
+import top.xiaotang27.trdm.fare.QuoteEnvironment;
 import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.io.IOException;
@@ -121,6 +122,13 @@ public final class FareRuntime {
     public FareQuote quote(long fromStationId, long toStationId, Map<String, CardRuleStats> cardStats) {
         sync();
         return FareEngine.quote(config, graph, fromStationId, toStationId, dimensionId(), cardStats);
+    }
+
+    public FareQuote quote(long fromStationId, long toStationId, Map<String, CardRuleStats> cardStats,
+                           QuoteEnvironment environment) {
+        sync();
+        return FareEngine.quote(config, graph, fromStationId, toStationId, dimensionId(),
+                cardStats, environment);
     }
 
     /** 保存配置：已联网时交给服务端；否则写本地文件（回退）。 */

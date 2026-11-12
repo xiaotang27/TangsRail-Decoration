@@ -29,9 +29,12 @@ public final class ScriptCompiler {
     private static final Set<String> NUMBER_VALUES = Set.of(
             "number", "context_intervals", "context_stations", "context_meters",
             "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
+            "time_hour", "time_minute", "time_weekday",
+            "card_day_rides", "card_day_amount", "card_month_rides", "card_month_amount",
             "add", "subtract", "multiply", "divide", "min", "max",
             "table_intervals", "table_meters");
-    private static final Set<String> BOOLEAN_VALUES = Set.of("compare", "and", "or", "not", "line_is");
+    private static final Set<String> BOOLEAN_VALUES = Set.of(
+            "compare", "and", "or", "not", "line_is", "is_weekend");
     private static final Set<String> VALUE_STATEMENTS = Set.of(
             "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare",
             "discount_fare", "surcharge");
@@ -555,6 +558,13 @@ public final class ScriptCompiler {
                 case "card_rule_rides" -> context.cardRides();
                 case "card_rule_amount" -> context.cardAmountYuan();
                 case "card_rule_distance" -> context.cardKilometers();
+                case "time_hour" -> context.hour();
+                case "time_minute" -> context.minute();
+                case "time_weekday" -> context.weekday();
+                case "card_day_rides" -> context.cardDayRides();
+                case "card_day_amount" -> context.cardDayAmountYuan();
+                case "card_month_rides" -> context.cardMonthRides();
+                case "card_month_amount" -> context.cardMonthAmountYuan();
                 case "add" -> number(node.inputs.get("a"), context) + number(node.inputs.get("b"), context);
                 case "subtract" -> number(node.inputs.get("a"), context)
                         - number(node.inputs.get("b"), context);
@@ -588,6 +598,7 @@ public final class ScriptCompiler {
                 case "and" -> bool(node.inputs.get("a"), context) && bool(node.inputs.get("b"), context);
                 case "or" -> bool(node.inputs.get("a"), context) || bool(node.inputs.get("b"), context);
                 case "not" -> !bool(node.inputs.get("a"), context);
+                case "is_weekend" -> context.weekend();
                 case "line_is" -> {
                     try {
                         yield context.routeId() == Long.parseLong(node.fields.getOrDefault("line", "0"));

@@ -135,14 +135,23 @@ public final class FareRule {
     public long baseFareCents(long intervals, long meters, int fromZone, int toZone,
                               long routeId, String routeName, CardRuleStats cardStats,
                               top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
+        return baseFareCents(intervals, meters, fromZone, toZone, routeId, routeName,
+                cardStats, QuoteEnvironment.ZERO, resolver);
+    }
+
+    public long baseFareCents(long intervals, long meters, int fromZone, int toZone,
+                              long routeId, String routeName, CardRuleStats cardStats,
+                              QuoteEnvironment environment,
+                              top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
         final CardRuleStats stats = cardStats == null ? CardRuleStats.ZERO : cardStats;
+        final QuoteEnvironment env = environment == null ? QuoteEnvironment.ZERO : environment;
         return switch (kind) {
             case MTR_VANILLA -> vanillaFareCents(fromZone, toZone);
             case FLAT -> Math.max(0L, flatFareCents);
             case INTERVAL_TABLE -> tierFareCents(intervals);
             case DISTANCE_TABLE -> tierFareCents(meters);
             case SCRIPT -> scriptFareCents(intervals, meters, fromZone, toZone,
-                    routeId, routeName, stats, resolver);
+                    routeId, routeName, stats, env, resolver);
         };
     }
 
@@ -154,6 +163,7 @@ public final class FareRule {
     /** 执行积木脚本；脚本缺失/编译失败/运行失败时回退 MTR 原版公式。 */
     private long scriptFareCents(long intervals, long meters, int fromZone, int toZone,
                                  long routeId, String routeName, CardRuleStats cardStats,
+                                 QuoteEnvironment environment,
                                  top.xiaotang27.trdm.fare.script.RuleResolver resolver) {
         if (script == null || script.isEmpty()) {
             return vanillaFareCents(fromZone, toZone);
@@ -161,7 +171,11 @@ public final class FareRule {
         try {
             final double yuan = ScriptRuntime.evaluate(script,
                     new ScriptContext(intervals, meters, fromZone, toZone, routeId, routeName,
-                            cardStats.rides(), cardStats.amountCents(), cardStats.meters()), resolver);
+                            cardStats.rides(), cardStats.amountCents(), cardStats.meters(),
+                            environment.hour(), environment.minute(), environment.weekday(),
+                            environment.cardDayRides(), environment.cardDayAmountCents(),
+                            environment.cardMonthRides(), environment.cardMonthAmountCents()),
+                    resolver);
             if (!Double.isFinite(yuan)) {
                 return vanillaFareCents(fromZone, toZone);
             }

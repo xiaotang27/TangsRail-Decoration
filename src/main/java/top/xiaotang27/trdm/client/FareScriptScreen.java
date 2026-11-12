@@ -28,6 +28,7 @@ import top.xiaotang27.trdm.fare.script.ScriptTree.Branch;
 import top.xiaotang27.trdm.fare.script.Scripts;
 import top.xiaotang27.trdm.ticket.PassRule;
 import top.xiaotang27.trdm.ticket.PassRules;
+import top.xiaotang27.trdm.ticket.TrdmClock;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -58,6 +59,8 @@ public final class FareScriptScreen extends Screen {
     private static final String[] NUMERIC_VALUE_TYPES = {
             "number", "context_intervals", "context_meters", "context_stations",
             "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
+            "time_hour", "time_minute", "time_weekday",
+            "card_day_rides", "card_day_amount", "card_month_rides", "card_month_amount",
             "table_intervals", "table_meters"};
     private static final String[] ARITHMETIC_VALUE_TYPES = {
             "add", "subtract", "multiply", "divide", "min", "max"};
@@ -103,7 +106,7 @@ public final class FareScriptScreen extends Screen {
         list.add(new PaletteEntry("gui.trdm.script.block.if_else", "if_else", true, false,
                 colorFor("if")));
         list.add(new PaletteEntry("gui.trdm.script.category.conditions", null, false, true, 0xFF2F6E45));
-        for (final String type : List.of("compare", "and", "or", "not", "line_is")) {
+        for (final String type : List.of("compare", "and", "or", "not", "line_is", "is_weekend")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.category.fare", null, false, true, 0xFF2F7D4F));
@@ -124,6 +127,15 @@ public final class FareScriptScreen extends Screen {
         list.add(new PaletteEntry("gui.trdm.script.category.loyalty", null, false, true, 0xFF9A6428));
         for (final String type : List.of("card_rule_rides", "card_rule_amount",
                 "card_rule_distance")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.card_period", null, false, true, 0xFF7A5A9A));
+        for (final String type : List.of("card_day_rides", "card_day_amount",
+                "card_month_rides", "card_month_amount")) {
+            list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
+        }
+        list.add(new PaletteEntry("gui.trdm.script.category.time", null, false, true, 0xFF2D6E82));
+        for (final String type : List.of("time_hour", "time_minute", "time_weekday")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.category.math", null, false, true, 0xFF8A5A2B));
@@ -779,7 +791,9 @@ public final class FareScriptScreen extends Screen {
             final top.xiaotang27.trdm.fare.script.ExecutionTrace raw = compiled.compiled().runTraced(
                     new ScriptContext(path.intervals(), path.meters(),
                             from == null ? 0 : from.zone(), to == null ? 0 : to.zone(),
-                            line.routeId(), line.name(), 0L, 0L, 0L),
+                            line.routeId(), line.name(), 0L, 0L, 0L,
+                            TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
+                            0L, 0L, 0L, 0L),
                     config.ruleResolver(visiting));
             trace = raw;
             if (rule.maxFareCents > 0L && raw.finalFare() * 100.0 > rule.maxFareCents) {
@@ -1026,7 +1040,9 @@ public final class FareScriptScreen extends Screen {
                 final double fare = compiled.compiled().run(new ScriptContext(
                         path.intervals(), path.meters(),
                         from == null ? 0 : from.zone(), to == null ? 0 : to.zone(),
-                        line.routeId(), line.name(), 0L, 0L, 0L), config.ruleResolver(visiting));
+                        line.routeId(), line.name(), 0L, 0L, 0L,
+                        TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
+                        0L, 0L, 0L, 0L), config.ruleResolver(visiting));
                 long cents = Math.max(0L, Math.round(fare * 100.0));
                 if (rule.maxFareCents > 0L) {
                     cents = Math.min(cents, rule.maxFareCents);
@@ -4001,7 +4017,7 @@ public final class FareScriptScreen extends Screen {
     private static int colorFor(String type) {
         return switch (type) {
             case "if", "if_else" -> 0xFFB06A1F;
-            case "compare", "and", "or", "not", "line_is" -> 0xFF3E8E5A;
+            case "compare", "and", "or", "not", "line_is", "is_weekend" -> 0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "discount_fare",
                  "cap_fare", "floor_fare", "free_ride", "surcharge" -> 0xFF2F7D4F;
             case "pass_price", "pass_days", "pass_discount", "pass_daily_limit" -> 0xFF2F7D4F;
@@ -4009,7 +4025,9 @@ public final class FareScriptScreen extends Screen {
             case "round_fare" -> 0xFF2D6E82;
             case "number", "context_intervals", "context_meters", "context_stations",
                  "context_zone_diff", "card_rule_rides", "card_rule_amount",
-                 "card_rule_distance", "add", "subtract", "multiply", "divide", "min", "max" ->
+                 "card_rule_distance", "time_hour", "time_minute", "time_weekday",
+                 "card_day_rides", "card_day_amount", "card_month_rides", "card_month_amount",
+                 "add", "subtract", "multiply", "divide", "min", "max" ->
                     0xFF8A5A2B;
             case "table_intervals", "table_meters" -> 0xFF6B4A8A;
             case "comment" -> 0xFFB38B2E;

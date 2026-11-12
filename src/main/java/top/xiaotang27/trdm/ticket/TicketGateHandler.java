@@ -154,8 +154,14 @@ public final class TicketGateHandler {
         final long origin = continuous
                 ? TicketData.journeyEntryStation(card) : TicketData.entryStation(card);
         final long paid = continuous ? TicketData.journeyPaid(card) : 0L;
+        final TicketData.CardPeriodStats dayStats = TicketData.cardDayStats(card);
+        final TicketData.CardPeriodStats monthStats = TicketData.cardMonthStats(card);
         final FareQuote quote = ServerFareRuntime.quote(level, origin, station.id,
-                TicketData.cardRuleStats(card));
+                TicketData.cardRuleStats(card),
+                new top.xiaotang27.trdm.fare.QuoteEnvironment(
+                        TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
+                        dayStats.rides(), dayStats.amountCents(),
+                        monthStats.rides(), monthStats.amountCents()));
         final long fare = quote.totalCents();
         if (!quote.connected() && quote.maxFareCapCents() <= 0L) {
             message(player, "gui.trdm.ticket.gate.no_fare");
@@ -171,6 +177,7 @@ public final class TicketGateHandler {
         TicketData.setBalance(card, newBalance);
         TicketData.markExit(card, station, dimension, fare, remainingFare, TrdmClock.now());
         TicketData.setJourneyPaid(card, fare);
+        TicketData.addCardUsage(card, Math.max(0L, remainingFare));
         for (final FareQuote.FareLeg leg : quote.legs()) {
             TicketData.addCardRuleTrip(card, leg.ruleId(), leg.fareCents(), leg.meters());
         }

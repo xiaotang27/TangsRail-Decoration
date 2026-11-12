@@ -62,6 +62,44 @@ public final class TrdmClock {
         return LocalDate.now().toEpochDay();
     }
 
+    /** 当前小时（0–23）；游戏时间按 06:00 开日的显示口径。 */
+    public static int hour() {
+        if (basis == TimeBasis.GAME) {
+            final long rem = Math.floorMod(gameMillis, DAY_MILLIS);
+            return (int) ((rem * 24.0 / DAY_MILLIS + 6.0) % 24.0);
+        }
+        return java.time.ZonedDateTime.now().getHour();
+    }
+
+    public static int minute() {
+        if (basis == TimeBasis.GAME) {
+            final long rem = Math.floorMod(gameMillis, DAY_MILLIS);
+            final double hours = (rem * 24.0 / DAY_MILLIS + 6.0) % 24.0;
+            return (int) ((hours - Math.floor(hours)) * 60.0);
+        }
+        return java.time.ZonedDateTime.now().getMinute();
+    }
+
+    /** 星期：1=周一 … 7=周日。 */
+    public static int weekday() {
+        if (basis == TimeBasis.GAME) {
+            return (int) Math.floorMod(dayKey(), 7L) + 1;
+        }
+        return LocalDate.now().getDayOfWeek().getValue();
+    }
+
+    public static boolean weekend() {
+        return weekday() >= 6;
+    }
+
+    /** 当月 key；系统时间为现实年月，游戏时间为每 30 个游戏日一个月。 */
+    public static String monthKey() {
+        if (basis == TimeBasis.GAME) {
+            return Long.toString(Math.floorDiv(dayKey(), 30L));
+        }
+        return java.time.YearMonth.now().toString();
+    }
+
     /** 把票务时间戳格式化为当前时间依据下的可读文本。 */
     public static String format(long millis) {
         if (basis == TimeBasis.GAME) {

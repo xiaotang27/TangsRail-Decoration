@@ -669,8 +669,16 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         final long origin = continuous
                 ? TicketData.journeyEntryStation(held) : TicketData.entryStation(held);
         final long paid = continuous ? TicketData.journeyPaid(held) : 0L;
+        final TicketData.CardPeriodStats dayStats = card
+                ? TicketData.cardDayStats(held) : TicketData.CardPeriodStats.ZERO;
+        final TicketData.CardPeriodStats monthStats = card
+                ? TicketData.cardMonthStats(held) : TicketData.CardPeriodStats.ZERO;
         final long fare = FareRuntime.get().quote(origin, stationId,
-                card ? TicketData.cardRuleStats(held) : Map.of()).totalCents();
+                card ? TicketData.cardRuleStats(held) : Map.of(),
+                new top.xiaotang27.trdm.fare.QuoteEnvironment(
+                        TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
+                        dayStats.rides(), dayStats.amountCents(),
+                        monthStats.rides(), monthStats.amountCents())).totalCents();
         final long value = card ? TicketData.balance(held) : TicketData.faceValue(held);
         final long due = Math.max(0L, fare - paid - value);
         infoAction = ACTION_PAY_FARE;

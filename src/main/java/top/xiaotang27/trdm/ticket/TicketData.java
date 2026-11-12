@@ -54,6 +54,12 @@ public final class TicketData {
     private static final String KEY_BALANCE = "balance";
     private static final String KEY_DEPOSIT = "deposit";
     private static final String KEY_CARD_RULE_STATS = "card_rule_stats";
+    private static final String KEY_CARD_DAY_KEY = "card_day_key";
+    private static final String KEY_CARD_DAY_RIDES = "card_day_rides";
+    private static final String KEY_CARD_DAY_AMOUNT = "card_day_amount";
+    private static final String KEY_CARD_MONTH_KEY = "card_month_key";
+    private static final String KEY_CARD_MONTH_RIDES = "card_month_rides";
+    private static final String KEY_CARD_MONTH_AMOUNT = "card_month_amount";
     private static final String KEY_STATE = "state";
     private static final String KEY_SOLD_STATION = "sold_station";
     private static final String KEY_SOLD_NAME = "sold_name";
@@ -278,6 +284,55 @@ public final class TicketData {
     public static long balance(ItemStack stack) {
         final CompoundTag root = root(stack);
         return root == null ? 0L : Math.max(0L, root.getLong(KEY_BALANCE));
+    }
+
+    /** 交通卡在某一自然日/月内的累计乘车次数和实际支付金额。 */
+    public record CardPeriodStats(long rides, long amountCents) {
+        public static final CardPeriodStats ZERO = new CardPeriodStats(0L, 0L);
+
+        public double amountYuan() {
+            return amountCents / 100.0;
+        }
+    }
+
+    public static CardPeriodStats cardDayStats(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        if (root == null || !Long.toString(TrdmClock.dayKey()).equals(root.getString(KEY_CARD_DAY_KEY))) {
+            return CardPeriodStats.ZERO;
+        }
+        return new CardPeriodStats(Math.max(0L, root.getLong(KEY_CARD_DAY_RIDES)),
+                Math.max(0L, root.getLong(KEY_CARD_DAY_AMOUNT)));
+    }
+
+    public static CardPeriodStats cardMonthStats(ItemStack stack) {
+        final CompoundTag root = root(stack);
+        if (root == null || !TrdmClock.monthKey().equals(root.getString(KEY_CARD_MONTH_KEY))) {
+            return CardPeriodStats.ZERO;
+        }
+        return new CardPeriodStats(Math.max(0L, root.getLong(KEY_CARD_MONTH_RIDES)),
+                Math.max(0L, root.getLong(KEY_CARD_MONTH_AMOUNT)));
+    }
+
+    /** 每次成功出站调用一次；金额为本次实际支付金额。 */
+    public static void addCardUsage(ItemStack stack, long paidCents) {
+        final CompoundTag root = copyRoot(stack);
+        final String dayKey = Long.toString(TrdmClock.dayKey());
+        final String monthKey = TrdmClock.monthKey();
+        final long dayRides = dayKey.equals(root.getString(KEY_CARD_DAY_KEY))
+                ? Math.max(0L, root.getLong(KEY_CARD_DAY_RIDES)) : 0L;
+        final long dayAmount = dayKey.equals(root.getString(KEY_CARD_DAY_KEY))
+                ? Math.max(0L, root.getLong(KEY_CARD_DAY_AMOUNT)) : 0L;
+        final long monthRides = monthKey.equals(root.getString(KEY_CARD_MONTH_KEY))
+                ? Math.max(0L, root.getLong(KEY_CARD_MONTH_RIDES)) : 0L;
+        final long monthAmount = monthKey.equals(root.getString(KEY_CARD_MONTH_KEY))
+                ? Math.max(0L, root.getLong(KEY_CARD_MONTH_AMOUNT)) : 0L;
+        root.putString(KEY_CARD_DAY_KEY, dayKey);
+        root.putLong(KEY_CARD_DAY_RIDES, dayRides + 1L);
+        root.putLong(KEY_CARD_DAY_AMOUNT, dayAmount + Math.max(0L, paidCents));
+        root.putString(KEY_CARD_MONTH_KEY, monthKey);
+        root.putLong(KEY_CARD_MONTH_RIDES, monthRides + 1L);
+        root.putLong(KEY_CARD_MONTH_AMOUNT, monthAmount + Math.max(0L, paidCents));
+        commit(stack, root);
     }
 
     /** 读取交通卡在各计费规则下的累计乘车统计。 */
