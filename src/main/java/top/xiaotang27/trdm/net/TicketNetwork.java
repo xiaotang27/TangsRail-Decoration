@@ -63,8 +63,10 @@ public final class TicketNetwork {
             final long faceCents = buf.readLong();
             final int quantity = buf.readVarInt();
             final boolean byPrice = buf.readBoolean();
+            final boolean cardPayment = buf.readBoolean();
             server.execute(() -> send(player,
-                    TicketPurchase.buySingle(player, pos, destination, faceCents, quantity, byPrice)));
+                    TicketPurchase.buySingle(player, pos, destination, faceCents, quantity,
+                            byPrice, cardPayment)));
         });
         ServerPlayNetworking.registerGlobalReceiver(BUY_CARD, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();
@@ -80,7 +82,9 @@ public final class TicketNetwork {
             final BlockPos pos = buf.readBlockPos();
             final String definitionId = buf.readUtf(64);
             final int quantity = buf.readVarInt();
-            server.execute(() -> send(player, TicketPurchase.buyPass(player, pos, definitionId, quantity)));
+            final boolean cardPayment = buf.readBoolean();
+            server.execute(() -> send(player,
+                    TicketPurchase.buyPass(player, pos, definitionId, quantity, cardPayment)));
         });
         ServerPlayNetworking.registerGlobalReceiver(PAY_FARE, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();

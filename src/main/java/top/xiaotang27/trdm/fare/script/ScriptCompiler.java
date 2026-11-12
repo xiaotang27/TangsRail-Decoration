@@ -25,19 +25,20 @@ public final class ScriptCompiler {
     private static final Set<String> STATEMENTS = Set.of(
             "on_fare", "set_fare", "add_fare", "multiply_fare", "cap_fare",
             "floor_fare", "discount_fare", "round_fare", "free_ride", "surcharge",
-            "if", "use_rule");
+            "set_var", "if", "use_rule");
     private static final Set<String> NUMBER_VALUES = Set.of(
             "number", "context_intervals", "context_stations", "context_meters",
             "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
             "time_hour", "time_minute", "time_weekday",
             "card_day_rides", "card_day_amount", "card_month_rides", "card_month_amount",
+            "get_var",
             "add", "subtract", "multiply", "divide", "min", "max",
             "table_intervals", "table_meters");
     private static final Set<String> BOOLEAN_VALUES = Set.of(
             "compare", "and", "or", "not", "line_is", "is_weekend", "card_has_policy");
     private static final Set<String> VALUE_STATEMENTS = Set.of(
             "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare",
-            "discount_fare", "surcharge");
+            "discount_fare", "surcharge", "set_var");
 
     /** 编译结果：成功时 {@code compiled} 非空，失败时 {@code errors} 非空。 */
     public record Result(CompiledScript compiled, List<String> errors) {
@@ -155,6 +156,10 @@ public final class ScriptCompiler {
                     && (node.fields.get("rule") == null || node.fields.get("rule").isBlank())) {
                 errors.add("“使用规则”没有选择规则: " + node.id);
             }
+            if ("set_var".equals(node.type)
+                    && node.fields.getOrDefault("name", "").isBlank()) {
+                errors.add("“设置变量”没有填写变量名: " + node.id);
+            }
             if ("if".equals(node.type)) {
                 validateInput(node, "condition", true);
             } else if (VALUE_STATEMENTS.contains(node.type)) {
@@ -253,6 +258,11 @@ public final class ScriptCompiler {
                 case "number" -> {
                     if (parseDouble(node.fields.get("value")) == null) {
                         errors.add("数字块的值无效: " + node.id);
+                    }
+                }
+                case "get_var" -> {
+                    if (node.fields.getOrDefault("name", "").isBlank()) {
+                        errors.add("变量块没有填写变量名: " + node.id);
                     }
                 }
                 case "table_intervals", "table_meters" -> validateTiers(node);
@@ -372,6 +382,7 @@ public final class ScriptCompiler {
         private int steps;
         private RuleResolver resolver;
         private java.util.List<TraceStep> traceSteps;
+        private java.util.Map<String, Double> variables;
 
         private CompiledScript(FareScript script, java.util.Map<String, ScriptNode> nodes) {
             this.script = script;
@@ -408,6 +419,7 @@ public final class ScriptCompiler {
             this.resolver = resolver;
             try {
                 final State state = new State();
+                variables = state.variables;
                 final ScriptNode hat = nodes.get(script.hat);
                 if (hat == null) {
                     throw new ScriptException("缺少帽子块");
@@ -419,6 +431,7 @@ public final class ScriptCompiler {
                 return state.fare;
             } finally {
                 this.resolver = null;
+                this.variables = null;
             }
         }
 
@@ -485,6 +498,13 @@ public final class ScriptCompiler {
                         state.fare = 0.0;
                         state.hasFare = true;
                         record(node, "免费乘车", before, state.fare);
+                        cursor = node.next;
+                    }
+                    case "set_var" -> {
+                        final double value = number(node.inputs.get("value"), context);
+                        final String name = node.fields.getOrDefault("name", "变量");
+                        state.variables.put(name, value);
+                        record(node, "变量 " + name + " = " + fmt(value), before, before);
                         cursor = node.next;
                     }
                     case "surcharge" -> {
@@ -569,6 +589,8 @@ public final class ScriptCompiler {
                 case "card_day_amount" -> context.cardDayAmountYuan();
                 case "card_month_rides" -> context.cardMonthRides();
                 case "card_month_amount" -> context.cardMonthAmountYuan();
+                case "get_var" -> variables.getOrDefault(
+                        node.fields.getOrDefault("name", ""), 0.0);
                 case "add" -> number(node.inputs.get("a"), context) + number(node.inputs.get("b"), context);
                 case "subtract" -> number(node.inputs.get("a"), context)
                         - number(node.inputs.get("b"), context);
@@ -661,5 +683,6 @@ public final class ScriptCompiler {
     private static final class State {
         private double fare;
         private boolean hasFare;
+        private final java.util.Map<String, Double> variables = new java.util.HashMap<>();
     }
 }

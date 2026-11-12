@@ -18,9 +18,11 @@ import top.xiaotang27.trdm.ticket.TrdmClock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /** 客服终端界面：补票/补记录、交通卡充值/记录查询、售票售卡。浅色主题；补票按计费引擎报价。 */
 public class CustomerServiceTerminalScreen extends TrdmScreenBase implements TicketResultReceiver {
@@ -88,6 +90,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     private String recordStation = "";
     private long recordStationId;
 
+    private boolean policyPopupOpen;
+    private boolean policyDropOpen;
+    private float policyDropScroll;
+    private final Set<String> policySelected = new LinkedHashSet<>();
+
     public CustomerServiceTerminalScreen(String stationName, long stationId, BlockPos pos) {
         super(null, Component.translatable("block.trdm.customer_service_terminal"));
         this.stationName = stationName == null ? "" : stationName;
@@ -146,6 +153,9 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         }
         if (dialog != null) {
             TicketUi.dialog(this, guiGraphics, dialogMessage, mx, my);
+        }
+        if (policyPopupOpen) {
+            renderPolicyPopup(guiGraphics, mx, my);
         }
     }
 
@@ -389,6 +399,136 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                 Component.translatable("gui.trdm.terminal.records"), Component.empty(), mx, my);
     }
 
+    private void renderPolicyPopup(GuiGraphics guiGraphics, float mx, float my) {
+        rect(guiGraphics, 0F, 0F, DESIGN_W, DESIGN_H, 0x88000000);
+        final float x = 220F;
+        final float y = 110F;
+        final float w = 520F;
+        final float h = 320F;
+        rect(guiGraphics, x - 1F, y - 1F, w + 2F, h + 2F, TicketUi.BORDER);
+        rect(guiGraphics, x, y, w, h, 0xFFF7F7F7);
+        rect(guiGraphics, x, y, w, 28F, TicketUi.ROW_HEADER);
+        text(guiGraphics, Component.translatable("gui.trdm.policies.card_title"),
+                x + 12F, y + 8F, FONT_ROW, TicketUi.TEXT_DARK);
+        text(guiGraphics, Component.translatable("gui.trdm.policies.card_hint"),
+                x + 12F, y + 38F, FONT_SUB, TicketUi.TEXT_MUTED);
+        text(guiGraphics, Component.translatable("gui.trdm.policies.dropdown_label"),
+                x + 12F, y + 60F, FONT_SUB, TicketUi.TEXT_MUTED);
+        final float fieldX = x + 12F;
+        final float fieldY = y + 78F;
+        final float fieldW = w - 24F;
+        rect(guiGraphics, fieldX - 1F, fieldY - 1F, fieldW + 2F, 26F, TicketUi.BORDER);
+        rect(guiGraphics, fieldX, fieldY, fieldW, 24F, 0xFFFFFFFF);
+        text(guiGraphics, Component.literal(policySummary()), fieldX + 8F, fieldY + 8F,
+                FONT_ROW, TicketUi.TEXT_DARK);
+        textRight(guiGraphics, Component.literal(policyDropOpen ? "▴" : "▾"),
+                fieldX + fieldW - 10F, fieldY + 8F, FONT_ROW, TicketUi.TEXT_DARK);
+
+        if (policyDropOpen) {
+            final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
+                    FareRuntime.get().config().discountPolicies;
+            final int visible = Math.min(7, policies.size());
+            final float listY = fieldY + 28F;
+            final float listH = visible * 22F + 4F;
+            rect(guiGraphics, fieldX - 1F, listY - 1F, fieldW + 2F, listH + 2F, TicketUi.BORDER);
+            rect(guiGraphics, fieldX, listY, fieldW, listH, 0xFFFFFFFF);
+            policyDropScroll = Math.max(0F, Math.min(
+                    Math.max(0F, policies.size() - visible), policyDropScroll));
+            for (int row = 0; row < visible; row++) {
+                final int index = row + (int) policyDropScroll;
+                if (index >= policies.size()) {
+                    break;
+                }
+                final top.xiaotang27.trdm.fare.DiscountPolicy policy = policies.get(index);
+                final float rowY = listY + 2F + row * 22F;
+                final boolean on = policySelected.contains(policy.id());
+                if (on) {
+                    rect(guiGraphics, fieldX + 1F, rowY, fieldW - 2F, 22F, 0x3325A35A);
+                }
+                text(guiGraphics, Component.literal((on ? "[×] " : "[ ] ") + policy.name()),
+                        fieldX + 8F, rowY + 7F, FONT_ROW, TicketUi.TEXT_DARK);
+            }
+        }
+
+        TicketUi.button(this, guiGraphics, x + 12F, y + h - 38F, 130F, 28F,
+                Component.translatable("gui.trdm.policies.save"),
+                hit(mx, my, x + 12F, y + h - 38F, 130F, 28F), FONT_ROW);
+        TicketUi.button(this, guiGraphics, x + 154F, y + h - 38F, 130F, 28F,
+                Component.translatable("gui.trdm.ticket.back"),
+                hit(mx, my, x + 154F, y + h - 38F, 130F, 28F), FONT_ROW);
+        if (FareRuntime.get().config().discountPolicies.isEmpty()) {
+            text(guiGraphics, Component.translatable("gui.trdm.policies.empty"),
+                    x + 12F, y + h - 62F, FONT_SUB, TicketUi.TEXT_MUTED);
+        }
+    }
+
+    private String policySummary() {
+        if (policySelected.isEmpty()) {
+            return Component.translatable("gui.trdm.script.trial.no_policy").getString();
+        }
+        if (policySelected.size() == 1) {
+            final String id = policySelected.iterator().next();
+            for (final top.xiaotang27.trdm.fare.DiscountPolicy policy
+                    : FareRuntime.get().config().discountPolicies) {
+                if (policy.id().equals(id)) {
+                    return policy.name();
+                }
+            }
+        }
+        return Component.translatable("gui.trdm.policies.selected_count",
+                policySelected.size()).getString();
+    }
+
+    private void clickPolicyPopup(float mx, float my) {
+        final float x = 220F;
+        final float y = 110F;
+        final float w = 520F;
+        final float h = 320F;
+        if (mx < x || mx >= x + w || my < y || my >= y + h) {
+            policyPopupOpen = false;
+            policyDropOpen = false;
+            return;
+        }
+        final float fieldX = x + 12F;
+        final float fieldY = y + 78F;
+        final float fieldW = w - 24F;
+        if (my >= y + h - 38F && my < y + h - 10F) {
+            if (mx >= x + 12F && mx < x + 142F) {
+                TicketClientNetwork.setCardPolicies(pos, policySelected);
+                policyPopupOpen = false;
+                policyDropOpen = false;
+                return;
+            }
+            if (mx >= x + 154F && mx < x + 284F) {
+                policyPopupOpen = false;
+                policyDropOpen = false;
+                return;
+            }
+        }
+        if (policyDropOpen) {
+            final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
+                    FareRuntime.get().config().discountPolicies;
+            final int visible = Math.min(7, policies.size());
+            final float listY = fieldY + 28F;
+            final float listH = visible * 22F + 4F;
+            if (mx >= fieldX && mx < fieldX + fieldW && my >= listY && my < listY + listH) {
+                final int row = (int) ((my - listY - 2F) / 22F) + (int) policyDropScroll;
+                if (row >= 0 && row < policies.size()) {
+                    final String id = policies.get(row).id();
+                    if (!policySelected.remove(id)) {
+                        policySelected.add(id);
+                    }
+                }
+                return;
+            }
+            policyDropOpen = false;
+        }
+        if (mx >= fieldX && mx < fieldX + fieldW && my >= fieldY && my < fieldY + 24F) {
+            policyDropOpen = !policyDropOpen;
+            policyDropScroll = 0F;
+        }
+    }
+
     private void renderRecharge(GuiGraphics guiGraphics, float mx, float my) {
         text(guiGraphics, Component.translatable("gui.trdm.terminal.recharge_title"),
                 TicketUi.PANEL_X + 20F, 78F, FONT_SECTION, TicketUi.TEXT_DARK);
@@ -534,6 +674,10 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
                     amountInput = "";
                 }
             }
+            return true;
+        }
+        if (policyPopupOpen) {
+            clickPolicyPopup(mx, my);
             return true;
         }
 
@@ -992,12 +1136,31 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         final float my = designY(mouseY);
+        if (policyPopupOpen && policyDropOpen
+                && my >= 216F && my < 380F) {
+            final int size = FareRuntime.get().config().discountPolicies.size();
+            policyDropScroll = Math.max(0F, Math.min(Math.max(0, size - 7),
+                    policyDropScroll + (delta > 0 ? -1F : 1F)));
+            return true;
+        }
         if (view == VIEW_STATION && my >= 154F && my < 470F) {
             stationScroll -= (float) delta * 24F;
             clampStationScroll();
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (policyPopupOpen) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+                policyPopupOpen = false;
+                policyDropOpen = false;
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private boolean clickInfo(float mx, float my) {
@@ -1050,7 +1213,11 @@ public class CustomerServiceTerminalScreen extends TrdmScreenBase implements Tic
         }
         if (hit(mx, my, TicketUi.PANEL_X + 184F, 400F, 150F, 28F)
                 && heldItem().is(Trdm.TRANSIT_CARD_ITEM) && FareRuntime.get().canEdit()) {
-            Minecraft.getInstance().setScreen(new CardPolicyScreen(this, pos, heldItem()));
+            policySelected.clear();
+            policySelected.addAll(TicketData.cardPolicies(heldItem()));
+            policyPopupOpen = true;
+            policyDropOpen = false;
+            policyDropScroll = 0F;
             return true;
         }
         if (hit(mx, my, TicketUi.PANEL_X + 20F, 400F, 150F, 28F)) {

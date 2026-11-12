@@ -53,7 +53,7 @@ public final class FareScriptScreen extends Screen {
 
     private static final String[] STATEMENT_TYPES = {
             "set_fare", "add_fare", "multiply_fare", "discount_fare",
-            "cap_fare", "floor_fare", "round_fare", "free_ride", "surcharge"};
+            "cap_fare", "floor_fare", "round_fare", "free_ride", "surcharge", "set_var"};
     private static final String[] PASS_STATEMENT_TYPES = {
             "pass_price", "pass_days", "pass_discount", "pass_daily_limit"};
     private static final String[] NUMERIC_VALUE_TYPES = {
@@ -61,7 +61,7 @@ public final class FareScriptScreen extends Screen {
             "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
             "time_hour", "time_minute", "time_weekday",
             "card_day_rides", "card_day_amount", "card_month_rides", "card_month_amount",
-            "table_intervals", "table_meters"};
+            "get_var", "table_intervals", "table_meters"};
     private static final String[] ARITHMETIC_VALUE_TYPES = {
             "add", "subtract", "multiply", "divide", "min", "max"};
     private static final String[] OPS = {"<", "<=", ">", ">=", "==", "!="};
@@ -125,6 +125,11 @@ public final class FareScriptScreen extends Screen {
                 "context_stations", "context_zone_diff")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
+        list.add(new PaletteEntry("gui.trdm.script.category.variables", null, false, true, 0xFF7A5A9A));
+        list.add(new PaletteEntry("gui.trdm.script.block.set_var", "set_var", true, false,
+                colorFor("set_var")));
+        list.add(new PaletteEntry("gui.trdm.script.block.get_var", "get_var", false, false,
+                colorFor("get_var")));
         list.add(new PaletteEntry("gui.trdm.script.category.loyalty", null, false, true, 0xFF9A6428));
         for (final String type : List.of("card_rule_rides", "card_rule_amount",
                 "card_rule_distance")) {
@@ -390,9 +395,9 @@ public final class FareScriptScreen extends Screen {
 
     private String selectedStatement;
     private String selectedValue;
-    private List<ScriptNode> clipboard = List.of();
-    private String clipboardRootId;
-    private boolean clipboardStatement;
+    private static List<ScriptNode> clipboard = List.of();
+    private static String clipboardRootId;
+    private static boolean clipboardStatement;
     private String dragStatementId;
     private String dragValueId;
     private String dragStatementType;
@@ -3133,6 +3138,7 @@ public final class FareScriptScreen extends Screen {
             switch (nodeType) {
                 case "discount_fare" -> number.fields.put("value", "10");
                 case "surcharge" -> number.fields.put("value", "1");
+                case "set_var" -> node.fields.put("name", "变量1");
                 case "pass_price" -> number.fields.put("value", "10");
                 case "pass_days" -> number.fields.put("value", "1");
                 case "pass_discount" -> number.fields.put("value", "100");
@@ -3231,6 +3237,7 @@ public final class FareScriptScreen extends Screen {
         script.nodes.add(value);
         switch (type) {
             case "number" -> value.fields.put("value", "3.0");
+            case "get_var" -> value.fields.put("name", "变量1");
             case "table_intervals" -> {
                 value.tiers.add(new ScriptTier(2.0, 2.0));
                 value.tiers.add(new ScriptTier(9.0, 3.0));
@@ -3699,6 +3706,18 @@ public final class FareScriptScreen extends Screen {
                 dirty = true;
             });
             addRenderableWidget(box);
+        }
+        if ((statement != null && "set_var".equals(statement.type) && selected == null)
+                || (selected != null && "get_var".equals(selected.type))) {
+            final ScriptNode target = selected != null ? selected : statement;
+            final int nameY = statement != null && "set_var".equals(statement.type)
+                    && selected == null ? y + 46 : y + 22;
+            final EditBox name = editBox(x, nameY, 140, 18,
+                    Component.translatable("gui.trdm.script.variable_name"));
+            name.setMaxLength(24);
+            name.setValue(target.fields.getOrDefault("name", "变量1"));
+            name.setResponder(text -> target.fields.put("name", text));
+            addRenderableWidget(name);
         }
         if (value != null && isTable(value.type)) {
             syncTierScroll(value);
@@ -4182,6 +4201,7 @@ public final class FareScriptScreen extends Screen {
         return "set_fare".equals(type) || "add_fare".equals(type) || "multiply_fare".equals(type)
                 || "discount_fare".equals(type) || "cap_fare".equals(type) || "floor_fare".equals(type)
                 || "surcharge".equals(type)
+                || "set_var".equals(type)
                 || "pass_price".equals(type) || "pass_days".equals(type)
                 || "pass_discount".equals(type) || "pass_daily_limit".equals(type);
     }
@@ -4230,6 +4250,7 @@ public final class FareScriptScreen extends Screen {
                     0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "discount_fare",
                  "cap_fare", "floor_fare", "free_ride", "surcharge" -> 0xFF2F7D4F;
+            case "set_var", "get_var" -> 0xFF7A5A9A;
             case "pass_price", "pass_days", "pass_discount", "pass_daily_limit" -> 0xFF2F7D4F;
             case "use_rule" -> 0xFF2F6E7D;
             case "round_fare" -> 0xFF2D6E82;
@@ -4282,6 +4303,7 @@ public final class FareScriptScreen extends Screen {
             case "line_is" -> "当前线路 = " + node.fields.getOrDefault("line_name",
                     node.fields.getOrDefault("line", "?"));
             case "is_weekend" -> "周末";
+            case "get_var" -> "变量 " + node.fields.getOrDefault("name", "?");
             case "card_has_policy" -> "政策：" + node.fields.getOrDefault("policy_name",
                     node.fields.getOrDefault("policy", "?"));
             case "add" -> arithmeticSummary(node, "+", depth);

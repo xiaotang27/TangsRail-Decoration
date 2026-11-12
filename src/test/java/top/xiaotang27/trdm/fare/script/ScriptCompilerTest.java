@@ -40,6 +40,30 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void localVariablesAreScopedToRun() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "setVar";
+        final ScriptNode setVar = new ScriptNode("setVar", "set_var");
+        setVar.fields.put("name", "x");
+        setVar.inputs.put("value", "two");
+        final ScriptNode two = new ScriptNode("two", "number");
+        two.fields.put("value", "2");
+        setVar.next = "setFare";
+        final ScriptNode setFare = new ScriptNode("setFare", "set_fare");
+        setFare.inputs.put("value", "read");
+        final ScriptNode read = new ScriptNode("read", "get_var");
+        read.fields.put("name", "x");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, setVar, two, setFare, read));
+
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        assertEquals(2.0, result.compiled().run(new ScriptContext(0, 0, 0, 0)), 1e-9);
+        assertEquals(2.0, result.compiled().run(new ScriptContext(0, 0, 0, 0)), 1e-9);
+    }
+
+    @Test
     void cardPolicyConditionUsesSelectedPolicy() {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");

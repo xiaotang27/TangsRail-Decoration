@@ -44,12 +44,18 @@ public final class TicketClientNetwork {
     }
 
     public static void buySingle(BlockPos pos, long destination, long faceCents, int quantity, boolean byPrice) {
+        buySingle(pos, destination, faceCents, quantity, byPrice, false);
+    }
+
+    public static void buySingle(BlockPos pos, long destination, long faceCents, int quantity,
+                                 boolean byPrice, boolean cardPayment) {
         final FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBlockPos(pos);
         buf.writeLong(destination);
         buf.writeLong(faceCents);
         buf.writeVarInt(quantity);
         buf.writeBoolean(byPrice);
+        buf.writeBoolean(cardPayment);
         ClientPlayNetworking.send(TicketNetwork.BUY_SINGLE, buf);
     }
 
@@ -61,10 +67,15 @@ public final class TicketClientNetwork {
     }
 
     public static void buyPass(BlockPos pos, String definitionId, int quantity) {
+        buyPass(pos, definitionId, quantity, false);
+    }
+
+    public static void buyPass(BlockPos pos, String definitionId, int quantity, boolean cardPayment) {
         final FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBlockPos(pos);
         buf.writeUtf(definitionId, 64);
         buf.writeVarInt(quantity);
+        buf.writeBoolean(cardPayment);
         ClientPlayNetworking.send(TicketNetwork.BUY_PASS, buf);
     }
 

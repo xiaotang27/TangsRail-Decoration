@@ -36,6 +36,12 @@ public final class TicketPurchase {
 
     public static Result buySingle(ServerPlayer player, BlockPos pos, long destStationId,
                                    long faceCents, int quantity, boolean byPrice) {
+        return buySingle(player, pos, destStationId, faceCents, quantity, byPrice, false);
+    }
+
+    public static Result buySingle(ServerPlayer player, BlockPos pos, long destStationId,
+                                   long faceCents, int quantity, boolean byPrice,
+                                   boolean cardPayment) {
         final ServerLevel level = player.serverLevel();
         final Result invalid = validate(player, pos, Trdm.TICKET_VENDING_MACHINE, Trdm.CUSTOMER_SERVICE_TERMINAL);
         if (invalid != null) {
@@ -60,7 +66,11 @@ public final class TicketPurchase {
         }
         final int count = Math.max(1, Math.min(64, quantity));
         final long cost = FareMoney.emeralds(face) * count;
-        if (!takeEmeralds(player, cost)) {
+        if (cardPayment) {
+            if (!takeCardPayment(player, face * count)) {
+                return error("gui.trdm.ticket.error.no_card_balance");
+            }
+        } else if (!takeEmeralds(player, cost)) {
             return new Result(false, "gui.trdm.ticket.error.no_emerald", cost);
         }
         final String dimension = ServerFareRuntime.dimensionId(level);
@@ -223,6 +233,11 @@ public final class TicketPurchase {
     // ===== 通票 =====
 
     public static Result buyPass(ServerPlayer player, BlockPos pos, String definitionId, int quantity) {
+        return buyPass(player, pos, definitionId, quantity, false);
+    }
+
+    public static Result buyPass(ServerPlayer player, BlockPos pos, String definitionId,
+                                 int quantity, boolean cardPayment) {
         final ServerLevel level = player.serverLevel();
         final Result invalid = validate(player, pos, Trdm.TICKET_VENDING_MACHINE, Trdm.CUSTOMER_SERVICE_TERMINAL);
         if (invalid != null) {
@@ -239,7 +254,11 @@ public final class TicketPurchase {
         final top.xiaotang27.trdm.fare.script.PassSettings settings = rule.settings();
         final int count = Math.max(1, Math.min(64, quantity));
         final long cost = (long) settings.priceEmeralds() * count;
-        if (!takeEmeralds(player, cost)) {
+        if (cardPayment) {
+            if (!takeCardPayment(player, settings.priceEmeralds() * 100L * count)) {
+                return error("gui.trdm.ticket.error.no_card_balance");
+            }
+        } else if (!takeEmeralds(player, cost)) {
             return new Result(false, "gui.trdm.ticket.error.no_emerald", cost);
         }
         final String dimension = ServerFareRuntime.dimensionId(level);
@@ -531,6 +550,22 @@ public final class TicketPurchase {
             }
         }
         return remaining == 0;
+    }
+
+    private static boolean takeCardPayment(ServerPlayer player, long cents) {
+        final ItemStack card = player.getMainHandItem();
+        if (!card.is(Trdm.TRANSIT_CARD_ITEM) || !TicketData.hasData(card)) {
+            return false;
+        }
+        final long amount = Math.max(0L, cents);
+        final long balance = TicketData.balance(card);
+        if (balance < amount) {
+            return false;
+        }
+        TicketData.setBalance(card, balance - amount);
+        TicketData.addTx(card, TrdmClock.now(), "ticket", -amount, balance - amount);
+        TicketSync.sync(player);
+        return true;
     }
 
     private static int countEmeralds(ServerPlayer player) {

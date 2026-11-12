@@ -7,8 +7,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import top.xiaotang27.trdm.Trdm;
 import top.xiaotang27.trdm.fare.FareMoney;
 import top.xiaotang27.trdm.ticket.PassRule;
+import top.xiaotang27.trdm.ticket.TicketData;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -356,9 +358,24 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
         TicketUi.button(this, guiGraphics, LIST_X, 400F, 150F, 28F,
                 Component.translatable("gui.trdm.ticket_machine.pay"),
                 hit(mx, my, LIST_X, 400F, 150F, 28F), FONT_ROW);
-        TicketUi.button(this, guiGraphics, LIST_X + 164F, 400F, 100F, 28F,
-                Component.translatable("gui.trdm.ticket_machine.back"),
-                hit(mx, my, LIST_X + 164F, 400F, 100F, 28F), FONT_ROW);
+        if (cardInHand()) {
+            TicketUi.button(this, guiGraphics, LIST_X + 164F, 400F, 120F, 28F,
+                    Component.translatable("gui.trdm.ticket_machine.pay_card"),
+                    hit(mx, my, LIST_X + 164F, 400F, 120F, 28F), FONT_ROW);
+            TicketUi.button(this, guiGraphics, LIST_X + 296F, 400F, 100F, 28F,
+                    Component.translatable("gui.trdm.ticket_machine.back"),
+                    hit(mx, my, LIST_X + 296F, 400F, 100F, 28F), FONT_ROW);
+        } else {
+            TicketUi.button(this, guiGraphics, LIST_X + 164F, 400F, 100F, 28F,
+                    Component.translatable("gui.trdm.ticket_machine.back"),
+                    hit(mx, my, LIST_X + 164F, 400F, 100F, 28F), FONT_ROW);
+        }
+    }
+
+    private boolean cardInHand() {
+        return this.minecraft != null && this.minecraft.player != null
+                && this.minecraft.player.getMainHandItem().is(Trdm.TRANSIT_CARD_ITEM)
+                && TicketData.hasData(this.minecraft.player.getMainHandItem());
     }
 
     // ===== 点击 =====
@@ -413,7 +430,15 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
                 }
                 return true;
             }
-            if (hit(mx, my, LIST_X + 164F, 400F, 100F, 28F)) {
+            if (cardInHand() && hit(mx, my, LIST_X + 164F, 400F, 120F, 28F)) {
+                if (!purchasePending) {
+                    purchasePending = true;
+                    TicketClientNetwork.buySingle(pos, transactionByPrice ? 0L : transactionStationId,
+                            unitPriceCents, quantity, transactionByPrice, true);
+                }
+                return true;
+            }
+            if (hit(mx, my, LIST_X + (cardInHand() ? 296F : 164F), 400F, 100F, 28F)) {
                 transactionOpen = false;
                 return true;
             }
@@ -489,7 +514,14 @@ public class TicketVendingScreen extends TrdmScreenBase implements TicketResultR
                 }
                 return true;
             }
-            if (hit(mx, my, LIST_X + 164F, 400F, 100F, 28F)) {
+            if (cardInHand() && hit(mx, my, LIST_X + 164F, 400F, 120F, 28F)) {
+                if (!purchasePending && !transactionPassId.isEmpty()) {
+                    purchasePending = true;
+                    TicketClientNetwork.buyPass(pos, transactionPassId, quantity, true);
+                }
+                return true;
+            }
+            if (hit(mx, my, LIST_X + (cardInHand() ? 296F : 164F), 400F, 100F, 28F)) {
                 transactionOpen = false;
                 return true;
             }
