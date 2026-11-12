@@ -263,6 +263,7 @@
   "gui.trdm.policies.saved": "交通卡优惠政策已更新",
   "gui.trdm.ticket.error.no_permission": "只有管理员可以修改交通卡优惠政策",
   "gui.trdm.script.choose_policy": "选择政策",
+  "gui.trdm.script.no_policies": "还没有配置任何优惠政策",
   "gui.trdm.script.block.time_hour": "当前小时",
   "gui.trdm.script.block.time_minute": "当前分钟",
   "gui.trdm.script.block.time_weekday": "星期（1=周一）",

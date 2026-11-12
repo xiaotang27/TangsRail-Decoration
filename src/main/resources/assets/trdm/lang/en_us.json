@@ -279,6 +279,7 @@
   "gui.trdm.script.block.is_weekend": "Is weekend",
   "gui.trdm.script.block.card_has_policy": "Card has policy",
   "gui.trdm.script.choose_policy": "Choose policy",
+  "gui.trdm.script.no_policies": "No policies configured",
   "gui.trdm.policies.title": "Transit card policies",
   "gui.trdm.policies.name": "Name",
   "gui.trdm.policies.id": "ID",

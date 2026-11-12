@@ -352,6 +352,16 @@ public final class FareScriptScreen extends Screen {
     private int ruleListH;
     private int ruleDropScroll;
     private boolean lineDropOpen;
+    private boolean policyDropOpen;
+    private float policyDropScroll;
+    private int policyFieldX;
+    private int policyFieldY;
+    private int policyFieldW;
+    private int policyFieldH;
+    private int policyListX;
+    private int policyListY;
+    private int policyListW;
+    private int policyListH;
     private int lineFieldX;
     private int lineFieldY;
     private int lineFieldW;
@@ -750,6 +760,7 @@ public final class FareScriptScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         drawRuleDropdown(guiGraphics, mouseX, mouseY);
         drawLineDropdown(guiGraphics, mouseX, mouseY);
+        drawPolicyDropdown(guiGraphics, mouseX, mouseY);
         drawOperatorDropdown(guiGraphics, mouseX, mouseY);
         drawTraceWindow(guiGraphics);
         drawNotice(guiGraphics);
@@ -2018,6 +2029,95 @@ public final class FareScriptScreen extends Screen {
         }
     }
 
+    private boolean handlePolicyClick(double mx, double my) {
+        if (!policyDropOpen) {
+            return false;
+        }
+        final List<top.xiaotang27.trdm.fare.DiscountPolicy> options =
+                FareRuntime.get().config().discountPolicies;
+        final int row = (int) ((my - policyListY - 2) / 18);
+        if (mx >= policyListX && mx < policyListX + policyListW
+                && my >= policyListY && my < policyListY + policyListH
+                && row >= 0 && row + (int) policyDropScroll < options.size()) {
+            final top.xiaotang27.trdm.fare.DiscountPolicy policy =
+                    options.get(row + (int) policyDropScroll);
+            final ScriptNode selected = selectedValueNode();
+            if (selected != null && "card_has_policy".equals(selected.type)) {
+                pushUndo();
+                selected.fields.put("policy", policy.id());
+                selected.fields.put("policy_name", policy.name());
+                error = "";
+            }
+            policyDropOpen = false;
+            rebuild();
+            return true;
+        }
+        final boolean inside = mx >= policyListX && mx < policyListX + policyListW
+                && my >= policyListY && my < policyListY + policyListH;
+        if (inside || (mx >= policyFieldX && mx < policyFieldX + policyFieldW
+                && my >= policyFieldY && my < policyFieldY + policyFieldH)) {
+            policyDropOpen = false;
+            return true;
+        }
+        policyDropOpen = false;
+        return false;
+    }
+
+    private void drawPolicyDropdown(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!policyDropOpen) {
+            return;
+        }
+        final List<top.xiaotang27.trdm.fare.DiscountPolicy> options =
+                FareRuntime.get().config().discountPolicies;
+        if (options.isEmpty()) {
+            policyDropOpen = false;
+            return;
+        }
+        final int visible = Math.min(8, options.size());
+        policyListX = policyFieldX;
+        policyListW = Math.max(180, policyFieldW);
+        policyListH = visible * 18 + 4;
+        policyListY = policyFieldY + policyFieldH + 2;
+        if (policyListY + policyListH > this.height - 8) {
+            policyListY = Math.max(44, policyFieldY - policyListH - 2);
+        }
+        policyDropScroll = Math.max(0F, Math.min(Math.max(0, options.size() - visible),
+                policyDropScroll));
+        fill(guiGraphics, policyListX - 1, policyListY - 1, policyListW + 2,
+                policyListH + 2, PANEL_BORDER);
+        fill(guiGraphics, policyListX, policyListY, policyListW, policyListH, 0xF0161616);
+        final ScriptNode selected = selectedValueNode();
+        for (int row = 0; row < visible; row++) {
+            final int index = row + (int) policyDropScroll;
+            if (index >= options.size()) {
+                break;
+            }
+            final top.xiaotang27.trdm.fare.DiscountPolicy policy = options.get(index);
+            final int top = policyListY + 2 + row * 18;
+            final boolean hovered = mouseX >= policyListX && mouseX < policyListX + policyListW
+                    && mouseY >= top && mouseY < top + 18;
+            final boolean current = selected != null
+                    && policy.id().equals(selected.fields.get("policy"));
+            if (current) {
+                fill(guiGraphics, policyListX + 1, top, policyListW - 2, 18, 0x3345B35A);
+            } else if (hovered) {
+                fill(guiGraphics, policyListX + 1, top, policyListW - 2, 18, 0x33FFFFFF);
+            }
+            drawString(guiGraphics, fit(policy.name(), policyListW - 16),
+                    policyListX + 8, top + 5, hovered ? 0xFFFFFFFF : 0xFFD0D0D0);
+        }
+        if (options.size() > visible) {
+            final int trackX = policyListX + policyListW - 5;
+            final int trackH = policyListH - 6;
+            fill(guiGraphics, trackX, policyListY + 3, 3, trackH, 0xFF3A3A3A);
+            final int thumbH = Math.max(10, Math.round(trackH * (float) visible / options.size()));
+            final int maxScroll = options.size() - visible;
+            final int thumbY = policyListY + 3 + Math.round((trackH - thumbH)
+                    * policyDropScroll / maxScroll);
+            fill(guiGraphics, trackX, thumbY, 3, thumbH, 0xFF8A8A8A);
+        }
+    }
+
     private void drawRuleField(GuiGraphics guiGraphics, View view) {        final int[] rect = ruleFieldRect(view);
         final int x = rect[0];
         final int y = rect[1];
@@ -2629,6 +2729,9 @@ public final class FareScriptScreen extends Screen {
         if (handleLineClick(mouseX, mouseY)) {
             return true;
         }
+        if (handlePolicyClick(mouseX, mouseY)) {
+            return true;
+        }
         if (handleOperatorClick(mouseX, mouseY)) {
             return true;
         }
@@ -2915,6 +3018,15 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         if (handleTrialScroll(mouseX, mouseY, delta)) {
+            return true;
+        }
+        if (policyDropOpen && mouseX >= policyListX && mouseX < policyListX + policyListW
+                && mouseY >= policyListY && mouseY < policyListY + policyListH) {
+            final int visible = Math.min(8, FareRuntime.get().config().discountPolicies.size());
+            final int max = Math.max(0,
+                    FareRuntime.get().config().discountPolicies.size() - visible);
+            policyDropScroll = Math.max(0F, Math.min(max,
+                    policyDropScroll + (delta > 0 ? -1F : 1F)));
             return true;
         }
         if (lineDropOpen && mouseX >= lineListX && mouseX < lineListX + lineListW
@@ -3272,28 +3384,6 @@ public final class FareScriptScreen extends Screen {
         return booleanSlot ? isBoolean(type) : isNumeric(type);
     }
 
-    private void cyclePolicy(ScriptNode node) {
-        if (node == null) {
-            return;
-        }
-        final List<top.xiaotang27.trdm.fare.DiscountPolicy> policies =
-                FareRuntime.get().config().discountPolicies;
-        if (policies.isEmpty()) {
-            return;
-        }
-        final String current = node.fields.getOrDefault("policy", "");
-        int index = 0;
-        for (int i = 0; i < policies.size(); i++) {
-            if (policies.get(i).id().equals(current)) {
-                index = (i + 1) % policies.size();
-                break;
-            }
-        }
-        node.fields.put("policy", policies.get(index).id());
-        node.fields.put("policy_name", policies.get(index).name());
-        rebuild();
-    }
-
     private void cycleValueType() {
         pushUndo();
         final ScriptNode selected = selectedValueNode();
@@ -3465,10 +3555,14 @@ public final class FareScriptScreen extends Screen {
             popupVisible = false;
             popupW = 0;
             popupH = 0;
+            policyDropOpen = false;
             return;
         }
         final ScriptNode value = popupValue();
         final ScriptNode selected = selectedValueNode();
+        if (selected == null || !"card_has_policy".equals(selected.type)) {
+            policyDropOpen = false;
+        }
         popupW = Math.min(320, Math.max(220, this.width - 24));
         if (selected != null && "compare".equals(selected.type)) {
             popupH = 146;
@@ -3633,9 +3727,23 @@ public final class FareScriptScreen extends Screen {
         }
         if (selected != null && "card_has_policy".equals(selected.type)) {
             final String current = selected.fields.getOrDefault("policy_name", "");
-            button(x, y + 22, 180, 18, Component.literal(current.isBlank()
-                    ? Component.translatable("gui.trdm.script.choose_policy").getString()
-                    : current), () -> cyclePolicy(selected));
+            policyFieldX = x;
+            policyFieldY = y + 22;
+            policyFieldW = 180;
+            policyFieldH = 18;
+                    button(policyFieldX, policyFieldY, policyFieldW, policyFieldH,
+                    Component.literal((current.isBlank()
+                            ? Component.translatable("gui.trdm.script.choose_policy").getString()
+                            : current) + "  ▼"), () -> {
+                        if (FareRuntime.get().config().discountPolicies.isEmpty()) {
+                            error = Component.translatable("gui.trdm.script.no_policies").getString();
+                            rebuild();
+                            return;
+                        }
+                        policyDropOpen = !policyDropOpen;
+                        policyDropScroll = 0;
+                        rebuild();
+                    });
         }
 
         int bx = x;
@@ -4407,6 +4515,10 @@ public final class FareScriptScreen extends Screen {
         }
         if (lineDropOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             lineDropOpen = false;
+            return true;
+        }
+        if (policyDropOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            policyDropOpen = false;
             return true;
         }
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE
