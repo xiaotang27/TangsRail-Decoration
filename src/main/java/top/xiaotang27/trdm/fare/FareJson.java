@@ -267,6 +267,7 @@ public final class FareJson {
                 node.after = string(nodeObject, "after", null);
                 node.x = integer(nodeObject, "x", 0);
                 node.y = integer(nodeObject, "y", 0);
+                node.disabled = bool(nodeObject, "disabled", false);
                 if (nodeObject.has("inputs") && nodeObject.get("inputs").isJsonObject()) {
                     for (final Map.Entry<String, JsonElement> entry
                             : nodeObject.getAsJsonObject("inputs").entrySet()) {
@@ -335,6 +336,9 @@ public final class FareJson {
             }
             nodeObject.addProperty("x", node.x);
             nodeObject.addProperty("y", node.y);
+            if (node.disabled) {
+                nodeObject.addProperty("disabled", true);
+            }
             if (!node.inputs.isEmpty()) {
                 final JsonObject inputs = new JsonObject();
                 for (final Map.Entry<String, String> entry : node.inputs.entrySet()) {

@@ -112,7 +112,7 @@ public final class FareConfig {
      * {@code visiting} 保存当前调用链；规则不存在、被停用或出现循环引用时返回 {@code null}，
      * 积木会被跳过而不会让整条规则报错。
      */
-    RuleResolver ruleResolver(Set<String> visiting) {
+    public RuleResolver ruleResolver(Set<String> visiting) {
         return new RuleResolver() {
             @Override
             public Double resolve(String ruleId, ScriptContext context) {

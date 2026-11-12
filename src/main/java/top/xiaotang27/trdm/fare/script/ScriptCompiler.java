@@ -24,7 +24,8 @@ public final class ScriptCompiler {
 
     private static final Set<String> STATEMENTS = Set.of(
             "on_fare", "set_fare", "add_fare", "multiply_fare", "cap_fare",
-            "floor_fare", "discount_fare", "round_fare", "if", "use_rule");
+            "floor_fare", "discount_fare", "round_fare", "free_ride", "surcharge",
+            "if", "use_rule");
     private static final Set<String> NUMBER_VALUES = Set.of(
             "number", "context_intervals", "context_stations", "context_meters",
             "context_zone_diff", "card_rule_rides", "card_rule_amount", "card_rule_distance",
@@ -32,7 +33,8 @@ public final class ScriptCompiler {
             "table_intervals", "table_meters");
     private static final Set<String> BOOLEAN_VALUES = Set.of("compare", "and", "or", "not", "line_is");
     private static final Set<String> VALUE_STATEMENTS = Set.of(
-            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare", "discount_fare");
+            "set_fare", "add_fare", "multiply_fare", "cap_fare", "floor_fare",
+            "discount_fare", "surcharge");
 
     /** 编译结果：成功时 {@code compiled} 非空，失败时 {@code errors} 非空。 */
     public record Result(CompiledScript compiled, List<String> errors) {
@@ -126,7 +128,24 @@ public final class ScriptCompiler {
                 errors.add("语句块存在环: " + node.id);
                 return;
             }
-            if ("set_fare".equals(node.type) || "use_rule".equals(node.type)) {
+            if (node.disabled) {
+                final String link = "if".equals(node.type) ? node.after : node.next;
+                if (link != null && !link.isBlank()) {
+                    final ScriptNode next = nodes.get(link);
+                    if (next == null) {
+                        errors.add("被禁用语句块的后继不存在: " + node.id + " -> " + link);
+                    } else if (!STATEMENTS.contains(next.type)) {
+                        errors.add("被禁用语句块的后继必须是语句块: " + node.id + " -> " + link);
+                    } else {
+                        validateStatement(next);
+                    }
+                }
+                visitingStatements.remove(node.id);
+                visitedStatements.add(node.id);
+                return;
+            }
+            if ("set_fare".equals(node.type) || "use_rule".equals(node.type)
+                    || "free_ride".equals(node.type)) {
                 reachableSetFare++;
             }
             if ("use_rule".equals(node.type)
@@ -390,6 +409,10 @@ public final class ScriptCompiler {
                 if (node == null) {
                     throw new ScriptException("语句块不存在: " + cursor);
                 }
+                if (node.disabled) {
+                    cursor = "if".equals(node.type) ? node.after : node.next;
+                    continue;
+                }
                 switch (node.type) {
                     case "on_fare" -> cursor = node.next;
                     case "set_fare" -> {
@@ -411,6 +434,16 @@ public final class ScriptCompiler {
                         final double percent = Math.max(0.0,
                                 Math.min(100.0, number(node.inputs.get("value"), context)));
                         state.fare *= 1.0 - percent / 100.0;
+                        state.hasFare = true;
+                        cursor = node.next;
+                    }
+                    case "free_ride" -> {
+                        state.fare = 0.0;
+                        state.hasFare = true;
+                        cursor = node.next;
+                    }
+                    case "surcharge" -> {
+                        state.fare += Math.max(0.0, number(node.inputs.get("value"), context));
                         state.hasFare = true;
                         cursor = node.next;
                     }

@@ -40,6 +40,55 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void freeRideAndSurcharge() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "three");
+        final ScriptNode three = new ScriptNode("three", "number");
+        three.fields.put("value", "3");
+        set.next = "free";
+        final ScriptNode free = new ScriptNode("free", "free_ride");
+        free.next = "surcharge";
+        final ScriptNode surcharge = new ScriptNode("surcharge", "surcharge");
+        surcharge.inputs.put("value", "oneHalf");
+        final ScriptNode oneHalf = new ScriptNode("oneHalf", "number");
+        oneHalf.fields.put("value", "1.5");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, set, three, free, surcharge, oneHalf));
+
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        assertEquals(1.5, result.compiled().run(
+                new ScriptContext(0, 0, 0, 0)), 1e-9);
+    }
+
+    @Test
+    void disabledStatementIsSkipped() {
+        final FareScript script = new FareScript();
+        final ScriptNode hat = new ScriptNode("hat", "on_fare");
+        hat.next = "set";
+        final ScriptNode set = new ScriptNode("set", "set_fare");
+        set.inputs.put("value", "two");
+        final ScriptNode two = new ScriptNode("two", "number");
+        two.fields.put("value", "2");
+        set.next = "extra";
+        final ScriptNode extra = new ScriptNode("extra", "add_fare");
+        extra.disabled = true;
+        extra.inputs.put("value", "five");
+        final ScriptNode five = new ScriptNode("five", "number");
+        five.fields.put("value", "5");
+        script.hat = "hat";
+        script.nodes.addAll(List.of(hat, set, two, extra, five));
+
+        final ScriptCompiler.Result result = ScriptCompiler.compile(script);
+        assertTrue(result.errors().isEmpty(), () -> String.join("；", result.errors()));
+        assertEquals(2.0, result.compiled().run(
+                new ScriptContext(0, 0, 0, 0)), 1e-9);
+    }
+
+    @Test
     void cardLoyaltyValues() {
         final FareScript script = new FareScript();
         final ScriptNode hat = new ScriptNode("hat", "on_fare");

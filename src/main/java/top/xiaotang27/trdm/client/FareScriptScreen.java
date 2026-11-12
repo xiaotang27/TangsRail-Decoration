@@ -2,6 +2,7 @@ package top.xiaotang27.trdm.client;
 
 import mtr.client.ClientData;
 import mtr.data.Route;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -28,6 +29,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -44,7 +46,7 @@ public final class FareScriptScreen extends Screen {
 
     private static final String[] STATEMENT_TYPES = {
             "set_fare", "add_fare", "multiply_fare", "discount_fare",
-            "cap_fare", "floor_fare", "round_fare"};
+            "cap_fare", "floor_fare", "round_fare", "free_ride", "surcharge"};
     private static final String[] PASS_STATEMENT_TYPES = {
             "pass_price", "pass_days", "pass_discount", "pass_daily_limit"};
     private static final String[] NUMERIC_VALUE_TYPES = {
@@ -97,7 +99,7 @@ public final class FareScriptScreen extends Screen {
         }
         list.add(new PaletteEntry("gui.trdm.script.category.fare", null, false, true, 0xFF2F7D4F));
         for (final String type : List.of("set_fare", "add_fare", "multiply_fare",
-                "discount_fare", "cap_fare", "floor_fare")) {
+                "discount_fare", "cap_fare", "floor_fare", "free_ride", "surcharge")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, true, false, colorFor(type)));
         }
         list.add(new PaletteEntry("gui.trdm.script.block.use_rule", "use_rule", true, false,
@@ -123,6 +125,9 @@ public final class FareScriptScreen extends Screen {
         for (final String type : List.of("table_intervals", "table_meters")) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
+        list.add(new PaletteEntry("gui.trdm.script.category.comment", null, false, true, 0xFFB38B2E));
+        list.add(new PaletteEntry("gui.trdm.script.block.comment", "comment", false, false,
+                colorFor("comment")));
         return list;
     }
 
@@ -145,6 +150,9 @@ public final class FareScriptScreen extends Screen {
         for (final String type : ARITHMETIC_VALUE_TYPES) {
             list.add(new PaletteEntry("gui.trdm.script.block." + type, type, false, false, colorFor(type)));
         }
+        list.add(new PaletteEntry("gui.trdm.script.category.comment", null, false, true, 0xFFB38B2E));
+        list.add(new PaletteEntry("gui.trdm.script.block.comment", "comment", false, false,
+                colorFor("comment")));
         return list;
     }
 
@@ -152,9 +160,38 @@ public final class FareScriptScreen extends Screen {
         return passRule == null ? PALETTE : PASS_PALETTE;
     }
 
+    private List<PaletteEntry> visiblePalette() {
+        final List<PaletteEntry> all = palette();
+        final List<PaletteEntry> result = new ArrayList<>();
+        final String query = paletteQuery == null ? "" : paletteQuery.trim().toLowerCase(Locale.ROOT);
+        if (!query.isEmpty()) {
+            for (final PaletteEntry entry : all) {
+                if (entry.header()) {
+                    continue;
+                }
+                final String label = Component.translatable(entry.labelKey()).getString()
+                        .toLowerCase(Locale.ROOT);
+                if (label.contains(query) || entry.type().toLowerCase(Locale.ROOT).contains(query)) {
+                    result.add(entry);
+                }
+            }
+            return result;
+        }
+        boolean skip = false;
+        for (final PaletteEntry entry : all) {
+            if (entry.header()) {
+                skip = collapsedCategories.contains(entry.labelKey());
+                result.add(entry);
+            } else if (!skip) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
     private int paletteY(int index) {
         int y = PALETTE_TOP;
-        final List<PaletteEntry> entries = palette();
+        final List<PaletteEntry> entries = visiblePalette();
         for (int i = 0; i < index && i < entries.size(); i++) {
             y += entries.get(i).header() ? PALETTE_HEADER : PALETTE_ROW;
         }
@@ -162,7 +199,7 @@ public final class FareScriptScreen extends Screen {
     }
 
     private int paletteTotalHeight() {
-        return paletteY(palette().size()) - PALETTE_TOP;
+        return paletteY(visiblePalette().size()) - PALETTE_TOP;
     }
 
     private int paletteViewHeight() {
@@ -178,8 +215,8 @@ public final class FareScriptScreen extends Screen {
                 || my < PALETTE_TOP || my >= PALETTE_TOP + paletteViewHeight()) {
             return null;
         }
-        for (int index = 0; index < palette().size(); index++) {
-            final PaletteEntry entry = palette().get(index);
+        for (int index = 0; index < visiblePalette().size(); index++) {
+            final PaletteEntry entry = visiblePalette().get(index);
             final float y = paletteY(index) - paletteScroll;
             final int h = entry.header() ? PALETTE_HEADER : 21;
             if (my >= y && my < y + h) {
@@ -328,6 +365,13 @@ public final class FareScriptScreen extends Screen {
     private String dragValueId;
     private String dragStatementType;
     private String dragValueType;
+    private String dragCommentType;
+    private String dragCommentId;
+    private double commentDragOffsetX;
+    private double commentDragOffsetY;
+    private String lastCommentClickId = "";
+    private long lastCommentClickAt;
+    private boolean commentUndoPushed;
     private double dragX;
     private double dragY;
     private DropTarget statementDrop;
@@ -336,6 +380,9 @@ public final class FareScriptScreen extends Screen {
     private String tierScrollNode;
     private int tierScroll;
     private float paletteScroll;
+    private String paletteQuery = "";
+    private final Set<String> collapsedCategories = new HashSet<>();
+    private EditBox paletteSearch;
 
     public FareScriptScreen(Screen parent, FareRule rule) {
         this(parent, rule, null);
@@ -387,6 +434,14 @@ public final class FareScriptScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.ticket.back"),
                         button -> onClose())
                 .bounds(backX, this.height - 28, 100, 20).build());
+        paletteSearch = new EditBox(this.font, PALETTE_X, 28, PALETTE_W, 16,
+                Component.translatable("gui.trdm.script.search"));
+        paletteSearch.setValue(paletteQuery);
+        paletteSearch.setResponder(value -> {
+            paletteQuery = value == null ? "" : value;
+            paletteScroll = 0F;
+        });
+        addRenderableWidget(paletteSearch);
         addRenderableWidget(Button.builder(Component.translatable("gui.trdm.script.undo"),
                         button -> undo())
                 .bounds(this.width - 184, 6, 84, 20).build());
@@ -403,6 +458,19 @@ public final class FareScriptScreen extends Screen {
                 .bounds(132, 6, 48, 20).build();
         paste.active = !clipboard.isEmpty();
         addRenderableWidget(paste);
+        final Button disable = Button.builder(Component.translatable(
+                        selectedStatement != null && script.node(selectedStatement) != null
+                                && script.node(selectedStatement).disabled
+                                ? "gui.trdm.script.enable" : "gui.trdm.script.disable"),
+                        button -> toggleDisabled())
+                .bounds(184, 6, 60, 20).build();
+        disable.active = selectedStatement != null && script.node(selectedStatement) != null;
+        addRenderableWidget(disable);
+        final Button trial = Button.builder(Component.translatable("gui.trdm.script.trial.button"),
+                        button -> openTrial())
+                .bounds(250, 6, 60, 20).build();
+        trial.active = rule != null;
+        addRenderableWidget(trial);
 
         if (popupVisible) {
             addPopupWidgets();
@@ -629,13 +697,14 @@ public final class FareScriptScreen extends Screen {
         final ValueTarget valueTarget = (dragValueType != null || dragValueId != null)
                 ? valueTargetAt(mouseX, mouseY) : null;
         drawCanvas(guiGraphics, mouseX, mouseY, valueTarget);
+        drawMinimap(guiGraphics);
         if (popupVisible) {
             drawPopup(guiGraphics);
             drawPopupLabels(guiGraphics, valueTarget);
             drawTierScrollbar(guiGraphics);
         }
         if (dragStatementType != null || dragValueType != null || dragStatementId != null
-                || dragValueId != null) {
+                || dragValueId != null || dragCommentType != null) {
             drawGhost(guiGraphics);
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -648,6 +717,41 @@ public final class FareScriptScreen extends Screen {
         }
     }
 
+    private void drawMinimap(GuiGraphics guiGraphics) {
+        if (views.isEmpty()) {
+            return;
+        }
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        for (final View view : views) {
+            minX = Math.min(minX, view.left);
+            minY = Math.min(minY, view.top);
+            maxX = Math.max(maxX, view.left + view.width);
+            maxY = Math.max(maxY, view.top + view.height);
+        }
+        final int mapW = 104;
+        final int mapH = 74;
+        final int mapX = canvasRight - mapW - 10;
+        final int mapY = canvasTop + 8;
+        final int contentW = Math.max(1, maxX - minX);
+        final int contentH = Math.max(1, maxY - minY);
+        final float scale = Math.min((mapW - 8F) / contentW, (mapH - 8F) / contentH);
+        fill(guiGraphics, mapX - 1, mapY - 1, mapW + 2, mapH + 2, 0xCC303030);
+        fill(guiGraphics, mapX, mapY, mapW, mapH, 0xE6FFFFFF);
+        guiGraphics.enableScissor(mapX, mapY, mapX + mapW, mapY + mapH);
+        for (final View view : views) {
+            final int x = mapX + 4 + Math.round((view.left - minX) * scale);
+            final int y = mapY + 4 + Math.round((view.top - minY) * scale);
+            final int w = Math.max(2, Math.round(view.width * scale));
+            final int h = Math.max(2, Math.round(view.height * scale));
+            fill(guiGraphics, x, y, w, h,
+                    view.node.disabled ? 0xFF999999 : colorFor(view.node.type));
+        }
+        guiGraphics.disableScissor();
+    }
+
     private void drawPalette(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         final int top = 46;
         final int panelH = this.height - top - 8;
@@ -657,8 +761,8 @@ public final class FareScriptScreen extends Screen {
         final int viewH = paletteViewHeight();
         guiGraphics.enableScissor(PALETTE_X + 1, PALETTE_TOP, PALETTE_X + PALETTE_W - 1,
                 PALETTE_TOP + viewH);
-        for (int index = 0; index < palette().size(); index++) {
-            final PaletteEntry entry = palette().get(index);
+        for (int index = 0; index < visiblePalette().size(); index++) {
+            final PaletteEntry entry = visiblePalette().get(index);
             final int y = Math.round(paletteY(index) - paletteScroll);
             final int entryH = entry.header() ? PALETTE_HEADER - 2 : 21;
             if (y + entryH < PALETTE_TOP || y > PALETTE_TOP + viewH) {
@@ -666,7 +770,8 @@ public final class FareScriptScreen extends Screen {
             }
             if (entry.header()) {
                 fill(guiGraphics, PALETTE_X + 1, y, PALETTE_W - 2, PALETTE_HEADER - 2, entry.color());
-                drawString(guiGraphics, Component.translatable(entry.labelKey()).getString(),
+                drawString(guiGraphics, (collapsedCategories.contains(entry.labelKey()) ? "▶ " : "▼ ")
+                                + Component.translatable(entry.labelKey()).getString(),
                         PALETTE_X + 8, y + 4, 0xFFFFFF);
             } else {
                 final boolean hover = mouseX >= PALETTE_X + 6 && mouseX < PALETTE_X + PALETTE_W - 6
@@ -754,6 +859,7 @@ public final class FareScriptScreen extends Screen {
             }
         }
         // 空画布不显示文字提示。
+        drawComments(guiGraphics);
 
         // 拖放反馈画在块内容之上。
         if (statementDrop != null) {
@@ -777,6 +883,83 @@ public final class FareScriptScreen extends Screen {
             fill(guiGraphics, tx + 49, ty + 12, 2, 9, overTrash ? 0xFFC0392B : 0xFFE8E8E8);
         }
         guiGraphics.disableScissor();
+    }
+
+    private int commentScreenX(ScriptNode node) {
+        return canvasLeft + Math.round(panX) + Math.round(node.x * zoom);
+    }
+
+    private int commentScreenY(ScriptNode node) {
+        return canvasTop + Math.round(panY) + Math.round(node.y * zoom);
+    }
+
+    private int commentWidth() {
+        return Math.max(100, Math.round(160 * zoom));
+    }
+
+    private java.util.List<net.minecraft.util.FormattedCharSequence> commentLines(ScriptNode node) {
+        final String text = node.fields.getOrDefault("text", "");
+        final String display = text.isBlank()
+                ? Component.translatable("gui.trdm.script.comment.empty").getString() : text;
+        return this.font.split(Component.literal(display), commentWidth() - 12);
+    }
+
+    private int commentHeight(ScriptNode node) {
+        return Math.max(26, commentLines(node).size() * 10 + 12);
+    }
+
+    private ScriptNode commentAt(double mx, double my) {
+        for (int index = script.nodes.size() - 1; index >= 0; index--) {
+            final ScriptNode node = script.nodes.get(index);
+            if (!"comment".equals(node.type)) {
+                continue;
+            }
+            final int x = commentScreenX(node);
+            final int y = commentScreenY(node);
+            if (mx >= x && mx < x + commentWidth() && my >= y && my < y + commentHeight(node)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private void drawComments(GuiGraphics guiGraphics) {
+        for (final ScriptNode node : script.nodes) {
+            if (!"comment".equals(node.type)) {
+                continue;
+            }
+            final int x = commentScreenX(node);
+            final int y = commentScreenY(node);
+            final int w = commentWidth();
+            final int h = commentHeight(node);
+            if (x + w < canvasLeft || x > canvasRight || y + h < canvasTop || y > canvasBottom) {
+                continue;
+            }
+            final boolean active = node.id.equals(dragCommentId);
+            fill(guiGraphics, x + 2, y + 2, w, h, 0x44000000);
+            fill(guiGraphics, x - 1, y - 1, w + 2, h + 2, active ? 0xFF9A7420 : 0xFFD6B84A);
+            fill(guiGraphics, x, y, w, h, 0xFFFFF3B0);
+            fill(guiGraphics, x, y, w, 3, 0xFFE0C05A);
+            int lineY = y + 8;
+            for (final net.minecraft.util.FormattedCharSequence line : commentLines(node)) {
+                guiGraphics.drawString(this.font, line, x + 6, lineY, 0xFF4A3A12, false);
+                lineY += 10;
+            }
+        }
+    }
+
+    private void createComment(double mouseX, double mouseY) {
+        pushUndo();
+        final ScriptNode node = new ScriptNode(Scripts.uniqueId(script, "c"), "comment");
+        node.fields.put("text", "");
+        node.x = Math.round((float) ((mouseX - canvasLeft - panX) / zoom));
+        node.y = Math.round((float) ((mouseY - canvasTop - panY) / zoom));
+        script.nodes.add(node);
+        openCommentEditor(node);
+    }
+
+    private void openCommentEditor(ScriptNode node) {
+        Minecraft.getInstance().setScreen(new CommentEditScreen(this, node));
     }
 
     private boolean visible(View view) {
@@ -896,9 +1079,15 @@ public final class FareScriptScreen extends Screen {
         final int x = view.left;
         final int top = view.top;
         final int w = view.width;
-        drawBlockShape(guiGraphics, x, top, w, view.height, colorFor(node.type), selected, hovered,
+        drawBlockShape(guiGraphics, x, top, w, view.height,
+                node.disabled ? 0xFF777777 : colorFor(node.type), selected, hovered,
                 attachedAbove(view), attachedBelow(view), drawBottomGroove(view));
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
+        if (node.disabled) {
+            final String disabled = Component.translatable("gui.trdm.script.disabled_tag").getString();
+            drawString(guiGraphics, disabled, x + Math.max(10, w - font.width(disabled) - 8),
+                    top + 8, 0xFFE0E0E0);
+        }
         if ("use_rule".equals(node.type)) {
             drawRuleField(guiGraphics, view);
             return;
@@ -1644,6 +1833,9 @@ public final class FareScriptScreen extends Screen {
         if (dragStatementType != null) {
             label = blockLabel(dragStatementType);
             color = colorFor(dragStatementType);
+        } else if (dragCommentType != null) {
+            label = Component.translatable("gui.trdm.script.block.comment").getString();
+            color = colorFor("comment");
         } else if (dragValueType != null) {
             label = blockLabel(dragValueType);
             color = colorFor(dragValueType);
@@ -1707,8 +1899,19 @@ public final class FareScriptScreen extends Screen {
             return true;
         }
         final PaletteEntry paletteEntry = paletteEntryAt(mouseX, mouseY);
+        if (paletteEntry != null && paletteEntry.header()) {
+            if (!collapsedCategories.remove(paletteEntry.labelKey())) {
+                collapsedCategories.add(paletteEntry.labelKey());
+            }
+            paletteScroll = Math.max(0, Math.min(paletteMaxScroll(), paletteScroll));
+            rebuild();
+            return true;
+        }
         if (paletteEntry != null && !paletteEntry.header()) {
-            if (paletteEntry.statement()) {
+            if ("comment".equals(paletteEntry.type())) {
+                dragCommentType = "comment";
+                popupVisible = false;
+            } else if (paletteEntry.statement()) {
                 dragStatementType = paletteEntry.type();
                 popupVisible = false;
             } else {
@@ -1718,6 +1921,27 @@ public final class FareScriptScreen extends Screen {
             dragX = mouseX;
             dragY = mouseY;
             rebuild();
+            return true;
+        }
+        final ScriptNode comment = commentAt(mouseX, mouseY);
+        if (comment != null) {
+            final long now = System.currentTimeMillis();
+            final boolean doubleClick = comment.id.equals(lastCommentClickId)
+                    && now - lastCommentClickAt <= 350L;
+            lastCommentClickId = comment.id;
+            lastCommentClickAt = now;
+            if (doubleClick) {
+                pushUndo();
+                openCommentEditor(comment);
+                dragCommentId = null;
+                return true;
+            }
+            dragCommentId = comment.id;
+            dragMoved = false;
+            commentUndoPushed = false;
+            commentDragOffsetX = mouseX - commentScreenX(comment);
+            commentDragOffsetY = mouseY - commentScreenY(comment);
+            popupVisible = false;
             return true;
         }
         final View view = viewAt(mouseX, mouseY);
@@ -1768,6 +1992,29 @@ public final class FareScriptScreen extends Screen {
         }
         if (button != 0) {
             return super.mouseReleased(mouseX, mouseY, button);
+        }
+        if (dragCommentType != null) {
+            if (inCanvas(mouseX, mouseY)) {
+                createComment(mouseX, mouseY);
+            }
+            clearDrag();
+            rebuild();
+            return true;
+        }
+        if (dragCommentId != null) {
+            final String id = dragCommentId;
+            if (dragMoved && !dropOnSelf && overTrash) {
+                final ScriptNode node = script.node(id);
+                if (node != null) {
+                    if (!commentUndoPushed) {
+                        pushUndo();
+                    }
+                    script.nodes.remove(node);
+                }
+            }
+            clearDrag();
+            rebuild();
+            return true;
         }
         if (dragStatementType != null) {
             final DropTarget target = computeStatementDrop(mouseX, mouseY, null);
@@ -1844,6 +2091,9 @@ public final class FareScriptScreen extends Screen {
         dragValueType = null;
         dragStatementId = null;
         dragValueId = null;
+        dragCommentType = null;
+        dragCommentId = null;
+        commentUndoPushed = false;
         dragMoved = false;
         statementDrop = null;
         dropOnSelf = false;
@@ -1858,6 +2108,23 @@ public final class FareScriptScreen extends Screen {
             panLastX = mouseX;
             panLastY = mouseY;
             layout();
+            return true;
+        }
+        if (dragCommentId != null) {
+            if (!commentUndoPushed) {
+                pushUndo();
+                commentUndoPushed = true;
+            }
+            dragMoved = true;
+            final ScriptNode node = script.node(dragCommentId);
+            if (node != null) {
+                node.x = Math.round((float) ((mouseX - canvasLeft - panX - commentDragOffsetX) / zoom));
+                node.y = Math.round((float) ((mouseY - canvasTop - panY - commentDragOffsetY) / zoom));
+            }
+            overTrash = mouseX >= trashX() && mouseX < trashX() + 88
+                    && mouseY >= trashY() && mouseY < trashY() + 32;
+            this.dragX = mouseX;
+            this.dragY = mouseY;
             return true;
         }
         if (dragStatementId != null) {
@@ -1988,6 +2255,7 @@ public final class FareScriptScreen extends Screen {
             final ScriptNode number = newNumberValue("number");
             switch (nodeType) {
                 case "discount_fare" -> number.fields.put("value", "10");
+                case "surcharge" -> number.fields.put("value", "1");
                 case "pass_price" -> number.fields.put("value", "10");
                 case "pass_days" -> number.fields.put("value", "1");
                 case "pass_discount" -> number.fields.put("value", "100");
@@ -2752,8 +3020,24 @@ public final class FareScriptScreen extends Screen {
 
     // ===== 复制 / 粘贴 =====
 
-    private void copySelection() {
-        final String root = selectedValue != null ? selectedValue : selectedStatement;
+    private void toggleDisabled() {
+        final ScriptNode node = script.node(selectedStatement);
+        if (node == null || "on_fare".equals(node.type)) {
+            return;
+        }
+        pushUndo();
+        node.disabled = !node.disabled;
+        rebuild();
+    }
+
+    private void openTrial() {
+        if (rule == null) {
+            return;
+        }
+        Minecraft.getInstance().setScreen(new FareTrialScreen(this, this, script.copy(), rule));
+    }
+
+    private void copySelection() {        final String root = selectedValue != null ? selectedValue : selectedStatement;
         if (root == null) {
             return;
         }
@@ -2995,6 +3279,7 @@ public final class FareScriptScreen extends Screen {
     private static boolean valueStatement(String type) {
         return "set_fare".equals(type) || "add_fare".equals(type) || "multiply_fare".equals(type)
                 || "discount_fare".equals(type) || "cap_fare".equals(type) || "floor_fare".equals(type)
+                || "surcharge".equals(type)
                 || "pass_price".equals(type) || "pass_days".equals(type)
                 || "pass_discount".equals(type) || "pass_daily_limit".equals(type);
     }
@@ -3040,7 +3325,7 @@ public final class FareScriptScreen extends Screen {
             case "if", "if_else" -> 0xFFB06A1F;
             case "compare", "and", "or", "not", "line_is" -> 0xFF3E8E5A;
             case "set_fare", "add_fare", "multiply_fare", "discount_fare",
-                 "cap_fare", "floor_fare" -> 0xFF2F7D4F;
+                 "cap_fare", "floor_fare", "free_ride", "surcharge" -> 0xFF2F7D4F;
             case "pass_price", "pass_days", "pass_discount", "pass_daily_limit" -> 0xFF2F7D4F;
             case "use_rule" -> 0xFF2F6E7D;
             case "round_fare" -> 0xFF2D6E82;
@@ -3049,6 +3334,7 @@ public final class FareScriptScreen extends Screen {
                  "card_rule_distance", "add", "subtract", "multiply", "divide", "min", "max" ->
                     0xFF8A5A2B;
             case "table_intervals", "table_meters" -> 0xFF6B4A8A;
+            case "comment" -> 0xFFB38B2E;
             default -> 0xFF555555;
         };
     }

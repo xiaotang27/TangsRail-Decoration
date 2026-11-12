@@ -351,7 +351,8 @@ public final class ScriptTree {
             reachable.add(hat.id);
             collectReachable(script, hat.next, reachable);
         }
-        script.nodes.removeIf(node -> !reachable.contains(node.id));
+        script.nodes.removeIf(node -> !reachable.contains(node.id)
+                && !"comment".equals(node.type));
     }
 
     private static void collectReachable(FareScript script, String firstId, Set<String> reachable) {

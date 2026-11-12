@@ -30,6 +30,8 @@ public final class ScriptNode {
     public String after;
     public int x;
     public int y;
+    /** 被禁用的块保留在画布上，但编译/执行时跳过。 */
+    public boolean disabled;
     /** 槽位名 → 值块节点 ID。 */
     public final Map<String, String> inputs = new LinkedHashMap<>();
     /** 标量参数（数字/文本/枚举），由各块自己解释。 */
@@ -52,6 +54,7 @@ public final class ScriptNode {
         copy.after = after;
         copy.x = x;
         copy.y = y;
+        copy.disabled = disabled;
         copy.inputs.putAll(inputs);
         copy.fields.putAll(fields);
         copy.tiers.addAll(tiers);
