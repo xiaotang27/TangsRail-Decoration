@@ -767,6 +767,7 @@ public final class FareScriptScreen extends Screen {
         drawLineDropdown(guiGraphics, mouseX, mouseY);
         drawPolicyDropdown(guiGraphics, mouseX, mouseY);
         drawOperatorDropdown(guiGraphics, mouseX, mouseY);
+        drawTrialDropdowns(guiGraphics);
         drawTraceWindow(guiGraphics);
         drawNotice(guiGraphics);
         if (confirmCloseOpen) {
@@ -910,11 +911,20 @@ public final class FareScriptScreen extends Screen {
         if (!trialError.isEmpty()) {
             drawString(guiGraphics, fit(trialError, w - 16), x + 8, y + h - 12, 0xFFFF9090);
         }
-        drawTrialDropdown(guiGraphics, trialLineDropOpen, lineY + 19, controlW,
+    }
+
+    private void drawTrialDropdowns(GuiGraphics guiGraphics) {
+        if (!trialPanelOpen || trialCollapsed || rule == null) {
+            return;
+        }
+        final int x = trialPanelX();
+        final int y = trialPanelY();
+        final int w = trialPanelWidth();
+        drawTrialDropdown(guiGraphics, trialLineDropOpen, y + 49, w - 16,
                 trialLineNames(), trialLineIndex, trialLineDropScroll);
-        drawTrialDropdown(guiGraphics, trialStartDropOpen, startY + 19, controlW,
+        drawTrialDropdown(guiGraphics, trialStartDropOpen, y + 73, w - 16,
                 trialStationNames(), trialStartIndex, trialStartDropScroll);
-        drawTrialDropdown(guiGraphics, trialPolicyDropOpen, policyY + 19, controlW,
+        drawTrialDropdown(guiGraphics, trialPolicyDropOpen, y + 97, w - 16,
                 trialPolicyNames(), trialPolicyIndex, trialPolicyDropScroll);
     }
 

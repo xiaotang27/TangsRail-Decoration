@@ -256,7 +256,7 @@
   "gui.trdm.policies.delete": "删除",
   "gui.trdm.policies.add": "＋添加政策",
   "gui.trdm.policies.new": "新政策",
-  "gui.trdm.policies.limit": "最多 10 条优惠政策",
+  "gui.trdm.policies.limit": "最多 9 条优惠政策",
   "gui.trdm.policies.id_required": "政策 ID 不能为空",
   "gui.trdm.policies.name_required": "政策名称不能为空",
   "gui.trdm.policies.duplicate": "政策 ID 重复",

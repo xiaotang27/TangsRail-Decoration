@@ -290,7 +290,7 @@
   "gui.trdm.policies.delete": "Delete",
   "gui.trdm.policies.add": "+ Add policy",
   "gui.trdm.policies.new": "New policy",
-  "gui.trdm.policies.limit": "At most 10 policies",
+  "gui.trdm.policies.limit": "At most 9 policies",
   "gui.trdm.policies.id_required": "Policy ID cannot be empty",
   "gui.trdm.policies.name_required": "Policy name cannot be empty",
   "gui.trdm.policies.duplicate": "Duplicate policy ID",
