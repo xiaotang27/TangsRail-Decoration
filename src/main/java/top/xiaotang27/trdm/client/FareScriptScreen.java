@@ -286,6 +286,7 @@ public final class FareScriptScreen extends Screen {
         private int height;
         private boolean isIf;
         private boolean hasElse;
+        private boolean disabled;
         private boolean firstInChain;
         private int headerH;
         private int thenTop;
@@ -358,6 +359,11 @@ public final class FareScriptScreen extends Screen {
     private int ruleDropScroll;
     private boolean lineDropOpen;
     private boolean policyDropOpen;
+    private final Set<String> multiSelected = new HashSet<>();
+    private boolean dragGroup;
+    private boolean contextMenuOpen;
+    private float contextMenuX;
+    private float contextMenuY;
     private float policyDropScroll;
     private int policyFieldX;
     private int policyFieldY;
@@ -506,22 +512,7 @@ public final class FareScriptScreen extends Screen {
                 Component.translatable("gui.trdm.script.undo"), button -> undo()));
         addRenderableWidget(new TrdmEditorButton(this.width - 96, 6, 64, 20,
                 Component.translatable("gui.trdm.script.redo"), button -> redo()));
-        final TrdmEditorButton copy = new TrdmEditorButton(78, 6, 48, 20,
-                Component.translatable("gui.trdm.script.copy"), button -> copySelection());
-        copy.active = selectedStatement != null || selectedValue != null;
-        addRenderableWidget(copy);
-        final TrdmEditorButton paste = new TrdmEditorButton(130, 6, 48, 20,
-                Component.translatable("gui.trdm.script.paste"), button -> pasteClipboard());
-        paste.active = !clipboard.isEmpty();
-        addRenderableWidget(paste);
-        final TrdmEditorButton disable = new TrdmEditorButton(182, 6, 56, 20,
-                Component.translatable(selectedStatement != null && script.node(selectedStatement) != null
-                        && script.node(selectedStatement).disabled
-                        ? "gui.trdm.script.enable" : "gui.trdm.script.disable"),
-                button -> toggleDisabled());
-        disable.active = selectedStatement != null && script.node(selectedStatement) != null;
-        addRenderableWidget(disable);
-        final TrdmEditorButton trial = new TrdmEditorButton(242, 6, 56, 20,
+        final TrdmEditorButton trial = new TrdmEditorButton(78, 6, 60, 20,
                 Component.translatable("gui.trdm.script.trial.button"), button -> openTrial());
         trial.active = rule != null;
         addRenderableWidget(trial);
@@ -580,6 +571,9 @@ public final class FareScriptScreen extends Screen {
             view.width = Math.max(120, blockW - depth * indentScreen);
             view.isIf = "if".equals(node.type);
             view.nextSiblingId = view.isIf ? node.after : node.next;
+            final View ownerView = branch.ownerId() == null || branch.ownerId().isBlank()
+                    ? null : viewById.get(branch.ownerId());
+            view.disabled = node.disabled || (ownerView != null && ownerView.disabled);
 
             // 先加入列表：父块在子块之前，反向命中的是子块。
             views.add(view);
@@ -759,7 +753,7 @@ public final class FareScriptScreen extends Screen {
             drawTierScrollbar(guiGraphics);
         }
         if (dragStatementType != null || dragValueType != null || dragStatementId != null
-                || dragValueId != null || dragCommentType != null) {
+                || dragValueId != null || dragCommentType != null || dragGroup) {
             drawGhost(guiGraphics);
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -768,6 +762,7 @@ public final class FareScriptScreen extends Screen {
         drawPolicyDropdown(guiGraphics, mouseX, mouseY);
         drawOperatorDropdown(guiGraphics, mouseX, mouseY);
         drawTrialDropdowns(guiGraphics);
+        drawContextMenu(guiGraphics, mouseX, mouseY);
         drawTraceWindow(guiGraphics);
         drawNotice(guiGraphics);
         if (confirmCloseOpen) {
@@ -1365,6 +1360,74 @@ public final class FareScriptScreen extends Screen {
         return true;
     }
 
+    private int contextWidth() {
+        return 158;
+    }
+
+    private int contextHeight() {
+        return 72;
+    }
+
+    private int contextX() {
+        return Math.round(Math.max(canvasLeft + 4,
+                Math.min(contextMenuX, canvasRight - contextWidth() - 4)));
+    }
+
+    private int contextY() {
+        return Math.round(Math.max(canvasTop + 4,
+                Math.min(contextMenuY, canvasBottom - contextHeight() - 4)));
+    }
+
+    private void drawContextMenu(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!contextMenuOpen) {
+            return;
+        }
+        final int x = contextX();
+        final int y = contextY();
+        fill(guiGraphics, x - 1, y - 1, contextWidth() + 2, contextHeight() + 2, 0xFF9A9A9A);
+        fill(guiGraphics, x, y, contextWidth(), contextHeight(), 0xF0202020);
+        drawContextItem(guiGraphics, x, y, 0, "gui.trdm.script.copy",
+                selectedStatement != null || selectedValue != null, mouseX, mouseY);
+        drawContextItem(guiGraphics, x, y, 1, "gui.trdm.script.paste",
+                !clipboard.isEmpty(), mouseX, mouseY);
+        final boolean canDisable = selectedStatement != null && script.node(selectedStatement) != null
+                && !"on_fare".equals(script.node(selectedStatement).type);
+        final boolean disabled = canDisable && script.node(selectedStatement).disabled;
+        drawContextItem(guiGraphics, x, y, 2, disabled ? "gui.trdm.script.enable" : "gui.trdm.script.disable",
+                canDisable, mouseX, mouseY);
+    }
+
+    private void drawContextItem(GuiGraphics guiGraphics, int x, int y, int index, String key,
+                                 boolean active, int mouseX, int mouseY) {
+        final int top = y + 4 + index * 22;
+        final boolean hovered = active && mouseX >= x && mouseX < x + contextWidth()
+                && mouseY >= top && mouseY < top + 20;
+        if (hovered) {
+            fill(guiGraphics, x + 2, top, contextWidth() - 4, 20, 0xBB0A7A1E);
+        }
+        drawString(guiGraphics, Component.translatable(key).getString(), x + 10, top + 6,
+                active ? 0xFFFFFFFF : 0xFF777777);
+    }
+
+    private boolean handleContextMenuClick(double mx, double my) {
+        final int x = contextX();
+        final int y = contextY();
+        if (mx < x || mx >= x + contextWidth() || my < y || my >= y + contextHeight()) {
+            return false;
+        }
+        final int index = (int) ((my - y - 4) / 22);
+        if (index == 0 && (selectedStatement != null || selectedValue != null)) {
+            copySelection();
+        } else if (index == 1 && !clipboard.isEmpty()) {
+            pasteClipboard();
+        } else if (index == 2 && selectedStatement != null
+                && script.node(selectedStatement) != null) {
+            toggleDisabled();
+        }
+        contextMenuOpen = false;
+        return true;
+    }
+
     private void drawMinimap(GuiGraphics guiGraphics) {
         if (views.isEmpty()) {
             return;
@@ -1395,7 +1458,7 @@ public final class FareScriptScreen extends Screen {
             final int w = Math.max(2, Math.round(view.width * scale));
             final int h = Math.max(2, Math.round(view.height * scale));
             fill(guiGraphics, x, y, w, h,
-                    view.node.disabled ? 0xFF999999 : colorFor(view.node.type));
+                    view.disabled ? 0xFF999999 : colorFor(view.node.type));
         }
         guiGraphics.disableScissor();
     }
@@ -1490,7 +1553,8 @@ public final class FareScriptScreen extends Screen {
             if (view.isIf && visible(view)) {
                 final boolean hovered = mouseX >= view.left && mouseX <= view.left + view.width
                         && mouseY >= view.top && mouseY <= view.top + view.height;
-                drawIfBackground(guiGraphics, view, view.node.id.equals(selectedStatement), hovered);
+                drawIfBackground(guiGraphics, view,
+                        view.node.id.equals(selectedStatement) || multiSelected.contains(view.node.id), hovered);
             }
         }
         for (final View view : views) {
@@ -1502,7 +1566,8 @@ public final class FareScriptScreen extends Screen {
             if (view.isIf) {
                 drawIfDetails(guiGraphics, view, valueTarget);
             } else {
-                drawStatement(guiGraphics, view, valueTarget, view.node.id.equals(selectedStatement),
+                drawStatement(guiGraphics, view, valueTarget,
+                        view.node.id.equals(selectedStatement) || multiSelected.contains(view.node.id),
                         hovered);
             }
         }
@@ -1761,7 +1826,8 @@ public final class FareScriptScreen extends Screen {
         final int y = view.top;
         final int w = view.width;
         final int h = view.height;
-        final int color = hovered ? brighten(colorFor("if")) : colorFor("if");
+        final int baseColor = view.disabled ? 0xFF777777 : colorFor("if");
+        final int color = hovered && !view.disabled ? brighten(baseColor) : baseColor;
         final boolean above = attachedAbove(view);
         final boolean below = attachedBelow(view);
         fill(guiGraphics, x + 3, y + 4, w, h, 0x28000000);
@@ -1828,15 +1894,18 @@ public final class FareScriptScreen extends Screen {
         final int h = view.condHeight;
         final boolean target = valueTarget != null && valueTarget.booleanSlot()
                 && view.node.id.equals(valueTarget.ownerId()) && "condition".equals(valueTarget.slot());
-        fill(guiGraphics, x, y, w, h, target ? 0xFFFFD45A : 0xFF202020);
+        fill(guiGraphics, x, y, w, h, target ? 0xFFFFD45A
+                : (view.disabled ? 0xFF555555 : 0xFF202020));
         if (condition != null) {
-            fill(guiGraphics, x + 2, y + 1, 3, h - 2, colorFor(condition.type));
+            fill(guiGraphics, x + 2, y + 1, 3, h - 2,
+                    view.disabled ? 0xFF999999 : colorFor(condition.type));
             final String label = fit(conditionSummary(condition.id), w - 10);
             drawString(guiGraphics, label, x + 8, y + Math.max(2, (h - 8) / 2),
-                    target ? 0xFF202020 : 0xE8E8E8);
+                    target ? 0xFF202020 : (view.disabled ? 0xFFD0D0D0 : 0xE8E8E8));
         } else {
             drawString(guiGraphics, Component.translatable("gui.trdm.script.condition_none").getString(),
-                    x + 8, y + Math.max(2, (h - 8) / 2), target ? 0xFF202020 : 0xFFB0B0B0);
+                    x + 8, y + Math.max(2, (h - 8) / 2),
+                    target ? 0xFF202020 : 0xFFB0B0B0);
         }
         if (view.width >= 200) {
             final String then = Component.translatable("gui.trdm.script.then").getString();
@@ -1852,10 +1921,10 @@ public final class FareScriptScreen extends Screen {
         final int top = view.top;
         final int w = view.width;
         drawBlockShape(guiGraphics, x, top, w, view.height,
-                node.disabled ? 0xFF777777 : colorFor(node.type), selected, hovered,
+                view.disabled ? 0xFF777777 : colorFor(node.type), selected, hovered,
                 attachedAbove(view), attachedBelow(view), drawBottomGroove(view));
         drawString(guiGraphics, blockLabel(node.type), x + 10, top + 8, 0xFFFFFF);
-        if (node.disabled) {
+        if (view.disabled) {
             final String disabled = Component.translatable("gui.trdm.script.disabled_tag").getString();
             drawString(guiGraphics, disabled, x + Math.max(10, w - font.width(disabled) - 8),
                     top + 8, 0xFFE0E0E0);
@@ -1894,11 +1963,13 @@ public final class FareScriptScreen extends Screen {
         final int chipH = Math.max(12, Math.round(20 * zoom));
         final boolean target = valueTarget != null && !valueTarget.booleanSlot()
                 && node.id.equals(valueTarget.ownerId()) && "value".equals(valueTarget.slot());
-        fill(guiGraphics, x + 10, chipTop, w - 20, chipH, target ? 0xFFFFD45A : 0xFF202020);
+        fill(guiGraphics, x + 10, chipTop, w - 20, chipH,
+                target ? 0xFFFFD45A : (view.disabled ? 0xFF4A4A4A : 0xFF202020));
         fill(guiGraphics, x + 12, chipTop + 1, Math.max(3, Math.round(4 * zoom)), chipH - 2,
-                value == null ? 0xFF555555 : colorFor(value.type));
+                view.disabled ? 0xFF8A8A8A : (value == null ? 0xFF555555 : colorFor(value.type)));
         drawString(guiGraphics, fit(chip, w - 34), x + 20,
-                chipTop + Math.max(2, Math.round(4 * zoom)), target ? 0xFF202020 : 0xE8E8E8);
+                chipTop + Math.max(2, Math.round(4 * zoom)),
+                target ? 0xFF202020 : (view.disabled ? 0xFFB8B8B8 : 0xE8E8E8));
     }
 
     private int[] ruleFieldRect(View view) {
@@ -2138,8 +2209,9 @@ public final class FareScriptScreen extends Screen {
         final int y = rect[1];
         final int w = rect[2];
         final int h = rect[3];
-        fill(guiGraphics, x, y, w, h, 0xFF202020);
-        fill(guiGraphics, x + 2, y + 1, 3, h - 2, colorFor("use_rule"));
+        fill(guiGraphics, x, y, w, h, view.disabled ? 0xFF4A4A4A : 0xFF202020);
+        fill(guiGraphics, x + 2, y + 1, 3, h - 2,
+                view.disabled ? 0xFF8A8A8A : colorFor("use_rule"));
         final ScriptNode node = view.node;
         final FareRule selected = selectedRule(node);
         final String text;
@@ -2156,7 +2228,8 @@ public final class FareScriptScreen extends Screen {
             text = Component.translatable("gui.trdm.script.choose_rule").getString();
             color = 0xFFB0B0B0;
         }
-        drawString(guiGraphics, fit(text, w - 24), x + 9, y + Math.max(2, (h - 8) / 2), color);
+        drawString(guiGraphics, fit(text, w - 24), x + 9, y + Math.max(2, (h - 8) / 2),
+                view.disabled ? 0xFFB8B8B8 : color);
         final int tx = x + w - 13;
         final int ty = y + h / 2 - 2;
         for (int row = 0; row < 4; row++) {
@@ -2700,6 +2773,10 @@ public final class FareScriptScreen extends Screen {
         } else if (dragValueType != null) {
             label = blockLabel(dragValueType);
             color = colorFor(dragValueType);
+        } else if (dragGroup) {
+            final int count = Math.max(2, selectedRootsInOrder().size());
+            label = count + " 个积木";
+            color = 0xFF3E8E5A;
         } else if (dragStatementId != null) {
             final ScriptNode node = script.node(dragStatementId);
             label = node == null ? "?" : blockLabel(node.type);
@@ -2756,7 +2833,26 @@ public final class FareScriptScreen extends Screen {
         if (handleTrialClick(mouseX, mouseY)) {
             return true;
         }
-        if ((button == 1 || button == 2) && inCanvas(mouseX, mouseY)) {
+        if (contextMenuOpen) {
+            if (handleContextMenuClick(mouseX, mouseY)) {
+                return true;
+            }
+            contextMenuOpen = false;
+        }
+        if (button == 1 && inCanvas(mouseX, mouseY)) {
+            final View hit = viewAt(mouseX, mouseY);
+            if (hit != null) {
+                selectedStatement = hit.node.id;
+                selectedValue = null;
+                popupVisible = false;
+            }
+            contextMenuOpen = true;
+            contextMenuX = (float) mouseX;
+            contextMenuY = (float) mouseY;
+            rebuild();
+            return true;
+        }
+        if (button == 2 && inCanvas(mouseX, mouseY)) {
             panning = true;
             panLastX = mouseX;
             panLastY = mouseY;
@@ -2844,9 +2940,28 @@ public final class FareScriptScreen extends Screen {
                 rebuild();
                 return true;
             }
+            if (Screen.hasControlDown()) {
+                if (!multiSelected.remove(view.node.id)) {
+                    multiSelected.add(view.node.id);
+                }
+                selectedStatement = view.node.id;
+                selectedValue = null;
+                dragStatementId = null;
+                dragGroup = false;
+                popupVisible = false;
+                rebuild();
+                return true;
+            }
             selectedStatement = view.node.id;
             selectedValue = null;
-            dragStatementId = view.node.id;
+            if (multiSelected.contains(view.node.id) && multiSelected.size() > 1) {
+                dragGroup = true;
+                dragStatementId = null;
+            } else {
+                multiSelected.clear();
+                dragGroup = false;
+                dragStatementId = view.node.id;
+            }
             dragMoved = false;
             popupVisible = false;
             dragX = mouseX;
@@ -2856,6 +2971,7 @@ public final class FareScriptScreen extends Screen {
         }
         selectedStatement = null;
         selectedValue = null;
+        multiSelected.clear();
         popupVisible = false;
         rebuild();
         return true;
@@ -2909,6 +3025,18 @@ public final class FareScriptScreen extends Screen {
         }
         if (dragValueType != null) {
             dropNewValue(dragValueType, mouseX, mouseY);
+            clearDrag();
+            popupVisible = selectedStatement != null;
+            rebuild();
+            return true;
+        }
+        if (dragGroup) {
+            final DropTarget target = dragMoved ? computeStatementDrop(mouseX, mouseY, null) : null;
+            if (dragMoved && !dropOnSelf && overTrash) {
+                deleteMultiSelected();
+            } else if (dragMoved && !dropOnSelf && target != null) {
+                moveMultiSelected(target);
+            }
             clearDrag();
             popupVisible = selectedStatement != null;
             rebuild();
@@ -2972,6 +3100,7 @@ public final class FareScriptScreen extends Screen {
         dragCommentId = null;
         commentUndoPushed = false;
         dragMoved = false;
+        dragGroup = false;
         statementDrop = null;
         dropOnSelf = false;
         overTrash = false;
@@ -3007,6 +3136,15 @@ public final class FareScriptScreen extends Screen {
         if (dragStatementId != null) {
             dragMoved = true;
             statementDrop = computeStatementDrop(mouseX, mouseY, dragStatementId);
+            this.dragX = mouseX;
+            this.dragY = mouseY;
+            return true;
+        }
+        if (dragGroup) {
+            dragMoved = true;
+            statementDrop = computeStatementDrop(mouseX, mouseY, null);
+            overTrash = mouseX >= trashX() && mouseX < trashX() + 88
+                    && mouseY >= trashY() && mouseY < trashY() + 32;
             this.dragX = mouseX;
             this.dragY = mouseY;
             return true;
@@ -3201,6 +3339,108 @@ public final class FareScriptScreen extends Screen {
         selectedValue = null;
         popupVisible = true;
         error = "";
+    }
+
+    private List<String> selectedRootsInOrder() {
+        final List<String> roots = new ArrayList<>();
+        for (final View view : views) {
+            final String id = view.node.id;
+            if (!multiSelected.contains(id)) {
+                continue;
+            }
+            boolean covered = false;
+            for (final String root : roots) {
+                if (isDescendant(id, root)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                roots.add(id);
+            }
+        }
+        return roots;
+    }
+
+    private void moveMultiSelected(DropTarget target) {
+        if (target == null || target.branch() == null) {
+            return;
+        }
+        final List<String> roots = selectedRootsInOrder();
+        if (roots.isEmpty()) {
+            return;
+        }
+        for (final String root : roots) {
+            if (target.nodeId() != null
+                    && (target.nodeId().equals(root) || isDescendant(target.nodeId(), root))) {
+                error = Component.translatable("gui.trdm.script.paste_no_target").getString();
+                return;
+            }
+            final String owner = target.branch().ownerId();
+            if (owner != null && !owner.isBlank()
+                    && (owner.equals(root) || isDescendant(owner, root))) {
+                error = Component.translatable("gui.trdm.script.paste_no_target").getString();
+                return;
+            }
+        }
+        if (target.kind() == DropKind.BRANCH_APPEND
+                && branchDepth(target.branch()) >= MAX_BRANCH_DEPTH) {
+            error = Component.translatable("gui.trdm.script.limit_depth").getString();
+            return;
+        }
+        pushUndo();
+        final List<String> copies = new ArrayList<>();
+        for (final String root : roots) {
+            final List<ScriptNode> nodes = ScriptTree.copyNodes(script, root, true);
+            final String copy = ScriptTree.duplicate(script, nodes, root);
+            if (copy != null) {
+                copies.add(copy);
+            }
+        }
+        if (copies.isEmpty()) {
+            error = Component.translatable("gui.trdm.script.paste_failed").getString();
+            return;
+        }
+        for (int index = copies.size() - 1; index >= 0; index--) {
+            final String copy = copies.get(index);
+            switch (target.kind()) {
+                case PORT_BEFORE -> insertIntoBranch(target.branch(), copy, target.nodeId());
+                case PORT_AFTER -> insertAfter(target.nodeId(), copy);
+                case BRANCH_APPEND -> appendToBranch(target.branch(), copy);
+            }
+        }
+        for (final String root : roots) {
+            final Set<String> removed = new HashSet<>();
+            ScriptTree.collectSubtree(script, root, removed);
+            detach(root);
+            script.nodes.removeIf(node -> removed.contains(node.id));
+        }
+        multiSelected.clear();
+        multiSelected.addAll(copies);
+        selectedStatement = copies.get(0);
+        selectedValue = null;
+        popupVisible = true;
+        error = "";
+        pruneUnreachable();
+    }
+
+    private void deleteMultiSelected() {
+        final List<String> roots = selectedRootsInOrder();
+        if (roots.isEmpty()) {
+            return;
+        }
+        pushUndo();
+        for (final String root : roots) {
+            final Set<String> removed = new HashSet<>();
+            ScriptTree.collectSubtree(script, root, removed);
+            detach(root);
+            script.nodes.removeIf(node -> removed.contains(node.id));
+        }
+        multiSelected.clear();
+        selectedStatement = null;
+        selectedValue = null;
+        popupVisible = false;
+        pruneUnreachable();
     }
 
     /** 把嵌套语句拖到 C 形块外，追加到顶层末尾。 */
@@ -4524,6 +4764,10 @@ public final class FareScriptScreen extends Screen {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (editingComment != null) {
             handleCommentKey(keyCode, modifiers);
+            return true;
+        }
+        if (contextMenuOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            contextMenuOpen = false;
             return true;
         }
         if (traceOpen && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
