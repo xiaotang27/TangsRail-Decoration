@@ -328,6 +328,10 @@ public final class FareScriptScreen extends Screen {
     private float panX;
     private float panY;
     private boolean panning;
+    private boolean canvasPanPending;
+    private long canvasPanPressAt;
+    private double canvasPanPressX;
+    private double canvasPanPressY;
     private double panLastX;
     private double panLastY;
 
@@ -2969,6 +2973,15 @@ public final class FareScriptScreen extends Screen {
             rebuild();
             return true;
         }
+        if (inCanvas(mouseX, mouseY) && !inTrash(mouseX, mouseY)) {
+            canvasPanPending = true;
+            canvasPanPressAt = System.currentTimeMillis();
+            canvasPanPressX = mouseX;
+            canvasPanPressY = mouseY;
+            dragStatementId = null;
+            dragGroup = false;
+            return true;
+        }
         selectedStatement = null;
         selectedValue = null;
         multiSelected.clear();
@@ -2979,6 +2992,15 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (canvasPanPending) {
+            canvasPanPending = false;
+            selectedStatement = null;
+            selectedValue = null;
+            multiSelected.clear();
+            popupVisible = false;
+            rebuild();
+            return true;
+        }
         if (panning) {
             panning = false;
             return true;
@@ -3101,6 +3123,7 @@ public final class FareScriptScreen extends Screen {
         commentUndoPushed = false;
         dragMoved = false;
         dragGroup = false;
+        canvasPanPending = false;
         statementDrop = null;
         dropOnSelf = false;
         overTrash = false;
@@ -3108,6 +3131,17 @@ public final class FareScriptScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (canvasPanPending) {
+            final double distance = Math.hypot(mouseX - canvasPanPressX, mouseY - canvasPanPressY);
+            if (System.currentTimeMillis() - canvasPanPressAt >= 260L && distance >= 4.0) {
+                canvasPanPending = false;
+                panning = true;
+                panLastX = mouseX;
+                panLastY = mouseY;
+                popupVisible = false;
+            }
+            return true;
+        }
         if (panning) {
             panX += (float) (mouseX - panLastX);
             panY += (float) (mouseY - panLastY);
