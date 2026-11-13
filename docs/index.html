@@ -26,6 +26,10 @@
       // Sidebar Configuration
       auto2top: true,
       loadSidebar: true,
+      // 文档按目录分节，子目录里没有 _sidebar.md 时统一回退到根目录这份
+      alias: {
+        '/.*/_sidebar.md': '/_sidebar.md',
+      },
       maxLevel: 0,
       subMaxLevel: 3,
 

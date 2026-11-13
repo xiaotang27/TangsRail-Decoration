@@ -1,10 +1,10 @@
 package top.xiaotang27.trdm.client;
 
-import mtr.client.ClientCache;
 import mtr.client.ClientData;
 import mtr.data.Platform;
 import mtr.data.Station;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.control.StationScope;
@@ -13,11 +13,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * 站台选择界面：屏蔽门集控装置和站名牌共用，只有底部多一行隔离开关的区别。
+ * 站台选择界面：屏蔽门集控装置、站名牌、PIS 屏幕共用，只有底部多一行隔离开关的区别。
  * <p>
  */
 public class PsdControlScreen extends TrdmScreenBase {
@@ -48,10 +46,6 @@ public class PsdControlScreen extends TrdmScreenBase {
     private static final float BUTTON_CLOSE_X = CONTENT_RIGHT - BUTTON_W;
 
     private static final int COLOR_TERMINUS = 0xFFA8A8A8;
-    private static final int COLOR_BADGE_TEXT_LIGHT = 0xFFFFFFFF;
-    private static final int COLOR_BADGE_TEXT_DARK = 0xFF101010;
-
-    private static final Pattern DIGITS = Pattern.compile("\\d+");
 
     private static final Object FIELD_SEARCH = "psd:search";
 
@@ -69,13 +63,25 @@ public class PsdControlScreen extends TrdmScreenBase {
     private float scroll;
 
     /**
-     * @param targetPos          打开界面的那个方块（集控装置 / 站名牌）的位置，选完写回它
+     * @param targetPos          打开界面的那个方块（集控装置 / 站名牌 / PIS 屏幕）的位置，选完写回它
      * @param selectedPlatformId 它当前选的站台（0 = 没选，用来高亮）
      */
     public PsdControlScreen(BlockPos targetPos, long selectedPlatformId, boolean isolated,
                             TrdmControlClient.SelectMode mode) {
-        super(null, Component.translatable(mode == TrdmControlClient.SelectMode.STATION_SIGN
-                ? "block.trdm.station_sign" : "block.trdm.psd_control"));
+        this(null, targetPos, selectedPlatformId, isolated, mode);
+    }
+
+    /**
+     * 带返回界面的版本：从 PIS 设置界面点「选择站台」进来时，关掉这一页要回到设置界面，
+     * 而不是直接回游戏。
+     */
+    public PsdControlScreen(Screen parent, BlockPos targetPos, long selectedPlatformId, boolean isolated,
+                            TrdmControlClient.SelectMode mode) {
+        super(parent, Component.translatable(switch (mode) {
+            case STATION_SIGN -> "block.trdm.station_sign";
+            case PIS -> "block.trdm.pis";
+            case CONTROL_DEVICE -> "block.trdm.psd_control";
+        }));
         this.controlPos = targetPos;
         this.selectedPlatformId = selectedPlatformId;
         this.isolated = isolated;
@@ -84,6 +90,10 @@ public class PsdControlScreen extends TrdmScreenBase {
 
     private boolean isControlDevice() {
         return mode == TrdmControlClient.SelectMode.CONTROL_DEVICE;
+    }
+
+    private boolean isPis() {
+        return mode == TrdmControlClient.SelectMode.PIS;
     }
 
     @Override
@@ -98,48 +108,11 @@ public class PsdControlScreen extends TrdmScreenBase {
             if (!StationScope.sameStation(deviceStation, platformStation)) {
                 continue;
             }
-            rows.add(new Row(platform.id, String.valueOf(platform.name), buildRouteLines(platform.id)));
+            rows.add(new Row(platform.id, String.valueOf(platform.name), PlatformSummary.lines(platform.id)));
         }
         scroll = 0F;
         lastQuery = null;
         syncRows(query);
-    }
-
-    /**
-     * 一个站台的线路列表（MTR 的 PlatformRouteDetails：线路色、线路名、站序）。
-     * 终点站取这条线路的末站；本站就是末站时显示「终点站」。
-     */
-    private static List<RouteLine> buildRouteLines(long platformId) {
-        final List<ClientCache.PlatformRouteDetails> details = new ArrayList<>(
-                ClientData.DATA_CACHE.requestPlatformIdToRoutes(platformId));
-        details.sort(Comparator.comparing((ClientCache.PlatformRouteDetails route) -> route.routeName,
-                String.CASE_INSENSITIVE_ORDER));
-
-        final List<RouteLine> lines = new ArrayList<>();
-        for (final ClientCache.PlatformRouteDetails route : details) {
-            final List<ClientCache.PlatformRouteDetails.StationDetails> stations = route.stationDetails;
-            final String terminus;
-            if (stations.isEmpty()) {
-                terminus = "";
-            } else if (route.currentStationIndex >= stations.size() - 1) {
-                terminus = Component.translatable("gui.trdm.psd_control.terminal").getString();
-            } else {
-                terminus = Component.translatable("gui.trdm.psd_control.towards",
-                        stations.get(stations.size() - 1).stationName).getString();
-            }
-            lines.add(new RouteLine(routeNumber(route.routeName), route.routeName, terminus, route.routeColor));
-        }
-        return lines;
-    }
-
-    /** 线路色块里那个数字：线路名里第一段连续数字（「1号线|Line 1」→「1」），没有就取头两个字符。 */
-    private static String routeNumber(String routeName) {
-        final String chinesePart = routeName == null ? "" : routeName.split("\\|")[0].trim();
-        final Matcher matcher = DIGITS.matcher(chinesePart);
-        if (matcher.find()) {
-            return matcher.group();
-        }
-        return chinesePart.isEmpty() ? "#" : chinesePart.substring(0, Math.min(2, chinesePart.length()));
     }
 
     /** 搜索框里的实时文字优先，没在输入就用已提交的关键字。 */
@@ -196,6 +169,10 @@ public class PsdControlScreen extends TrdmScreenBase {
         hint(guiGraphics, deviceStation == null
                 ? Component.translatable("gui.trdm.psd_control.no_station")
                 : Component.translatable("gui.trdm.psd_control.station", deviceStation.name), CONTENT_X, SUB_Y);
+        if (isPis()) {
+            // PIS 的「清除选择」= 回到自动跟随最近站台，和站名牌/集控装置的语义不完全一样，说清楚
+            hint(guiGraphics, "gui.trdm.pis.pick_hint", CONTENT_X, SUB_Y + SUB_LINE);
+        }
 
         buttonText(guiGraphics, BUTTON_CLEAR_X, BUTTON_Y, BUTTON_W, BUTTON_H,
                 Component.translatable("gui.trdm.psd_control.clear"), false,
@@ -256,11 +233,11 @@ public class PsdControlScreen extends TrdmScreenBase {
             hint(guiGraphics, "gui.trdm.psd_control.no_route", CONTENT_X + 9F + BADGE_W + 8F, lineTop + 5F);
             return;
         }
-        for (final RouteLine line : row.routes()) {
+        for (final PlatformSummary.Line line : row.routes()) {
             final float badgeLeft = CONTENT_X + 9F;
             rect(guiGraphics, badgeLeft, lineTop, BADGE_W, BADGE_H, 0xFF000000 | line.color());
             textCentred(guiGraphics, Component.literal(line.badgeText()), badgeLeft, BADGE_W, lineTop + 6F,
-                    FONT_SUB, contrastColor(line.color()));
+                    FONT_SUB, PlatformSummary.textColor(line.color()));
 
             final float textLeft = badgeLeft + BADGE_W + 8F;
             text(guiGraphics, Component.literal(line.routeName()), textLeft, lineTop + 1F, FONT_ROW, COLOR_TEXT);
@@ -270,14 +247,6 @@ public class PsdControlScreen extends TrdmScreenBase {
             }
             lineTop += ROUTE_H;
         }
-    }
-
-    /** 色块上的字：线路色偏亮就用黑字，偏暗就用白字。 */
-    private static int contrastColor(int rgb) {
-        final int red = (rgb >> 16) & 0xFF;
-        final int green = (rgb >> 8) & 0xFF;
-        final int blue = rgb & 0xFF;
-        return 0.299 * red + 0.587 * green + 0.114 * blue > 155 ? COLOR_BADGE_TEXT_DARK : COLOR_BADGE_TEXT_LIGHT;
     }
 
     // ===== 点击 =====
@@ -338,13 +307,13 @@ public class PsdControlScreen extends TrdmScreenBase {
     }
 
     /** 列表一行：一个站台 + 它停靠的线路。 */
-    private record Row(long platformId, String platformNumber, List<RouteLine> routes) {
+    private record Row(long platformId, String platformNumber, List<PlatformSummary.Line> routes) {
 
         private boolean matches(String needle) {
             if (platformNumber.toLowerCase(Locale.ROOT).contains(needle)) {
                 return true;
             }
-            for (final RouteLine line : routes) {
+            for (final PlatformSummary.Line line : routes) {
                 if (line.routeName().toLowerCase(Locale.ROOT).contains(needle)
                         || line.terminus().toLowerCase(Locale.ROOT).contains(needle)) {
                     return true;
@@ -352,9 +321,5 @@ public class PsdControlScreen extends TrdmScreenBase {
             }
             return false;
         }
-    }
-
-    /** 一条线路：色块里的线路号、线路全名、终点站那一行、线路色。 */
-    private record RouteLine(String badgeText, String routeName, String terminus, int color) {
     }
 }

@@ -1,12 +1,10 @@
-- [首页](README)
-- 使用
-  - [安装与依赖](install)
-  - [方块与屏蔽门](blocks)
-  - [站名牌](signs)
-  - [PIS 乘客信息屏](pis)
-  - [集控装置与通用设置](control)
-- 资源包
-  - [总览与可覆盖清单](resourcepack)
-  - [PIS 广告资源包](resourcepack-pis-ads)
-  - [标志牌贴图与预设](resourcepack-signs)
-- [开发与构建](dev)
+- [首页](/)
+- 面向玩家
+  - [快速开始](/面向玩家/start)
+  - [方块交互操作](/面向玩家/jiaohu)
+  - [通用设置](/面向玩家/tongyongshezhi)
+- 面向开发者
+  - [PIS 自定义广告播放](/面向开发者/pis_ad)
+  - 自定义票务设置
+    - [自定义规则](/面向开发者/自定义票务设置/zidingyiguize)
+    - [自定义通票](/面向开发者/自定义票务设置/zidingyitongpiao)

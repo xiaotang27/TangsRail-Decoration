@@ -282,6 +282,16 @@ public final class TrdmControlNetwork {
             return;
         }
 
+        if (entity instanceof BlockTrdmPis.TileEntityTrdmPis pis) {
+            // PIS 屏幕：0 = 自动跟随最近的站台，非 0 才需要校验是不是同一个车站的站台
+            if (platformId != 0 && !sameStation(serverLevel, pos, platformId, player)) {
+                return;
+            }
+            pis.setPlatformId(platformId);
+            sendSelectedMessage(player, serverLevel, platformId);
+            return;
+        }
+
         if (entity instanceof BlockTrdmStationSign.TileEntityTrdmStationSign) {
             if (platformId != 0 && !sameStation(serverLevel, pos, platformId, player)) {
                 return;

@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import top.xiaotang27.trdm.block.BlockTrdmPis;
 import top.xiaotang27.trdm.render.TrdmPisAds;
+import top.xiaotang27.trdm.render.TrdmPisData;
 import top.xiaotang27.trdm.render.TrdmPisGlobal;
 
 import java.util.ArrayList;
@@ -17,9 +18,17 @@ import java.util.Map;
 
 /**
  * PIS 屏幕设置界面（刷子右键屏幕打开）。分三段：
- * <ol>
+ * <ul>
+ *     <li><b>站台</b>：右上角「选择站台」进入现有的站台选择界面，副标题行显示当前跟随的站台和它的线路；</li>
+ *     <li><b>屏幕跑马信息显示</b>：本屏 / 全局两段跑马灯文字；</li>
+ *     <li><b>广告显示设置</b>：逐条广告的启用、时长和顺序。</li>
+ * </ul>
  */
 public class PisSettingsScreen extends TrdmScreenBase {
+
+    // ===== 站台摘要（副标题第二行）=====
+    private static final float PLATFORM_Y = SUB_Y + SUB_LINE;
+    private static final float PLATFORM_BADGE = 18F;
 
     // ===== 跑马信息区 =====
     private static final float LABEL_W = 56F;
@@ -53,6 +62,9 @@ public class PisSettingsScreen extends TrdmScreenBase {
     private static final float DONE_X = CONTENT_RIGHT - DONE_W;
     private static final float RESCAN_W = 96F;
     private static final float RESCAN_X = DONE_X - 8F - RESCAN_W;
+    /** 选站台：放在「重新扫描」左边，和另外两个按钮同一行。 */
+    private static final float PICK_W = 104F;
+    private static final float PICK_X = RESCAN_X - 8F - PICK_W;
 
     private static final Object FIELD_LOCAL = "pis:ticker";
     private static final Object FIELD_GLOBAL = "pis:ticker_global";
@@ -64,6 +76,14 @@ public class PisSettingsScreen extends TrdmScreenBase {
     private final List<String> order = new ArrayList<>();
     private final Map<String, Boolean> enabled = new HashMap<>();
     private final Map<String, Integer> times = new HashMap<>();
+
+    /** 方块里存的站台（0 = 自动取最近站台）。 */
+    private long platformId;
+    /** 实际生效的站台（自动时是最近站台；0 = 没有可用站台）。 */
+    private long shownPlatformId;
+    /** 生效站台的显示名；站台已经被删掉就是 null。 */
+    private String platformName;
+    private final List<PlatformSummary.Line> platformLines = new ArrayList<>();
 
     private Station station;
     private float scroll;
@@ -84,16 +104,29 @@ public class PisSettingsScreen extends TrdmScreenBase {
         order.clear();
         enabled.clear();
         times.clear();
+        platformId = 0L;
         if (Minecraft.getInstance().level != null
                 && Minecraft.getInstance().level.getBlockEntity(targetPos)
                 instanceof BlockTrdmPis.TileEntityTrdmPis pis) {
             ticker = pis.getTicker();
             adsEnabled = pis.isAdsEnabled();
+            platformId = pis.getPlatformId();
             order.addAll(pis.getAdOrder());
             enabled.putAll(pis.getAdEnabled());
             times.putAll(pis.getAdTimes());
         }
+        refreshPlatform();
         syncCatalogue();
+    }
+
+    /** 重新算「实际显示哪个站台」：自动时取最近站台，手动选的直接用。 */
+    private void refreshPlatform() {
+        shownPlatformId = TrdmPisData.resolvePlatformId(targetPos, platformId);
+        platformName = shownPlatformId == 0 ? null : PlatformSummary.name(shownPlatformId);
+        platformLines.clear();
+        if (platformName != null) {
+            platformLines.addAll(PlatformSummary.lines(shownPlatformId));
+        }
     }
 
     /** 把 json 里新出现的广告补进列表尾巴，删掉已经不存在的。 */
@@ -128,9 +161,11 @@ public class PisSettingsScreen extends TrdmScreenBase {
         hint(guiGraphics, station == null
                 ? Component.translatable("gui.trdm.psd_control.no_station")
                 : Component.translatable("gui.trdm.pis.station", station.name), CONTENT_X, SUB_Y);
-        hint(guiGraphics, Component.translatable("gui.trdm.pis.pack_count", TrdmPisAds.packCount()),
-                CONTENT_X, SUB_Y + SUB_LINE);
+        renderPlatformSummary(guiGraphics);
 
+        buttonText(guiGraphics, PICK_X, TITLE_Y, PICK_W, BUTTON_H,
+                Component.translatable("gui.trdm.pis.pick_platform"), false,
+                hit(mx, my, PICK_X, TITLE_Y, PICK_W, BUTTON_H), FONT_ROW);
         buttonText(guiGraphics, RESCAN_X, TITLE_Y, RESCAN_W, BUTTON_H,
                 Component.translatable("gui.trdm.pis.rescan"), false,
                 hit(mx, my, RESCAN_X, TITLE_Y, RESCAN_W, BUTTON_H), FONT_ROW);
@@ -151,8 +186,10 @@ public class PisSettingsScreen extends TrdmScreenBase {
                 TrdmPisGlobal.ticker());
         hint(guiGraphics, "gui.trdm.pis.global_ticker_hint", CONTENT_X, HINT_GLOBAL_Y);
 
-        // 广告显示设置
+        // 广告显示设置（资源包数量挪到这一行的右端，不再占副标题）
         section(guiGraphics, "gui.trdm.pis.ads_section", ADS_SECTION_Y);
+        textRight(guiGraphics, Component.translatable("gui.trdm.pis.pack_count", TrdmPisAds.packCount()),
+                CONTENT_RIGHT, ADS_SECTION_Y + 6F, FONT_SUB, COLOR_SUB);
         if (order.isEmpty()) {
             hint(guiGraphics, "gui.trdm.pis.no_ads", CONTENT_X, LIST_TOP + 6F);
         } else {
@@ -164,6 +201,65 @@ public class PisSettingsScreen extends TrdmScreenBase {
             scissorOff(guiGraphics);
             scrollbar(guiGraphics, CONTENT_RIGHT - 4F, LIST_TOP, LIST_BOTTOM - LIST_TOP,
                     order.size() * AD_ROW_H, LIST_BOTTOM - LIST_TOP, scroll);
+        }
+    }
+
+    /**
+     * 副标题第二行：当前跟哪个站台（自动时写出最近站台），后面跟它的线路色块。
+     * 站台在 MTR 里只有编号，光写「站台 1」认不出是哪条线，所以把线路也带出来。
+     */
+    private void renderPlatformSummary(GuiGraphics guiGraphics) {
+        text(guiGraphics, Component.translatable("gui.trdm.pis.platform_label"), CONTENT_X, PLATFORM_Y + 2F,
+                FONT_SUB, COLOR_SUB);
+        float x = CONTENT_X + textWidth(Component.translatable("gui.trdm.pis.platform_label"), FONT_SUB) + 8F;
+
+        final Component value;
+        final int color;
+        if (shownPlatformId == 0) {
+            value = Component.translatable("gui.trdm.pis.platform_none");
+            color = COLOR_WARN;
+        } else if (platformName == null) {
+            value = Component.translatable("gui.trdm.pis.platform_missing");
+            color = COLOR_WARN;
+        } else if (platformId == 0) {
+            value = Component.translatable("gui.trdm.pis.platform_auto",
+                    Component.translatable("gui.trdm.psd_control.platform", platformName));
+            color = COLOR_TEXT;
+        } else {
+            value = Component.translatable("gui.trdm.psd_control.platform", platformName);
+            color = COLOR_TEXT;
+        }
+        text(guiGraphics, value, x, PLATFORM_Y, FONT_ROW, color);
+        x += textWidth(value, FONT_ROW) + 12F;
+        // 线路依次往右排；排不下的就不画，末尾用省略号表示还有（站台线路多的时候不会切半截）
+        int shown = 0;
+        for (final PlatformSummary.Line line : platformLines) {
+            final Component routeName = Component.literal(line.routeName());
+            final Component terminus = Component.literal(line.terminus());
+            float blockWidth = PLATFORM_BADGE + 8F + textWidth(routeName, FONT_ROW);
+            if (!line.terminus().isEmpty()) {
+                blockWidth += 8F + textWidth(terminus, FONT_SUB);
+            }
+            if (x + blockWidth > CONTENT_RIGHT) {
+                break;
+            }
+            rect(guiGraphics, x, PLATFORM_Y - 2F, PLATFORM_BADGE, PLATFORM_BADGE, 0xFF000000 | line.color());
+            textCentred(guiGraphics, Component.literal(line.badgeText()), x, PLATFORM_BADGE, PLATFORM_Y + 2F,
+                    FONT_SUB, PlatformSummary.textColor(line.color()));
+            x += PLATFORM_BADGE + 8F;
+
+            text(guiGraphics, routeName, x, PLATFORM_Y, FONT_ROW, COLOR_TEXT);
+            x += textWidth(routeName, FONT_ROW);
+            if (!line.terminus().isEmpty()) {
+                x += 8F;
+                text(guiGraphics, terminus, x, PLATFORM_Y + 1F, FONT_SUB, COLOR_SUB);
+                x += textWidth(terminus, FONT_SUB);
+            }
+            x += 16F;
+            shown++;
+        }
+        if (shown < platformLines.size() && x + 12F <= CONTENT_RIGHT) {
+            text(guiGraphics, Component.literal("…"), x, PLATFORM_Y, FONT_ROW, COLOR_SUB);
         }
     }
 
@@ -213,6 +309,11 @@ public class PisSettingsScreen extends TrdmScreenBase {
 
     @Override
     protected boolean clickPage(float mx, float my) {
+        if (hit(mx, my, PICK_X, TITLE_Y, PICK_W, BUTTON_H)) {
+            // 进现有那套站台选择界面，选完 / 关掉都会回到这一页，onInit 会把新站台重新读出来
+            TrdmControlClient.openPisPlatformSelect(targetPos, platformId, this);
+            return true;
+        }
         if (hit(mx, my, RESCAN_X, TITLE_Y, RESCAN_W, BUTTON_H)) {
             TrdmPisAds.invalidate();
             syncCatalogue();

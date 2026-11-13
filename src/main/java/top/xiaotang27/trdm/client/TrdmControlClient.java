@@ -4,6 +4,7 @@ import mtr.block.IBlock;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import top.xiaotang27.trdm.block.BlockTrdmBigStationSign;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
+import top.xiaotang27.trdm.block.BlockTrdmPis;
 import top.xiaotang27.trdm.block.SignRuns;
 import top.xiaotang27.trdm.control.PsdStyles;
 import top.xiaotang27.trdm.net.TrdmControlNetwork;
@@ -30,7 +32,9 @@ public final class TrdmControlClient {
         /** 屏蔽门集控装置：有隔离开关。 */
         CONTROL_DEVICE,
         /** 站名牌：只有站台列表。 */
-        STATION_SIGN
+        STATION_SIGN,
+        /** PIS 屏幕：选「这块屏跟随哪个站台」，只有站台列表。 */
+        PIS
     }
 
     private TrdmControlClient() {
@@ -56,6 +60,15 @@ public final class TrdmControlClient {
         Minecraft.getInstance().setScreen(new PsdControlScreen(targetPos, selectedPlatformId, isolated, mode));
     }
 
+    /**
+     * PIS 屏幕：从设置界面点「选择站台」进来。选完 / 关掉这一页都回到设置界面，
+     * 设置界面重新初始化时会把新站台读出来。
+     */
+    public static void openPisPlatformSelect(BlockPos pisPos, long selectedPlatformId, Screen parent) {
+        Minecraft.getInstance().setScreen(
+                new PsdControlScreen(parent, pisPos, selectedPlatformId, false, SelectMode.PIS));
+    }
+
     /** PIS 屏幕：刷子右键打开设置界面。 */
     public static void openPisSettings(BlockPos targetPos) {
         Minecraft.getInstance().setScreen(new PisSettingsScreen(targetPos));
@@ -67,7 +80,7 @@ public final class TrdmControlClient {
                                        java.util.Map<String, Integer> times) {
         if (Minecraft.getInstance().level != null
                 && Minecraft.getInstance().level.getBlockEntity(targetPos)
-                instanceof top.xiaotang27.trdm.block.BlockTrdmPis.TileEntityTrdmPis pis) {
+                instanceof BlockTrdmPis.TileEntityTrdmPis pis) {
             pis.setTicker(ticker);
             pis.setAdsEnabled(adsEnabled);
             pis.setAds(order, enabled, times);
@@ -168,6 +181,11 @@ public final class TrdmControlClient {
     }
 
     public static void sendSelection(BlockPos targetPos, long platformId) {
+        // PIS 屏幕：本地先改，免得从选择界面退回设置界面时还显示旧站台（服务端随后会同步一次同样的值）
+        if (Minecraft.getInstance().level != null
+                && Minecraft.getInstance().level.getBlockEntity(targetPos) instanceof BlockTrdmPis.TileEntityTrdmPis pis) {
+            pis.setPlatformId(platformId);
+        }
         final FriendlyByteBuf buf = PacketByteBufs.create();
         buf.writeBlockPos(targetPos);
         buf.writeLong(platformId);
