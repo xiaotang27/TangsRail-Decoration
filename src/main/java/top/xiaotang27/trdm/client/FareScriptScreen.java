@@ -816,7 +816,8 @@ public final class FareScriptScreen extends Screen {
                             0L, 0L, 0L, 0L, trialPolicyIds()),
                     config.ruleResolver(visiting));
             trace = raw;
-            if (rule.maxFareCents > 0L && raw.finalFare() * 100.0 > rule.maxFareCents) {
+            if (rule.kind != top.xiaotang27.trdm.fare.FareRule.Kind.SCRIPT
+                    && rule.maxFareCents > 0L && raw.finalFare() * 100.0 > rule.maxFareCents) {
                 final java.util.List<top.xiaotang27.trdm.fare.script.TraceStep> steps =
                         new ArrayList<>(raw.steps());
                 steps.add(new top.xiaotang27.trdm.fare.script.TraceStep(steps.size(),
@@ -1112,7 +1113,8 @@ public final class FareScriptScreen extends Screen {
                         TrdmClock.hour(), TrdmClock.minute(), TrdmClock.weekday(),
                         0L, 0L, 0L, 0L, trialPolicyIds()), config.ruleResolver(visiting));
                 long cents = Math.max(0L, Math.round(fare * 100.0));
-                if (rule.maxFareCents > 0L) {
+                if (rule.kind != top.xiaotang27.trdm.fare.FareRule.Kind.SCRIPT
+                        && rule.maxFareCents > 0L) {
                     cents = Math.min(cents, rule.maxFareCents);
                 }
                 trialFares.set(index, cents);

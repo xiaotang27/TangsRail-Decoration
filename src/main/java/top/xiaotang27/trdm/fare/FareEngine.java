@@ -77,7 +77,9 @@ public final class FareEngine {
                     leg.routeId, leg.routeName,
                     stats.getOrDefault(leg.rule.id, CardRuleStats.ZERO), env, resolver);
             boolean capped = false;
-            if (leg.rule.maxFareCents > 0L && fare > leg.rule.maxFareCents) {
+            // 积木规则的封顶由脚本里的“封顶”积木负责；旧版 maxFare 只对旧规则类型生效。
+            if (leg.rule.kind != FareRule.Kind.SCRIPT
+                    && leg.rule.maxFareCents > 0L && fare > leg.rule.maxFareCents) {
                 fare = leg.rule.maxFareCents;
                 capped = true;
             }

@@ -107,6 +107,18 @@ class FareEngineTest {
     }
 
     @Test
+    void scriptRuleIgnoresLegacyMaxFare() {
+        final FareConfig config = new FareConfig();
+        final FareRule rule = new FareRule("script-cap", "积木规则", FareRule.Kind.SCRIPT);
+        rule.maxFareCents = 100L;
+        rule.script = flatScript(5.0);
+        bind(config, 10L, rule);
+
+        final FareQuote quote = FareEngine.quote(config, graph(), 1, 2, DIM);
+        assertEquals(500L, quote.totalCents());
+    }
+
+    @Test
     void cardRuleStatsFeedScript() {
         final FareConfig config = new FareConfig();
         final FareRule rule = new FareRule("loyalty", "常客规则", FareRule.Kind.SCRIPT);

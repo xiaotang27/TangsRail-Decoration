@@ -155,6 +155,7 @@
   "gui.trdm.ticket.rule_fare": "Fare",
   "gui.trdm.ticket.rule_cap": "Maximum fare",
   "gui.trdm.ticket.rule_uncapped": "No cap",
+  "gui.trdm.ticket.rule_cap_script": "Controlled by the Cap block",
   "gui.trdm.ticket.rule_other": "Other",
   "gui.trdm.ticket.rule_vanilla_line": "MTR formula: 2 + |zone difference|",
   "gui.trdm.ticket.kind.flat": "Flat fare",

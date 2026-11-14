@@ -123,6 +123,7 @@
   "gui.trdm.ticket.rule_fare": "票价",
   "gui.trdm.ticket.rule_cap": "最高票价",
   "gui.trdm.ticket.rule_uncapped": "不封顶",
+  "gui.trdm.ticket.rule_cap_script": "由积木内的封顶积木控制",
   "gui.trdm.ticket.rule_other": "其它",
   "gui.trdm.ticket.rule_vanilla_line": "MTR 原版公式：2 + |收费区差|",
   "gui.trdm.ticket.kind.flat": "统一票价",

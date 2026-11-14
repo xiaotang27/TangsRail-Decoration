@@ -716,7 +716,9 @@ final class TicketConfigPage {
             }
         }
         summaryRow(guiGraphics, Component.translatable("gui.trdm.ticket.rule_cap"),
-                rule.maxFareCents > 0L ? FareMoney.yuan(rule.maxFareCents)
+                rule.kind == FareRule.Kind.SCRIPT
+                        ? Component.translatable("gui.trdm.ticket.rule_cap_script").getString()
+                        : rule.maxFareCents > 0L ? FareMoney.yuan(rule.maxFareCents)
                         : Component.translatable("gui.trdm.ticket.rule_uncapped").getString(), y);
     }
 
