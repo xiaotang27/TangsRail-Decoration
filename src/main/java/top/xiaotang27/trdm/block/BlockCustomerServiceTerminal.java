@@ -36,8 +36,8 @@ public class BlockCustomerServiceTerminal extends Block {
 
     private static final VoxelShape SHAPE_ONE = Shapes.box(4.0 / 16, 0, 6.0 / 16,
             12.0 / 16, 9.0 / 16, 10.0 / 16);
-    private static final VoxelShape SHAPE_TWO = Shapes.box(3.0 / 16, 0, 0,
-            13.0 / 16, 15.0 / 16, 1.0);
+    private static final VoxelShape SHAPE_TWO = Shapes.box(4.0 / 16, 0, 1.0 / 16,
+            12.0 / 16, 2.0, 15.0 / 16);
 
     public enum Model implements StringRepresentable {
         ONE,

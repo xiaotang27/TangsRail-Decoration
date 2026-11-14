@@ -155,8 +155,8 @@ public final class CustomerTerminalModelScreen extends Screen {
         final BlockState state = Trdm.CUSTOMER_SERVICE_TERMINAL.defaultBlockState()
                 .setValue(BlockCustomerServiceTerminal.MODEL, model)
                 .setValue(BlockCustomerServiceTerminal.FACING, Direction.NORTH);
-        final float scale = model == Model.ONE ? 190F : 115F;
-        final float height = model == Model.ONE ? 8.8347F / 16F : 15F / 16F;
+        final float scale = model == Model.ONE ? 190F : 78F;
+        final float height = model == Model.ONE ? 8.8347F / 16F : 2F;
         final PoseStack pose = graphics.pose();
         RenderSystem.enableDepthTest();
         pose.pushPose();
