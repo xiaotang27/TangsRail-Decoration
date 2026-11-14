@@ -44,6 +44,9 @@ public final class TicketNetwork {
     /** C2S：BlockPos + 政策 ID 列表，客服终端给主手交通卡设置政策。 */
     public static final ResourceLocation SET_CARD_POLICIES = Trdm.id("ticket_card_policies");
 
+    /** C2S：BlockPos + 客服终端模型序号，刷子选择模型后写回方块。 */
+    public static final ResourceLocation SET_TERMINAL_MODEL = Trdm.id("ticket_terminal_model");
+
     /** S2C：成功标志 + 翻译键 + 数值。 */
     public static final ResourceLocation RESULT = Trdm.id("ticket_result");
 
@@ -114,6 +117,32 @@ public final class TicketNetwork {
             }
             server.execute(() -> send(player,
                     TicketPurchase.setCardPolicies(player, pos, policies)));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(SET_TERMINAL_MODEL,
+                (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final int ordinal = buf.readVarInt();
+            server.execute(() -> {
+                if (!top.xiaotang27.trdm.block.BlockTrdmPSDControl.isHoldingBrush(player)) {
+                    return;
+                }
+                if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64.0) {
+                    return;
+                }
+                final net.minecraft.world.level.block.state.BlockState state =
+                        player.serverLevel().getBlockState(pos);
+                if (!state.is(Trdm.CUSTOMER_SERVICE_TERMINAL)
+                        || !(state.getBlock() instanceof top.xiaotang27.trdm.block.BlockCustomerServiceTerminal)) {
+                    return;
+                }
+                final top.xiaotang27.trdm.block.BlockCustomerServiceTerminal.Model[] models =
+                        top.xiaotang27.trdm.block.BlockCustomerServiceTerminal.Model.values();
+                if (ordinal < 0 || ordinal >= models.length) {
+                    return;
+                }
+                top.xiaotang27.trdm.block.BlockCustomerServiceTerminal.setModel(
+                        player.serverLevel(), pos, models[ordinal]);
+            });
         });
         ServerPlayNetworking.registerGlobalReceiver(CONFIG_UPDATE, (server, player, handler, buf, responseSender) -> {
             final String json = buf.readUtf(1_000_000);

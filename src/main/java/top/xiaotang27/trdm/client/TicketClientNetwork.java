@@ -121,4 +121,12 @@ public final class TicketClientNetwork {
         }
         ClientPlayNetworking.send(TicketNetwork.SET_CARD_POLICIES, buf);
     }
+
+    public static void setTerminalModel(BlockPos pos,
+                                        top.xiaotang27.trdm.block.BlockCustomerServiceTerminal.Model model) {
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        buf.writeVarInt(model.ordinal());
+        ClientPlayNetworking.send(TicketNetwork.SET_TERMINAL_MODEL, buf);
+    }
 }

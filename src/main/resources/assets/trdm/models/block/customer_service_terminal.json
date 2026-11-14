@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "trdm:block/ticket/customer_service_terminal"
-  }
+  "parent": "trdm:block/customer_service_terminal_1"
 }

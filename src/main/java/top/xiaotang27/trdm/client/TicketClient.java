@@ -29,6 +29,11 @@ public final class TicketClient {
         Minecraft.getInstance().setScreen(new CustomerServiceTerminalScreen(station.name, station.id, pos));
     }
 
+    public static void openTerminalModel(BlockPos pos,
+                                         top.xiaotang27.trdm.block.BlockCustomerServiceTerminal.Model model) {
+        Minecraft.getInstance().setScreen(new CustomerTerminalModelScreen(pos, model));
+    }
+
     private static void message(String key) {
         final Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player != null) {

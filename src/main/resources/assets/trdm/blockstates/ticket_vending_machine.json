@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=north": {
       "model": "trdm:block/ticket_vending_machine"
+    },
+    "facing=east": {
+      "model": "trdm:block/ticket_vending_machine",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "trdm:block/ticket_vending_machine",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "trdm:block/ticket_vending_machine",
+      "y": 270
     }
   }
 }

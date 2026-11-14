@@ -1,7 +1,34 @@
 {
   "variants": {
-    "": {
-      "model": "trdm:block/customer_service_terminal"
+    "facing=north,model=one": {
+      "model": "trdm:block/customer_service_terminal_1"
+    },
+    "facing=east,model=one": {
+      "model": "trdm:block/customer_service_terminal_1",
+      "y": 90
+    },
+    "facing=south,model=one": {
+      "model": "trdm:block/customer_service_terminal_1",
+      "y": 180
+    },
+    "facing=west,model=one": {
+      "model": "trdm:block/customer_service_terminal_1",
+      "y": 270
+    },
+    "facing=north,model=two": {
+      "model": "trdm:block/customer_service_terminal_2"
+    },
+    "facing=east,model=two": {
+      "model": "trdm:block/customer_service_terminal_2",
+      "y": 90
+    },
+    "facing=south,model=two": {
+      "model": "trdm:block/customer_service_terminal_2",
+      "y": 180
+    },
+    "facing=west,model=two": {
+      "model": "trdm:block/customer_service_terminal_2",
+      "y": 270
     }
   }
 }

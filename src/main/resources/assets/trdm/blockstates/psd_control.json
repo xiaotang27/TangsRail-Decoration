@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=north": {
       "model": "trdm:block/psd_control"
+    },
+    "facing=east": {
+      "model": "trdm:block/psd_control",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "trdm:block/psd_control",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "trdm:block/psd_control",
+      "y": 270
     }
   }
 }
