@@ -51,8 +51,14 @@ public class BlockTrdmPSDControl extends BaseEntityBlock {
     public static final String KEY_ISOLATED = "isolated";
 
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-    private static final VoxelShape SHAPE = Shapes.box(0, 0, 4.5 / 16,
-            12.0 / 16, 9.0 / 16, 11.5 / 16);
+    private static final VoxelShape SHAPE_NORTH = Shapes.box(2.0 / 16, 0, 9.0 / 16,
+            14.0 / 16, 9.0 / 16, 1.0);
+    private static final VoxelShape SHAPE_SOUTH = Shapes.box(2.0 / 16, 0, 0,
+            14.0 / 16, 9.0 / 16, 7.0 / 16);
+    private static final VoxelShape SHAPE_EAST = Shapes.box(9.0 / 16, 0, 2.0 / 16,
+            1.0, 9.0 / 16, 14.0 / 16);
+    private static final VoxelShape SHAPE_WEST = Shapes.box(0, 0, 2.0 / 16,
+            7.0 / 16, 9.0 / 16, 14.0 / 16);
 
     public BlockTrdmPSDControl() {
         super(Properties.of().strength(2F).noOcclusion());
@@ -81,13 +87,18 @@ public class BlockTrdmPSDControl extends BaseEntityBlock {
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
-        return SHAPE;
+        return switch (state.getValue(FACING)) {
+            case SOUTH -> SHAPE_SOUTH;
+            case EAST -> SHAPE_EAST;
+            case WEST -> SHAPE_WEST;
+            default -> SHAPE_NORTH;
+        };
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter world, BlockPos pos,
                                         CollisionContext context) {
-        return SHAPE;
+        return getShape(state, world, pos, context);
     }
 
     @Override
