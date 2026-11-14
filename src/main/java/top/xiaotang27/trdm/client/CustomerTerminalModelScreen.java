@@ -27,7 +27,7 @@ public final class CustomerTerminalModelScreen extends Screen {
 
     private static final int GREEN = 0xFF0A7A0A;
     private static final int GREY = 0xFF9E9E9E;
-    private static final int INK = 0xFF111111;
+    private static final int INK = 0xFFFFFFFF;
 
     private final BlockPos pos;
     private Model current;
@@ -58,7 +58,7 @@ public final class CustomerTerminalModelScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xFFFFFFFF);
+        graphics.fill(0, 0, this.width, this.height, 0xE62A2A2A);
         previewAngle += 0.7F;
         final int cx = centreX();
         final int cy = centreY();
@@ -95,12 +95,12 @@ public final class CustomerTerminalModelScreen extends Screen {
         final String apply = Component.translatable("gui.trdm.terminal_model.apply").getString();
         graphics.drawString(this.font, apply,
                 Math.round((this.width - this.font.width(apply)) / 2F),
-                Math.round(cy + outer + 40F), 0xFF333333);
+                Math.round(cy + outer + 40F), 0xFFD0D0D0);
 
         final String version = "TangsRail Decoration Version " + FabricLoader.getInstance()
                 .getModContainer("trdm").map(c -> c.getMetadata().getVersion().getFriendlyString())
                 .orElse("?");
-        graphics.drawString(this.font, version, 55, this.height - 28, 0xFF333333);
+        graphics.drawString(this.font, version, 55, this.height - 28, 0xFFB8B8B8);
     }
 
     private Model sideAt(double mouseX, double mouseY, int cx, int cy, int inner, int outer) {
@@ -155,8 +155,8 @@ public final class CustomerTerminalModelScreen extends Screen {
         final BlockState state = Trdm.CUSTOMER_SERVICE_TERMINAL.defaultBlockState()
                 .setValue(BlockCustomerServiceTerminal.MODEL, model)
                 .setValue(BlockCustomerServiceTerminal.FACING, Direction.NORTH);
-        final float scale = model == Model.ONE ? 190F : 78F;
-        final float height = model == Model.ONE ? 8.8347F / 16F : 2F;
+        final float scale = model == Model.ONE ? 190F : 115F;
+        final float height = model == Model.ONE ? 8.8347F / 16F : 15F / 16F;
         final PoseStack pose = graphics.pose();
         RenderSystem.enableDepthTest();
         pose.pushPose();

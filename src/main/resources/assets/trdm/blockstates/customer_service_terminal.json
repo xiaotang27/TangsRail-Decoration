@@ -16,19 +16,20 @@
       "y": 270
     },
     "facing=north,model=two": {
-      "model": "trdm:block/customer_service_terminal_2"
-    },
-    "facing=east,model=two": {
       "model": "trdm:block/customer_service_terminal_2",
       "y": 90
     },
-    "facing=south,model=two": {
+    "facing=east,model=two": {
       "model": "trdm:block/customer_service_terminal_2",
       "y": 180
     },
-    "facing=west,model=two": {
+    "facing=south,model=two": {
       "model": "trdm:block/customer_service_terminal_2",
       "y": 270
+    },
+    "facing=west,model=two": {
+      "model": "trdm:block/customer_service_terminal_2",
+      "y": 0
     }
   }
 }

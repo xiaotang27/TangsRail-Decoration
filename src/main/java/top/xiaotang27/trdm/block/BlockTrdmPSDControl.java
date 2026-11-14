@@ -51,8 +51,8 @@ public class BlockTrdmPSDControl extends BaseEntityBlock {
     public static final String KEY_ISOLATED = "isolated";
 
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-    private static final VoxelShape SHAPE = Shapes.box(2.0 / 16, 0, 4.5 / 16,
-            14.0 / 16, 9.0 / 16, 11.5 / 16);
+    private static final VoxelShape SHAPE = Shapes.box(0, 0, 4.5 / 16,
+            12.0 / 16, 9.0 / 16, 11.5 / 16);
 
     public BlockTrdmPSDControl() {
         super(Properties.of().strength(2F).noOcclusion());
