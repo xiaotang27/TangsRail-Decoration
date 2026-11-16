@@ -1,4 +1,4 @@
-{
+﻿{
   "parent": "block/block",
   "textures": {
     "0": "trdm:block/lighrt_psdtop_1",
@@ -495,10 +495,11 @@
         0
       ],
       "scale": [
-        1.2,
-        1.2,
-        1.2
+        1.0,
+        1.0,
+        1.0
       ]
     }
   }
 }
+
