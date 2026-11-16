@@ -1,7 +1,12 @@
 package top.xiaotang27.trdm.block;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import top.xiaotang27.trdm.Trdm;
 
 /**
  * 门楣 / 延伸板方块实体上的灯光数据。两个方块实体（门楣的 {@code TileEntityTrdmPSDTop}、
@@ -56,5 +61,32 @@ public interface PsdLightHolder {
         if (blockEntity.getLevel() instanceof ServerLevel serverLevel) {
             serverLevel.getChunkSource().blockChanged(blockEntity.getBlockPos());
         }
+    }
+
+    /**
+     * 拆除这一格门楣 / 延伸板上已经装好的灯：能拆的都拆下来，按原物品掉回世界。
+     * 可染色灯拆下来后颜色丢失（物品本身不存颜色），重新装回去时是默认白色。
+     *
+     * @return 是否真的拆了东西（没装灯返回 false，调用方继续走原来的右键逻辑）
+     */
+    static boolean removeLights(Level level, BlockPos pos) {
+        if (level.isClientSide || !(level.getBlockEntity(pos) instanceof PsdLightHolder holder)) {
+            return false;
+        }
+        boolean removed = false;
+        if (holder.hasTubeLight()) {
+            holder.setTubeLight(false);
+            Block.popResource(level, pos, new ItemStack(Trdm.WALL_LIGHT_ITEM));
+            removed = true;
+        }
+        final PsdLightKind top = holder.topLight();
+        if (top != PsdLightKind.NONE) {
+            final int color = holder.topLightColor();
+            holder.setTopLight(PsdLightKind.NONE, color);
+            Block.popResource(level, pos, new ItemStack(
+                    top == PsdLightKind.COLOR ? Trdm.PSD_TOP_LIGHT_COLOR_ITEM : Trdm.PSD_TOP_LIGHT_ITEM));
+            removed = true;
+        }
+        return removed;
     }
 }

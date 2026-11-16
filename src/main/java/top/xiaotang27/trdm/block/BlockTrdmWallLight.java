@@ -40,8 +40,11 @@ public class BlockTrdmWallLight extends Block implements EntityBlockMapper {
     /** 灯管的水平走向（只对吊顶 / 地面有意义；贴墙时由 MOUNT 决定）。 */
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 
-    /** 选中框厚度：灯管本体只有 1 像素上下，选中框按一整条薄片给，方便瞄准。 */
-    private static final double THIN = 1.0D / 16.0D;
+    /** 灯管本体只有约 0.8 像素粗；选中框 / 碰撞箱按模型实际占的那一条薄片给。 */
+    private static final double TUBE_EDGE = 0.85D / 16.0D;
+    private static final double TUBE_Y0 = 7.5D / 16.0D;
+    private static final double TUBE_Y1 = 8.5D / 16.0D;
+    private static final double CEILING_Y0 = 15.18D / 16.0D;
 
     public BlockTrdmWallLight() {
         super(Properties.of().strength(0.5F).noOcclusion().lightLevel(state -> 15));
@@ -67,25 +70,35 @@ public class BlockTrdmWallLight extends Block implements EntityBlockMapper {
                 .setValue(FACING, context.getHorizontalDirection());
     }
 
+    /**
+     * 选中框 / 碰撞箱和模型的朝向一致：
+     * 吊顶 / 地面时灯管沿 {@link #FACING} 的水平轴铺满整格；贴墙时灯管沿墙面铺满，
+     * 厚度只占底座到灯管外沿那一条。之前吊顶的框固定按 z 向给，横着放时就会和模型错 90°。
+     */
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        final boolean alongX = state.getValue(FACING).getAxis() == Direction.Axis.X;
         return switch (state.getValue(MOUNT)) {
-            // 吊顶：灯管在格子顶部，沿 z 铺满；选中框按 1 像素宽的薄条给
-            case UP -> Shapes.box(7.5D / 16D, 15.0D / 16D, 0.0D, 8.5D / 16D, 1.0D, 1.0D);
-            // 地面：灯管在格子底部
-            case DOWN -> Shapes.box(7.5D / 16D, 0.0D, 0.0D, 8.5D / 16D, 1.0D / 16D, 1.0D);
-            // 墙：底座贴住那一面，灯管水平铺满整格
-            case NORTH -> Shapes.box(0.0D, 7.0D / 16D, 0.0D, 1.0D, 8.8D / 16D, THIN);
-            case SOUTH -> Shapes.box(0.0D, 7.0D / 16D, 1.0D - THIN, 1.0D, 8.8D / 16D, 1.0D);
-            case WEST -> Shapes.box(0.0D, 7.0D / 16D, 0.0D, THIN, 8.8D / 16D, 1.0D);
-            case EAST -> Shapes.box(1.0D - THIN, 7.0D / 16D, 0.0D, 1.0D, 8.8D / 16D, 1.0D);
+            case UP -> alongX
+                    ? Shapes.box(0.0D, CEILING_Y0, 7.5D / 16D, 1.0D, 1.0D, 8.5D / 16D)
+                    : Shapes.box(7.5D / 16D, CEILING_Y0, 0.0D, 8.5D / 16D, 1.0D, 1.0D);
+            case DOWN -> alongX
+                    ? Shapes.box(0.0D, 0.0D, 7.5D / 16D, 1.0D, TUBE_EDGE, 8.5D / 16D)
+                    : Shapes.box(7.5D / 16D, 0.0D, 0.0D, 8.5D / 16D, TUBE_EDGE, 1.0D);
+            case NORTH -> Shapes.box(0.0D, TUBE_Y0, 0.0D, 1.0D, TUBE_Y1, TUBE_EDGE);
+            case SOUTH -> Shapes.box(0.0D, TUBE_Y0, 1.0D - TUBE_EDGE, 1.0D, TUBE_Y1, 1.0D);
+            case WEST -> Shapes.box(0.0D, TUBE_Y0, 0.0D, TUBE_EDGE, TUBE_Y1, 1.0D);
+            case EAST -> Shapes.box(1.0D - TUBE_EDGE, TUBE_Y0, 0.0D, 1.0D, TUBE_Y1, 1.0D);
         };
     }
 
-    /** 灯管是贴着吊顶 / 墙的装饰件，不参与碰撞（和门楣上的灯一样，不占额外碰撞箱）。 */
+    /**
+     * 碰撞箱和选中框一致：都很薄，贴着放置面，不挡路；但方向和模型一致，
+     * F3+B 看到的框 / 射线选中的位置不会和灯管错开。
+     */
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return Shapes.empty();
+        return getShape(state, level, pos, context);
     }
 
     @Override

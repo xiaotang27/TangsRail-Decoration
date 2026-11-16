@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 import top.xiaotang27.trdm.block.BlockTrdmPSDExtension;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.PsdLightHolder;
+import top.xiaotang27.trdm.block.PsdLightKind;
 
 import java.util.List;
 
@@ -41,6 +42,16 @@ public class ItemTrdmWallLight extends BlockItem {
         final Block block = level.getBlockState(pos).getBlock();
         if ((block instanceof BlockTrdmPSDTop || block instanceof BlockTrdmPSDExtension)
                 && level.getBlockEntity(pos) instanceof PsdLightHolder holder) {
+            // 反过来：装墙管时把原来的顶部灯拆下来掉回世界（两种灯现在都在站台侧，不能叠着）
+            final PsdLightKind oldTop = holder.topLight();
+            if (oldTop != PsdLightKind.NONE) {
+                holder.setTopLight(PsdLightKind.NONE, holder.topLightColor());
+                if (!level.isClientSide) {
+                    Block.popResource(level, pos, new ItemStack(oldTop == PsdLightKind.COLOR
+                            ? top.xiaotang27.trdm.Trdm.PSD_TOP_LIGHT_COLOR_ITEM
+                            : top.xiaotang27.trdm.Trdm.PSD_TOP_LIGHT_ITEM));
+                }
+            }
             final boolean changed = !holder.hasTubeLight();
             holder.setTubeLight(true);
             if (!level.isClientSide && changed) {
@@ -59,6 +70,8 @@ public class ItemTrdmWallLight extends BlockItem {
         tooltip.add(Component.translatable("tooltip.trdm.wall_light.mount")
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip.trdm.wall_light.header")
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip.trdm.psd_light.remove")
                 .withStyle(ChatFormatting.GRAY));
     }
 }

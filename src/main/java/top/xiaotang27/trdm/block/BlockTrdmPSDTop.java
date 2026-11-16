@@ -95,6 +95,14 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
 
     @Override
     public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand interactionHand, BlockHitResult blockHitResult) {
+        // 潜行 + 空手右键：拆掉这一格上已经装好的灯，按原物品掉回世界
+        if (player.isShiftKeyDown() && player.getMainHandItem().isEmpty()) {
+            if (world.isClientSide) {
+                return world.getBlockEntity(pos) instanceof PsdLightHolder light && light.hasAnyLight()
+                        ? InteractionResult.SUCCESS : InteractionResult.PASS;
+            }
+            return PsdLightHolder.removeLights(world, pos) ? InteractionResult.SUCCESS : InteractionResult.PASS;
+        }
         // 蹲下 + 刷子：打开屏蔽门外观设置（吊版 / 玻璃装饰线样式）。
         // 放在最前面，门楣也算「屏蔽门」的一部分 —— 点哪一格都能开。
         final InteractionResult appearance = openAppearanceOnShiftBrush(world, pos, player);

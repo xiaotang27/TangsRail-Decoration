@@ -106,7 +106,7 @@ public class PsdLightColorScreen extends TrdmScreenBase {
         renderHueStrip(guiGraphics);
 
         // ===== 十六进制 =====
-        section(guiGraphics, "gui.trdm.psd_light_color.hex", HEX_SECTION_Y);
+        sectionAt(guiGraphics, "gui.trdm.psd_light_color.hex", RIGHT_X, HEX_SECTION_Y);
         field(guiGraphics, FIELD_HEX, RIGHT_X, HEX_Y, HEX_W, HEX_H, FONT_SECTION, hexText());
         hint(guiGraphics, "gui.trdm.psd_light_color.hex_hint", RIGHT_X, HEX_HINT_Y);
         if (invalidHex) {
@@ -115,7 +115,7 @@ public class PsdLightColorScreen extends TrdmScreenBase {
         }
 
         // ===== 常用颜色 =====
-        section(guiGraphics, "gui.trdm.psd_light_color.preset", PRESET_SECTION_Y);
+        sectionAt(guiGraphics, "gui.trdm.psd_light_color.preset", RIGHT_X, PRESET_SECTION_Y);
         for (int index = 0; index < PRESETS.length; index++) {
             final float x = presetX(index);
             final float y = presetY(index);
@@ -333,6 +333,11 @@ public class PsdLightColorScreen extends TrdmScreenBase {
 
     private int screenY(float designY) {
         return Math.round(originY + designY * scale);
+    }
+
+    /** 右侧两列的分组标题：基类的 {@code section(String, y)} 固定画在 CONTENT_X，这里指定 x。 */
+    private void sectionAt(GuiGraphics guiGraphics, String key, float x, float y) {
+        text(guiGraphics, Component.translatable(key), x, y, FONT_SECTION, COLOR_TEXT);
     }
 
     private static float presetX(int index) {

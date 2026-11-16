@@ -654,6 +654,7 @@
   "tooltip.trdm.wall_light.mount": "贴天花板 / 墙面安装，灯头随放置面自动转向",
   "tooltip.trdm.wall_light.header": "点在 TRD 门楣或延伸板上：贴装到门楣朝站台那侧",
   "tooltip.trdm.psd_top_light.only_header": "只能安装在 TRD 门楣或延伸板上",
+  "tooltip.trdm.psd_light.remove": "潜行 + 空手右键已安装的灯：拆除并把物品掉回世界",
   "tooltip.trdm.psd_top_light.color_brush": "刷子右键已安装的灯：设置底座颜色",
   "gui.trdm.psd_light_color.title": "设置颜色",
   "gui.trdm.psd_light_color.hint": "拖动色块选饱和度/亮度，右侧竖条调色相；也可以直接输入十六进制",

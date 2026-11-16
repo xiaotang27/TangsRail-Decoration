@@ -12,8 +12,6 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import top.xiaotang27.trdm.Trdm;
-import top.xiaotang27.trdm.block.BlockTrdmPSDExtension;
-import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.BlockTrdmWallLight;
 import top.xiaotang27.trdm.block.PsdLightHolder;
 import top.xiaotang27.trdm.block.PsdLightKind;
@@ -54,12 +52,12 @@ public final class TrdmLightRenderer {
     private TrdmLightRenderer() {
     }
 
-    /** 门楣 / 延伸板上装着的灯（模型 1 的贴装形态、模型 2 / 3）。
+    /**
+     * 门楣 / 延伸板上装着的灯（模型 1 的贴装形态、模型 2 / 3）。
      * <p>
-     * 模型 2 / 3 的文件坐标原样贴在门楣的 x = 0 那面 —— 按 MTR 的约定，
-     * {@code facing} 是朝轨道那侧，所以它们装在轨道侧、往轨道上方探出；
-     * 模型 1 的坐标在 x = 6 那面，装在站台侧。要换边时把模型沿 x = 6 镜像即可
-     * （{@code x' = 6 - x}），不用改方块状态。
+     * 模型 2 / 3 的文件坐标是以门楣 x = 0 那面（轨道侧）为贴装面写的；实际要装在
+     * <b>站台内侧</b>，所以先沿 x = 6 镜像（{@code x' = 6/16 - x}）再按 facing 旋转。
+     * 模型 1 的坐标本来就在 x = 6 那面（站台侧），不镜像。
      */
     public static void renderAttachment(BlockState state, PsdLightHolder holder, PoseStack matrices,
                                         MultiBufferSource buffers, int light) {
@@ -67,38 +65,43 @@ public final class TrdmLightRenderer {
             return;
         }
         final Direction facing = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+        final Matrix4f facingTransform = facingMatrix(facing);
         if (holder.hasTubeLight()) {
-            renderModel(matrices, MODEL_TUBE, facing, null, -1, Vec3.ZERO, buffers, light);
+            renderModel(matrices, MODEL_TUBE, facingTransform, -1, buffers, light);
         }
         final PsdLightKind top = holder.topLight();
         if (top == PsdLightKind.PLAIN) {
-            renderModel(matrices, MODEL_PLAIN, facing, null, -1, topLightShift(state, facing), buffers, light);
+            renderModel(matrices, MODEL_PLAIN, facingTransform.mul(platformRotation()), -1, buffers, light);
         } else if (top == PsdLightKind.COLOR) {
-            renderModel(matrices, MODEL_COLOR, facing, null, holder.topLightColor(),
-                    topLightShift(state, facing), buffers, light);
+            renderModel(matrices, MODEL_COLOR, facingTransform.mul(platformRotation()),
+                    holder.topLightColor(), buffers, light);
         }
     }
 
+    /** 门楣模型面向（facing）对应的旋转，和方块状态里 {@code y} 的取值一致。 */
+    private static Matrix4f facingMatrix(Direction facing) {
+        final float degrees = switch (facing) {
+            case NORTH -> 90F;
+            case EAST -> 180F;
+            case SOUTH -> 270F;
+            default -> 0F;
+        };
+        return new Matrix4f()
+                .translate(0.5F, 0.0F, 0.5F)
+                .rotateY((float) Math.toRadians(-degrees))
+                .translate(-0.5F, 0.0F, -0.5F);
+    }
+
     /**
-     * 门楣 / 延伸板有 6px 和 4px 两种进深：
-     * 普通段 / 转角段是 x 0~6，顶部灯贴 x = 0 那面；
-     * 端门门楣（{@code END_GATE}）和延伸板的 {@code END_WALL} 段是 x 2~6，
-     * 顶部灯整体要沿「朝轨道」的反方向挪 2 像素，底座才还贴在门楣面上。
+     * 模型 2 / 3 的文件坐标贴在门楣 x = 0 那面；实际要贴 x = 6 那面（站台内侧）。
+     * 用绕竖轴 180° 的旋转而不是镜像：x' = 6/16 - x、z' = 1 - z，
+     * 这样法线不会被翻面，底座受光才对。
      */
-    private static Vec3 topLightShift(BlockState state, Direction facing) {
-        final boolean thinner;
-        if (state.getBlock() instanceof BlockTrdmPSDTop) {
-            thinner = state.getValue(BlockTrdmPSDTop.END_GATE);
-        } else if (state.getBlock() instanceof BlockTrdmPSDExtension) {
-            thinner = state.getValue(BlockTrdmPSDExtension.SHAPE) == BlockTrdmPSDExtension.EnumShape.END_WALL;
-        } else {
-            thinner = false;
-        }
-        if (!thinner) {
-            return Vec3.ZERO;
-        }
-        // 模型往 facing 那一侧探出；往方块里挪就是 -facing 方向
-        return new Vec3(-facing.getStepX(), 0.0D, -facing.getStepZ()).scale(2.0D / 16.0D);
+    private static Matrix4f platformRotation() {
+        return new Matrix4f()
+                .translate(3.0F / 16.0F, 0.0F, 0.5F)
+                .rotateY((float) Math.PI)
+                .translate(-3.0F / 16.0F, 0.0F, -0.5F);
     }
 
     /** 独立放置的「墙上的荧光灯管」：按方块状态的底座朝向摆模型 1。 */
@@ -106,20 +109,17 @@ public final class TrdmLightRenderer {
         final BlockTrdmWallLight.EnumMount mount = state.getValue(BlockTrdmWallLight.MOUNT);
         final Direction facing = state.getValue(BlockTrdmWallLight.FACING);
         final Matrix4f transform = mountTransform(mount, facing);
-        renderModel(matrices, MODEL_TUBE, Direction.WEST, transform, -1, Vec3.ZERO, buffers, light);
+        renderModel(matrices, MODEL_TUBE, transform, -1, buffers, light);
     }
 
     /**
      * 画一个模型。
      *
-     * @param facing    模型面向；{@link Direction#WEST} 表示用模型文件的原始坐标（不旋转）
-     * @param transform 额外的方块坐标变换（独立灯管用），可为 null
+     * @param transform 模型原始坐标（0~16 像素 = 0~1 格）到方块局部坐标的变换
      * @param tintRgb   模型 3 color 面的染色（0xRRGGBB），-1 表示不染
-     * @param shift     画完之后整体再平移多少（格），用来适配 4 像素进深的端门门楣
      */
-    private static void renderModel(PoseStack matrices, ResourceLocation modelLocation, Direction facing,
-                                    Matrix4f transform, int tintRgb, Vec3 shift,
-                                    MultiBufferSource buffers, int light) {
+    private static void renderModel(PoseStack matrices, ResourceLocation modelLocation, Matrix4f transform,
+                                    int tintRgb, MultiBufferSource buffers, int light) {
         final List<TrdmModel.Element> elements = TrdmModel.load(modelLocation);
         if (elements.isEmpty()) {
             return;
@@ -129,10 +129,10 @@ public final class TrdmLightRenderer {
         for (final TrdmModel.Element element : elements) {
             for (final Map.Entry<Direction, TrdmModel.Face> entry : element.faces().entrySet()) {
                 final TrdmModel.Face face = entry.getValue();
-                final Vec3[] raw = TrdmModel.corners(element, entry.getKey(), Vec3.ZERO, facing, 1F);
+                final Vec3[] raw = TrdmModel.corners(element, entry.getKey(), Vec3.ZERO, Direction.WEST, 1F);
                 final Vec3[] corners = new Vec3[4];
                 for (int index = 0; index < 4; index++) {
-                    corners[index] = (transform == null ? raw[index] : transformPoint(transform, raw[index])).add(shift);
+                    corners[index] = transformPoint(transform, raw[index]);
                 }
                 final Vec3 outward = faceNormal(corners);
                 final boolean colourFace = face.texture().equals(TEXTURE_COLOR);

@@ -52,6 +52,14 @@ public class ItemTrdmPSDLight extends Item {
             return InteractionResult.PASS;
         }
 
+        // 门楣上两种灯会占同一侧，装顶部灯时把原来那盏墙管拆下来掉回世界
+        if (holder.hasTubeLight()) {
+            holder.setTubeLight(false);
+            if (!level.isClientSide) {
+                Block.popResource(level, pos, new ItemStack(top.xiaotang27.trdm.Trdm.WALL_LIGHT_ITEM));
+            }
+        }
+
         final PsdLightKind lightKind = kind == Kind.COLOR ? PsdLightKind.COLOR : PsdLightKind.PLAIN;
         // 换灯时保留已经调过的颜色：装可染色灯 → 沿用当前颜色；装普通灯 → 颜色留着但不显示
         final int color = holder.topLight() == PsdLightKind.COLOR
@@ -77,5 +85,7 @@ public class ItemTrdmPSDLight extends Item {
             tooltip.add(Component.translatable("tooltip.trdm.psd_top_light.color_brush")
                     .withStyle(ChatFormatting.GRAY));
         }
+        tooltip.add(Component.translatable("tooltip.trdm.psd_light.remove")
+                .withStyle(ChatFormatting.GRAY));
     }
 }

@@ -13,9 +13,13 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -23,6 +27,7 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import top.xiaotang27.trdm.Trdm;
@@ -208,6 +213,20 @@ public class BlockTrdmPSDExtension extends Block implements EntityBlockMapper {
     @Override
     public BlockEntityMapper createBlockEntity(BlockPos pos, BlockState state) {
         return new TileEntityTrdmPSDExtension(pos, state);
+    }
+
+    /** 潜行 + 空手右键：拆掉这一格延伸板上已经装好的灯。 */
+    @Override
+    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand,
+                                 BlockHitResult hitResult) {
+        if (player.isShiftKeyDown() && player.getMainHandItem().isEmpty()) {
+            if (world.isClientSide) {
+                return world.getBlockEntity(pos) instanceof PsdLightHolder light && light.hasAnyLight()
+                        ? InteractionResult.SUCCESS : InteractionResult.PASS;
+            }
+            return PsdLightHolder.removeLights(world, pos) ? InteractionResult.SUCCESS : InteractionResult.PASS;
+        }
+        return super.use(state, world, pos, player, hand, hitResult);
     }
 
     /** 延伸板的灯光数据。字段和读写与门楣的 {@code TileEntityTrdmPSDTop} 完全一致。 */
