@@ -235,6 +235,7 @@ public class BlockTrdmPSDExtension extends Block implements EntityBlockMapper {
         private boolean tubeLight;
         private PsdLightKind topLight = PsdLightKind.NONE;
         private int topLightColor = DEFAULT_COLOR;
+        private boolean topLightColorManual;
 
         public TileEntityTrdmPSDExtension(BlockPos pos, BlockState state) {
             super(Trdm.PSD_EXTENSION_BE, pos, state);
@@ -265,24 +266,42 @@ public class BlockTrdmPSDExtension extends Block implements EntityBlockMapper {
         }
 
         @Override
-        public void setTopLight(PsdLightKind kind, int rgb) {
+        public boolean isTopLightColorManual() {
+            return topLightColorManual;
+        }
+
+        @Override
+        public void setTopLight(PsdLightKind kind, int rgb, boolean manualColor) {
             final PsdLightKind safeKind = kind == null ? PsdLightKind.NONE : kind;
             final int safeColor = PsdLightHolder.sanitizeColor(rgb);
-            if (topLight == safeKind && topLightColor == safeColor) {
+            if (topLight == safeKind && topLightColor == safeColor && topLightColorManual == manualColor) {
                 return;
             }
             topLight = safeKind;
             topLightColor = safeColor;
+            topLightColorManual = manualColor;
             PsdLightHolder.markLightChanged(this);
         }
 
         @Override
         public void setTopLightColor(int rgb) {
             final int safeColor = PsdLightHolder.sanitizeColor(rgb);
-            if (topLightColor == safeColor) {
+            if (topLightColor == safeColor && topLightColorManual) {
                 return;
             }
             topLightColor = safeColor;
+            topLightColorManual = true;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public void inheritTopLightColor(int rgb) {
+            final int safeColor = PsdLightHolder.sanitizeColor(rgb);
+            if (topLightColor == safeColor && !topLightColorManual) {
+                return;
+            }
+            topLightColor = safeColor;
+            topLightColorManual = false;
             PsdLightHolder.markLightChanged(this);
         }
 
@@ -293,6 +312,8 @@ public class BlockTrdmPSDExtension extends Block implements EntityBlockMapper {
             topLight = PsdLightKind.byName(tag.getString(KEY_TOP_LIGHT));
             topLightColor = tag.contains(KEY_TOP_LIGHT_COLOR)
                     ? PsdLightHolder.sanitizeColor(tag.getInt(KEY_TOP_LIGHT_COLOR)) : DEFAULT_COLOR;
+            topLightColorManual = tag.getBoolean(KEY_TOP_LIGHT_COLOR_MANUAL)
+                    || (!tag.contains(KEY_TOP_LIGHT_COLOR_MANUAL) && topLight == PsdLightKind.COLOR);
         }
 
         @Override
@@ -301,6 +322,7 @@ public class BlockTrdmPSDExtension extends Block implements EntityBlockMapper {
             tag.putBoolean(KEY_TUBE_LIGHT, tubeLight);
             tag.putString(KEY_TOP_LIGHT, topLight.getSerializedName());
             tag.putInt(KEY_TOP_LIGHT_COLOR, topLightColor);
+            tag.putBoolean(KEY_TOP_LIGHT_COLOR_MANUAL, topLightColorManual);
         }
 
         @Override

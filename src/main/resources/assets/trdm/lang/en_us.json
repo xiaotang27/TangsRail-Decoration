@@ -665,5 +665,6 @@
   "gui.trdm.psd_light_color.hex_hint": "Format: #RRGGBB, press Enter to apply",
   "gui.trdm.psd_light_color.invalid": "Invalid format — use #RRGGBB",
   "gui.trdm.psd_light_color.done": "Done",
+  "gui.trdm.psd_light_color.infect_hint": "Manual colors stay fixed; nearby connected lights that were not manually set follow this color",
   "gui.trdm.psd_light_color.no_light": "This block has no dyeable top light"
 }

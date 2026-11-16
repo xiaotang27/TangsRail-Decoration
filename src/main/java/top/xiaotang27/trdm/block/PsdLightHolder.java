@@ -27,6 +27,8 @@ public interface PsdLightHolder {
     String KEY_TUBE_LIGHT = "psd_tube_light";
     String KEY_TOP_LIGHT = "psd_top_light";
     String KEY_TOP_LIGHT_COLOR = "psd_top_light_color";
+    /** 颜色是不是玩家手动设过：手动的灯不跟随附近的颜色。 */
+    String KEY_TOP_LIGHT_COLOR_MANUAL = "psd_top_light_color_manual";
     /** 可染色灯没设置过颜色时的默认色（纯白）。 */
     int DEFAULT_COLOR = 0xFFFFFF;
 
@@ -38,8 +40,23 @@ public interface PsdLightHolder {
 
     int topLightColor();
 
-    void setTopLight(PsdLightKind kind, int rgb);
+    /** 颜色是否被玩家手动固定；没手动设过的灯会跟随附近延伸板 / 门楣的颜色。 */
+    boolean isTopLightColorManual();
 
+    /**
+     * @param manualColor true = 手动设置的颜色（不再跟随附近颜色）；
+     *                    false = 从附近颜色继承来的
+     */
+    void setTopLight(PsdLightKind kind, int rgb, boolean manualColor);
+
+    default void setTopLight(PsdLightKind kind, int rgb) {
+        setTopLight(kind, rgb, isTopLightColorManual());
+    }
+
+    /** 颜色传染：用附近传过来的颜色覆盖，并把「手动」标记清掉。 */
+    void inheritTopLightColor(int rgb);
+
+    /** 设置颜色界面 / 网络包用：手动设色，固定下来不再跟随。 */
     void setTopLightColor(int rgb);
 
     default boolean hasAnyLight() {

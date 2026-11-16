@@ -665,5 +665,6 @@
   "gui.trdm.psd_light_color.hex_hint": "格式：#RRGGBB，回车应用",
   "gui.trdm.psd_light_color.invalid": "格式不正确，应为 #RRGGBB",
   "gui.trdm.psd_light_color.done": "完成",
+  "gui.trdm.psd_light_color.infect_hint": "手动设置后这盏灯固定；附近连通的、没手动设过的灯会跟随这个颜色",
   "gui.trdm.psd_light_color.no_light": "这格上没有可染色的顶部灯"
 }

@@ -17,6 +17,7 @@ import top.xiaotang27.trdm.block.BlockTrdmBigStationSign;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.BlockTrdmPis;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
+import top.xiaotang27.trdm.block.PsdLightColors;
 import top.xiaotang27.trdm.block.PsdLightHolder;
 import top.xiaotang27.trdm.block.PsdLightKind;
 import top.xiaotang27.trdm.block.SignRuns;
@@ -197,7 +198,9 @@ public final class TrdmControlNetwork {
                 || holder.topLight() != PsdLightKind.COLOR) {
             return;
         }
+        // 手动改色：这盏灯固定下来，再把颜色传染给连通的、没手动设过的灯
         holder.setTopLightColor(rgb);
+        PsdLightColors.propagate(serverLevel, pos, rgb);
         if (DEBUG) {
             Trdm.LOGGER.info("[psd light] pos={} colour=#{}({})", pos, String.format("%06X", rgb & 0xFFFFFF),
                     rgb & 0xFFFFFF);

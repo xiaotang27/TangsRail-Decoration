@@ -394,6 +394,8 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         private PsdLightKind topLight = PsdLightKind.NONE;
         /** 模型 3 的染色；对模型 2 没有意义。 */
         private int topLightColor = DEFAULT_COLOR;
+        /** 颜色是不是玩家在「设置颜色」里手动设过；没设过的会跟随附近颜色。 */
+        private boolean topLightColorManual;
 
         public TileEntityTrdmPSDTop(BlockPos pos, BlockState state) {
             super(Trdm.PSD_TOP_BE, pos, state);
@@ -424,24 +426,42 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         }
 
         @Override
-        public void setTopLight(PsdLightKind kind, int rgb) {
+        public boolean isTopLightColorManual() {
+            return topLightColorManual;
+        }
+
+        @Override
+        public void setTopLight(PsdLightKind kind, int rgb, boolean manualColor) {
             final PsdLightKind safeKind = kind == null ? PsdLightKind.NONE : kind;
             final int safeColor = PsdLightHolder.sanitizeColor(rgb);
-            if (topLight == safeKind && topLightColor == safeColor) {
+            if (topLight == safeKind && topLightColor == safeColor && topLightColorManual == manualColor) {
                 return;
             }
             topLight = safeKind;
             topLightColor = safeColor;
+            topLightColorManual = manualColor;
             PsdLightHolder.markLightChanged(this);
         }
 
         @Override
         public void setTopLightColor(int rgb) {
             final int safeColor = PsdLightHolder.sanitizeColor(rgb);
-            if (topLightColor == safeColor) {
+            if (topLightColor == safeColor && topLightColorManual) {
                 return;
             }
             topLightColor = safeColor;
+            topLightColorManual = true;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public void inheritTopLightColor(int rgb) {
+            final int safeColor = PsdLightHolder.sanitizeColor(rgb);
+            if (topLightColor == safeColor && !topLightColorManual) {
+                return;
+            }
+            topLightColor = safeColor;
+            topLightColorManual = false;
             PsdLightHolder.markLightChanged(this);
         }
 
@@ -453,6 +473,9 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
             topLight = PsdLightKind.byName(tag.getString(KEY_TOP_LIGHT));
             topLightColor = tag.contains(KEY_TOP_LIGHT_COLOR)
                     ? PsdLightHolder.sanitizeColor(tag.getInt(KEY_TOP_LIGHT_COLOR)) : DEFAULT_COLOR;
+            // 旧存档没有 manual 字段：已经染过色的灯按「手动设过」处理，免得被附近颜色覆盖
+            topLightColorManual = tag.getBoolean(KEY_TOP_LIGHT_COLOR_MANUAL)
+                    || (!tag.contains(KEY_TOP_LIGHT_COLOR_MANUAL) && topLight == PsdLightKind.COLOR);
         }
 
         @Override
@@ -461,6 +484,7 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
             tag.putBoolean(KEY_TUBE_LIGHT, tubeLight);
             tag.putString(KEY_TOP_LIGHT, topLight.getSerializedName());
             tag.putInt(KEY_TOP_LIGHT_COLOR, topLightColor);
+            tag.putBoolean(KEY_TOP_LIGHT_COLOR_MANUAL, topLightColorManual);
         }
 
         @Override

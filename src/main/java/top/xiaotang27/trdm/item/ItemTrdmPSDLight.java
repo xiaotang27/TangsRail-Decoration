@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import org.jetbrains.annotations.Nullable;
 import top.xiaotang27.trdm.block.BlockTrdmPSDExtension;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
+import top.xiaotang27.trdm.block.PsdLightColors;
 import top.xiaotang27.trdm.block.PsdLightHolder;
 import top.xiaotang27.trdm.block.PsdLightKind;
 
@@ -61,12 +62,28 @@ public class ItemTrdmPSDLight extends Item {
         }
 
         final PsdLightKind lightKind = kind == Kind.COLOR ? PsdLightKind.COLOR : PsdLightKind.PLAIN;
-        // 换灯时保留已经调过的颜色：装可染色灯 → 沿用当前颜色；装普通灯 → 颜色留着但不显示
-        final int color = holder.topLight() == PsdLightKind.COLOR
-                ? holder.topLightColor() : PsdLightHolder.DEFAULT_COLOR;
+        final int color;
+        final boolean manual;
+        if (lightKind == PsdLightKind.COLOR) {
+            if (holder.topLight() == PsdLightKind.COLOR && holder.isTopLightColorManual()) {
+                // 已经手动定过色：重新装同一件物品不覆盖它
+                color = holder.topLightColor();
+                manual = true;
+            } else {
+                final int nearby = PsdLightColors.findNearbyColor(level, pos);
+                // 附近没有别的灯时保留这格原来的颜色（它本来就是继承来的）
+                color = nearby == PsdLightHolder.DEFAULT_COLOR && holder.topLight() == PsdLightKind.COLOR
+                        ? holder.topLightColor() : nearby;
+                manual = false;
+            }
+        } else {
+            color = holder.topLightColor();
+            manual = holder.isTopLightColorManual();
+        }
         final boolean changed = holder.topLight() != lightKind
-                || (lightKind == PsdLightKind.COLOR && holder.topLightColor() != color);
-        holder.setTopLight(lightKind, color);
+                || (lightKind == PsdLightKind.COLOR
+                && (holder.topLightColor() != color || holder.isTopLightColorManual() != manual));
+        holder.setTopLight(lightKind, color, manual);
 
         if (!level.isClientSide && changed) {
             final Player player = context.getPlayer();

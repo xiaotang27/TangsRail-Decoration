@@ -127,6 +127,7 @@ public class PsdLightColorScreen extends TrdmScreenBase {
             }
             rect(guiGraphics, x, y, PRESET_CELL_W, PRESET_CELL_H, 0xFF000000 | preset);
         }
+        hint(guiGraphics, "gui.trdm.psd_light_color.infect_hint", RIGHT_X, 438F);
     }
 
     // ===== 取色器绘制 =====
