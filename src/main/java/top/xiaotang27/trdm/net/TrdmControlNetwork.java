@@ -17,6 +17,8 @@ import top.xiaotang27.trdm.block.BlockTrdmBigStationSign;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.BlockTrdmPis;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
+import top.xiaotang27.trdm.block.PsdLightHolder;
+import top.xiaotang27.trdm.block.PsdLightKind;
 import top.xiaotang27.trdm.block.SignRuns;
 import top.xiaotang27.trdm.control.PsdDoorControl;
 import top.xiaotang27.trdm.control.StationScope;
@@ -43,6 +45,9 @@ public final class TrdmControlNetwork {
 
     /** C2S：BlockPos（门楣位置）+ 吊版样式 + 玻璃装饰线样式。 */
     public static final ResourceLocation PSD_APPEARANCE = Trdm.id("psd_appearance");
+
+    /** C2S：BlockPos（门楣 / 延伸板）+ 可染色顶部灯的颜色（0xRRGGBB）。 */
+    public static final ResourceLocation PSD_LIGHT_COLOR = Trdm.id("psd_light_color");
 
     /** C2S：BlockPos（PIS 屏幕）+ 跑马文字 + 广告开关 + 广告覆盖项。 */
     public static final ResourceLocation PIS_SETTINGS = Trdm.id("pis_settings");
@@ -95,6 +100,11 @@ public final class TrdmControlNetwork {
             final int headerStyle = buf.readVarInt();
             final int bandStyle = buf.readVarInt();
             server.execute(() -> handlePsdAppearance(player, pos, headerStyle, bandStyle));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(PSD_LIGHT_COLOR, (server, player, handler, buf, responseSender) -> {
+            final BlockPos pos = buf.readBlockPos();
+            final int rgb = buf.readInt();
+            server.execute(() -> handlePsdLightColor(player, pos, rgb));
         });
         ServerPlayNetworking.registerGlobalReceiver(END_GATE_OPEN, (server, player, handler, buf, responseSender) -> {
             final BlockPos pos = buf.readBlockPos();
@@ -173,6 +183,25 @@ public final class TrdmControlNetwork {
         applyToRun(serverLevel, pos, net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                 member -> BlockTrdmPSDTop.applyStyles(serverLevel, member, headerStyle, bandStyle));
         player.displayClientMessage(Component.translatable("gui.trdm.psd_style.applied"), true);
+    }
+
+    /** 可染色顶部灯：只改被点的那一格的颜色；方块实体自己负责标脏 + 广播。 */
+    private static void handlePsdLightColor(ServerPlayer player, BlockPos pos, int rgb) {
+        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > MAX_SELECT_DISTANCE_SQR) {
+            return;
+        }
+        if (!(player.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        if (!(serverLevel.getBlockEntity(pos) instanceof PsdLightHolder holder)
+                || holder.topLight() != PsdLightKind.COLOR) {
+            return;
+        }
+        holder.setTopLightColor(rgb);
+        if (DEBUG) {
+            Trdm.LOGGER.info("[psd light] pos={} colour=#{}({})", pos, String.format("%06X", rgb & 0xFFFFFF),
+                    rgb & 0xFFFFFF);
+        }
     }
 
     /**

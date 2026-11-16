@@ -36,6 +36,7 @@ import top.xiaotang27.trdm.block.BlockTrdmPis;
 import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmEndGateModels;
 import top.xiaotang27.trdm.block.BlockTrdmPSDExtension;
+import top.xiaotang27.trdm.block.BlockTrdmWallLight;
 import top.xiaotang27.trdm.block.BlockTrdmPisPole;
 import top.xiaotang27.trdm.block.BlockTrdmStationSign;
 import top.xiaotang27.trdm.block.BlockTicketVendingMachine;
@@ -43,6 +44,8 @@ import top.xiaotang27.trdm.block.BlockCustomerServiceTerminal;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePaving;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePavingStep;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
+import top.xiaotang27.trdm.item.ItemTrdmPSDLight;
+import top.xiaotang27.trdm.item.ItemTrdmWallLight;
 import top.xiaotang27.trdm.item.ItemTrdmBigSign;
 import top.xiaotang27.trdm.item.ItemSingleTicket;
 import top.xiaotang27.trdm.item.ItemTransitCard;
@@ -97,6 +100,8 @@ public class Trdm implements ModInitializer {
     public static final BlockCustomerServiceTerminal CUSTOMER_SERVICE_TERMINAL = new BlockCustomerServiceTerminal();
     /** 高站台门延伸板：在门楣高度把门楣往两侧/拐角延伸，直线 / 转角 / 拐弯后自动换门楣模型。 */
     public static final BlockTrdmPSDExtension PSD_EXTENSION = new BlockTrdmPSDExtension();
+    /** 墙上的荧光灯管：可独立贴天花板 / 墙面，也可贴装到门楣 / 延伸板上。 */
+    public static final BlockTrdmWallLight WALL_LIGHT = new BlockTrdmWallLight();
     /** 屏蔽门端门：门楣 + 可旋开的门 + 固定玻璃。 */
 
     // 物品（与 MTR 一致：门楣没有独立物品，用玻璃物品放置）
@@ -113,6 +118,12 @@ public class Trdm implements ModInitializer {
     public static final Item TACTILE_PAVING_STEP_ITEM = new BlockItem(TACTILE_PAVING_STEP, new Item.Properties());
     public static final ItemTrdmPSD PSD_END_GATE_ITEM = new ItemTrdmPSD(ItemTrdmPSD.Kind.END_GATE);
     public static final Item PSD_EXTENSION_ITEM = new BlockItem(PSD_EXTENSION, new Item.Properties());
+    /** 模型 1：墙上的荧光灯管。 */
+    public static final Item WALL_LIGHT_ITEM = new ItemTrdmWallLight(WALL_LIGHT, new Item.Properties());
+    /** 模型 2：站台门延伸板顶部灯（不可染色）。 */
+    public static final Item PSD_TOP_LIGHT_ITEM = new ItemTrdmPSDLight(ItemTrdmPSDLight.Kind.PLAIN);
+    /** 模型 3：可染色的站台门延伸板顶部灯。 */
+    public static final Item PSD_TOP_LIGHT_COLOR_ITEM = new ItemTrdmPSDLight(ItemTrdmPSDLight.Kind.COLOR);
     public static final Item TICKET_VENDING_MACHINE_ITEM =
             new BlockItem(TICKET_VENDING_MACHINE, new Item.Properties());
     public static final Item CUSTOMER_SERVICE_TERMINAL_ITEM =
@@ -125,6 +136,8 @@ public class Trdm implements ModInitializer {
     public static BlockEntityType<BlockTrdmPSDDoor.TileEntityTrdmPSDDoor> PSD_DOOR_1_BE;
     public static BlockEntityType<BlockTrdmPSDTop.TileEntityTrdmPSDTop> PSD_TOP_BE;
     public static BlockEntityType<BlockTrdmPSDControl.TileEntityTrdmPSDControl> PSD_CONTROL_BE;
+    public static BlockEntityType<BlockTrdmPSDExtension.TileEntityTrdmPSDExtension> PSD_EXTENSION_BE;
+    public static BlockEntityType<BlockTrdmWallLight.TileEntityTrdmWallLight> WALL_LIGHT_BE;
     public static BlockEntityType<BlockTrdmStationSign.TileEntityTrdmStationSign> STATION_SIGN_BE;
     public static BlockEntityType<BlockTrdmBigStationSign.TileEntityTrdmBigStationSign> BIG_SIGN_1_BE;
     public static BlockEntityType<BlockTrdmHungBigSign.TileEntityTrdmHungBigSign> HUNG_SIGN_BE;
@@ -155,6 +168,7 @@ public class Trdm implements ModInitializer {
         registerBlock("psd_end_gate", PSD_END_GATE);
         registerBlock("psd_end_gate_models", PSD_END_GATE_MODELS);
         registerBlock("psd_extension", PSD_EXTENSION);
+        registerBlock("wall_light", WALL_LIGHT);
         registerBlock("ticket_vending_machine", TICKET_VENDING_MACHINE);
         registerBlock("customer_service_terminal", CUSTOMER_SERVICE_TERMINAL);
 
@@ -171,6 +185,9 @@ public class Trdm implements ModInitializer {
         registerItem("tactile_paving_step", TACTILE_PAVING_STEP_ITEM);
         registerItem("psd_end_gate", PSD_END_GATE_ITEM);
         registerItem("psd_extension", PSD_EXTENSION_ITEM);
+        registerItem("wall_light", WALL_LIGHT_ITEM);
+        registerItem("psd_top_light", PSD_TOP_LIGHT_ITEM);
+        registerItem("psd_top_light_color", PSD_TOP_LIGHT_COLOR_ITEM);
         registerItem("ticket_vending_machine", TICKET_VENDING_MACHINE_ITEM);
         registerItem("customer_service_terminal", CUSTOMER_SERVICE_TERMINAL_ITEM);
         registerItem("single_ticket", SINGLE_TICKET_ITEM);
@@ -182,6 +199,12 @@ public class Trdm implements ModInitializer {
                 BlockEntityType.Builder.of(BlockTrdmPSDDoor.TileEntityTrdmPSDDoor::new, PSD_DOOR_1).build(null));
         PSD_TOP_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_top"),
                 BlockEntityType.Builder.of(BlockTrdmPSDTop.TileEntityTrdmPSDTop::new, PSD_TOP).build(null));
+        PSD_EXTENSION_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_extension"),
+                BlockEntityType.Builder.of(BlockTrdmPSDExtension.TileEntityTrdmPSDExtension::new, PSD_EXTENSION)
+                        .build(null));
+        WALL_LIGHT_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("wall_light"),
+                BlockEntityType.Builder.of(BlockTrdmWallLight.TileEntityTrdmWallLight::new, WALL_LIGHT)
+                        .build(null));
         PSD_CONTROL_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("psd_control"),
                 BlockEntityType.Builder.of(BlockTrdmPSDControl.TileEntityTrdmPSDControl::new, PSD_CONTROL).build(null));
         STATION_SIGN_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id("station_sign"),
@@ -224,6 +247,9 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(TACTILE_PAVING_STEP_ITEM));
                     entries.accept(new ItemStack(PSD_END_GATE_ITEM));
                     entries.accept(new ItemStack(PSD_EXTENSION_ITEM));
+                    entries.accept(new ItemStack(WALL_LIGHT_ITEM));
+                    entries.accept(new ItemStack(PSD_TOP_LIGHT_ITEM));
+                    entries.accept(new ItemStack(PSD_TOP_LIGHT_COLOR_ITEM));
                     entries.accept(new ItemStack(TICKET_VENDING_MACHINE_ITEM));
                     entries.accept(new ItemStack(CUSTOMER_SERVICE_TERMINAL_ITEM));
                     entries.accept(new ItemStack(SINGLE_TICKET_ITEM));

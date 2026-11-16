@@ -1,0 +1,10 @@
+{
+  "parent": "trdm:block/psd_toplight_1",
+  "display": {
+    "gui": {
+      "rotation": [30, 225, 0],
+      "translation": [0, 0, 0],
+      "scale": [1.6, 1.6, 1.6]
+    }
+  }
+}

@@ -15,6 +15,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import top.xiaotang27.trdm.block.BlockTrdmBigStationSign;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
 import top.xiaotang27.trdm.block.BlockTrdmPis;
+import top.xiaotang27.trdm.block.PsdLightHolder;
+import top.xiaotang27.trdm.block.PsdLightKind;
 import top.xiaotang27.trdm.block.SignRuns;
 import top.xiaotang27.trdm.control.PsdStyles;
 import top.xiaotang27.trdm.net.TrdmControlNetwork;
@@ -178,6 +180,41 @@ public final class TrdmControlClient {
         buf.writeVarInt(headerStyle);
         buf.writeVarInt(bandStyle);
         ClientPlayNetworking.send(TrdmControlNetwork.PSD_APPEARANCE, buf);
+    }
+
+    /** 可染色顶部灯：刷子右键已安装的灯 → 打开「设置颜色」界面。 */
+    public static void openPsdLightColor(BlockPos pos) {
+        final Level level = Minecraft.getInstance().level;
+        if (level == null) {
+            return;
+        }
+        if (level.getBlockEntity(pos) instanceof PsdLightHolder holder
+                && holder.topLight() == PsdLightKind.COLOR) {
+            Minecraft.getInstance().setScreen(new PsdLightColorScreen(pos, holder.topLightColor()));
+        } else {
+            final net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
+            if (player != null) {
+                player.displayClientMessage(Component.translatable("gui.trdm.psd_light_color.no_light"), true);
+            }
+        }
+    }
+
+    /** 可染色顶部灯：只改本地方块实体（取色拖动时逐帧预览用），不向服务端发包。 */
+    public static void applyPsdLightColorLocal(BlockPos pos, int rgb) {
+        final Level level = Minecraft.getInstance().level;
+        if (level != null && level.getBlockEntity(pos) instanceof PsdLightHolder holder
+                && holder.topLight() == PsdLightKind.COLOR) {
+            holder.setTopLightColor(rgb);
+        }
+    }
+
+    /** 可染色顶部灯：本地先改（同一帧生效），再把颜色发回服务端持久化并广播给附近玩家。 */
+    public static void sendPsdLightColor(BlockPos pos, int rgb) {
+        applyPsdLightColorLocal(pos, rgb);
+        final FriendlyByteBuf buf = PacketByteBufs.create();
+        buf.writeBlockPos(pos);
+        buf.writeInt(rgb & 0xFFFFFF);
+        ClientPlayNetworking.send(TrdmControlNetwork.PSD_LIGHT_COLOR, buf);
     }
 
     public static void sendSelection(BlockPos targetPos, long platformId) {

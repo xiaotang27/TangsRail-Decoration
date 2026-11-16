@@ -19,6 +19,8 @@ import top.xiaotang27.trdm.block.BlockTrdmPSDEndGate;
 import top.xiaotang27.trdm.block.BlockTrdmPSDGlass;
 import top.xiaotang27.trdm.block.BlockTrdmPSDGlassEnd;
 import top.xiaotang27.trdm.block.BlockTrdmPSDTop;
+import top.xiaotang27.trdm.block.PsdLightHolder;
+import top.xiaotang27.trdm.block.PsdLightKind;
 import top.xiaotang27.trdm.client.TrdmControlClient;
 import top.xiaotang27.trdm.client.TrdmEndGateDrag;
 import top.xiaotang27.trdm.client.TrdmEndGateHud;
@@ -26,7 +28,9 @@ import top.xiaotang27.trdm.client.TrdmVersionHud;
 import top.xiaotang27.trdm.client.TrdmMtrFonts;
 import top.xiaotang27.trdm.render.RenderTrdmPSDDoor;
 import top.xiaotang27.trdm.render.RenderTrdmPSDEndGate;
+import top.xiaotang27.trdm.render.RenderTrdmPSDExtension;
 import top.xiaotang27.trdm.render.RenderTrdmPSDTop;
+import top.xiaotang27.trdm.render.RenderTrdmWallLight;
 import top.xiaotang27.trdm.render.RenderTrdmBigStationSign;
 import top.xiaotang27.trdm.render.RenderTrdmHungBigSign;
 import top.xiaotang27.trdm.render.RenderTrdmPis;
@@ -108,6 +112,11 @@ public class TrdmClient implements ClientModInitializer {
 
         // 门楣：线路图 / 站名 / 方向箭头 / 站台色带 + 玻璃上的装饰带
         BlockEntityRendererRegistry.register(Trdm.PSD_TOP_BE, context -> new RenderTrdmPSDTop(null));
+        // 延伸板上的顶部灯（延伸板本体仍是静态模型，灯走 BER）
+        BlockEntityRendererRegistry.register(Trdm.PSD_EXTENSION_BE,
+                context -> new RenderTrdmPSDExtension<>(null));
+        // 独立放置的墙上的荧光灯管
+        BlockEntityRendererRegistry.register(Trdm.WALL_LIGHT_BE, context -> new RenderTrdmWallLight(null));
 
         // 端门：关着走静态玻璃模型，开着由这个渲染器把「整段」玻璃当一扇大门摆开 90°
         BlockEntityRendererRegistry.register(Trdm.PSD_END_GATE_BE, context -> new RenderTrdmPSDEndGate<>(null));
@@ -165,6 +174,15 @@ public class TrdmClient implements ClientModInitializer {
         }
         final BlockPos pos = hitResult.getBlockPos();
         final Block block = world.getBlockState(pos).getBlock();
+        // 可染色顶部灯：不按 Shift、手持刷子右键 → 打开「设置颜色」。
+        // 放在门楣自己的 use 之前拦下来，否则门楣会先把这次右键当成「翻箭头」吃掉。
+        if (hand == InteractionHand.MAIN_HAND && !player.isShiftKeyDown()
+                && BlockTrdmPSDControl.isHoldingBrush(player)
+                && world.getBlockEntity(pos) instanceof PsdLightHolder holder
+                && holder.topLight() == PsdLightKind.COLOR) {
+            TrdmControlClient.openPsdLightColor(pos);
+            return InteractionResult.SUCCESS;
+        }
         // 端门：右键按下先记一次「候选拖动」——
         // 没拖动就松手 = 短按（开/关），按住向下拖 = 调开度（状态机见 TrdmEndGateDrag）。
         if (!player.isShiftKeyDown() && hand == InteractionHand.MAIN_HAND

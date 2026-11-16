@@ -12,6 +12,10 @@ import mtr.mappings.BlockEntityMapper;
 import mtr.mappings.EntityBlockMapper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -374,10 +378,91 @@ public class BlockTrdmPSDTop extends BlockDirectionalMapper implements EntityBlo
         return newState;
     }
 
-    public static class TileEntityTrdmPSDTop extends BlockPSDTop.TileEntityRouteBase {
+    public static class TileEntityTrdmPSDTop extends BlockPSDTop.TileEntityRouteBase implements PsdLightHolder {
+
+        /** 模型 1：贴在门楣朝站台那侧、吊顶下的荧光灯管。 */
+        private boolean tubeLight;
+        /** 模型 2 / 3：贴在门楣朝轨道那侧、底座贴天花板的顶部灯。 */
+        private PsdLightKind topLight = PsdLightKind.NONE;
+        /** 模型 3 的染色；对模型 2 没有意义。 */
+        private int topLightColor = DEFAULT_COLOR;
 
         public TileEntityTrdmPSDTop(BlockPos pos, BlockState state) {
             super(Trdm.PSD_TOP_BE, pos, state);
+        }
+
+        @Override
+        public boolean hasTubeLight() {
+            return tubeLight;
+        }
+
+        @Override
+        public void setTubeLight(boolean value) {
+            if (tubeLight == value) {
+                return;
+            }
+            tubeLight = value;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public PsdLightKind topLight() {
+            return topLight;
+        }
+
+        @Override
+        public int topLightColor() {
+            return topLightColor;
+        }
+
+        @Override
+        public void setTopLight(PsdLightKind kind, int rgb) {
+            final PsdLightKind safeKind = kind == null ? PsdLightKind.NONE : kind;
+            final int safeColor = PsdLightHolder.sanitizeColor(rgb);
+            if (topLight == safeKind && topLightColor == safeColor) {
+                return;
+            }
+            topLight = safeKind;
+            topLightColor = safeColor;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public void setTopLightColor(int rgb) {
+            final int safeColor = PsdLightHolder.sanitizeColor(rgb);
+            if (topLightColor == safeColor) {
+                return;
+            }
+            topLightColor = safeColor;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        // 基类的 saveAdditional / load 是 final，MTR 留了这两个可覆盖的钩子
+        @Override
+        public void readCompoundTag(CompoundTag tag) {
+            super.readCompoundTag(tag);
+            tubeLight = tag.getBoolean(KEY_TUBE_LIGHT);
+            topLight = PsdLightKind.byName(tag.getString(KEY_TOP_LIGHT));
+            topLightColor = tag.contains(KEY_TOP_LIGHT_COLOR)
+                    ? PsdLightHolder.sanitizeColor(tag.getInt(KEY_TOP_LIGHT_COLOR)) : DEFAULT_COLOR;
+        }
+
+        @Override
+        public void writeCompoundTag(CompoundTag tag) {
+            super.writeCompoundTag(tag);
+            tag.putBoolean(KEY_TUBE_LIGHT, tubeLight);
+            tag.putString(KEY_TOP_LIGHT, topLight.getSerializedName());
+            tag.putInt(KEY_TOP_LIGHT_COLOR, topLightColor);
+        }
+
+        @Override
+        public CompoundTag getUpdateTag() {
+            return saveWithoutMetadata();
+        }
+
+        @Override
+        public Packet<ClientGamePacketListener> getUpdatePacket() {
+            return ClientboundBlockEntityDataPacket.create(this);
         }
     }
 

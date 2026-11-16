@@ -4,8 +4,14 @@ import mtr.block.BlockPSDAPGBase;
 import mtr.block.BlockPSDAPGDoorBase;
 import mtr.block.BlockPSDTop;
 import mtr.block.IBlock;
+import mtr.mappings.BlockEntityMapper;
+import mtr.mappings.EntityBlockMapper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -47,7 +53,7 @@ import top.xiaotang27.trdm.Trdm;
  * </ul>
  * 这样一段延伸板在拐角处自动变成 L 形，拐弯后的整段自动变成端门门楣，和楼梯的 straight / corner 规则一个思路。
  */
-public class BlockTrdmPSDExtension extends Block {
+public class BlockTrdmPSDExtension extends Block implements EntityBlockMapper {
 
     /** 门楣正面朝向（朝外的一侧）。 */
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
@@ -196,6 +202,97 @@ public class BlockTrdmPSDExtension extends Block {
     private static boolean hasSameFacingRun(BlockGetter level, BlockPos pos, Direction facing) {
         return isSameFacing(level, pos.relative(facing.getClockWise()), facing)
                 || isSameFacing(level, pos.relative(facing.getCounterClockWise()), facing);
+    }
+
+    /** 延伸板和门楣一样要挂顶部灯：方块实体只存灯的数据，方块状态保持不变。 */
+    @Override
+    public BlockEntityMapper createBlockEntity(BlockPos pos, BlockState state) {
+        return new TileEntityTrdmPSDExtension(pos, state);
+    }
+
+    /** 延伸板的灯光数据。字段和读写与门楣的 {@code TileEntityTrdmPSDTop} 完全一致。 */
+    public static class TileEntityTrdmPSDExtension extends BlockEntityMapper implements PsdLightHolder {
+
+        private boolean tubeLight;
+        private PsdLightKind topLight = PsdLightKind.NONE;
+        private int topLightColor = DEFAULT_COLOR;
+
+        public TileEntityTrdmPSDExtension(BlockPos pos, BlockState state) {
+            super(Trdm.PSD_EXTENSION_BE, pos, state);
+        }
+
+        @Override
+        public boolean hasTubeLight() {
+            return tubeLight;
+        }
+
+        @Override
+        public void setTubeLight(boolean value) {
+            if (tubeLight == value) {
+                return;
+            }
+            tubeLight = value;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public PsdLightKind topLight() {
+            return topLight;
+        }
+
+        @Override
+        public int topLightColor() {
+            return topLightColor;
+        }
+
+        @Override
+        public void setTopLight(PsdLightKind kind, int rgb) {
+            final PsdLightKind safeKind = kind == null ? PsdLightKind.NONE : kind;
+            final int safeColor = PsdLightHolder.sanitizeColor(rgb);
+            if (topLight == safeKind && topLightColor == safeColor) {
+                return;
+            }
+            topLight = safeKind;
+            topLightColor = safeColor;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public void setTopLightColor(int rgb) {
+            final int safeColor = PsdLightHolder.sanitizeColor(rgb);
+            if (topLightColor == safeColor) {
+                return;
+            }
+            topLightColor = safeColor;
+            PsdLightHolder.markLightChanged(this);
+        }
+
+        @Override
+        public void readCompoundTag(CompoundTag tag) {
+            super.readCompoundTag(tag);
+            tubeLight = tag.getBoolean(KEY_TUBE_LIGHT);
+            topLight = PsdLightKind.byName(tag.getString(KEY_TOP_LIGHT));
+            topLightColor = tag.contains(KEY_TOP_LIGHT_COLOR)
+                    ? PsdLightHolder.sanitizeColor(tag.getInt(KEY_TOP_LIGHT_COLOR)) : DEFAULT_COLOR;
+        }
+
+        @Override
+        public void writeCompoundTag(CompoundTag tag) {
+            super.writeCompoundTag(tag);
+            tag.putBoolean(KEY_TUBE_LIGHT, tubeLight);
+            tag.putString(KEY_TOP_LIGHT, topLight.getSerializedName());
+            tag.putInt(KEY_TOP_LIGHT_COLOR, topLightColor);
+        }
+
+        @Override
+        public CompoundTag getUpdateTag() {
+            return saveWithoutMetadata();
+        }
+
+        @Override
+        public Packet<ClientGamePacketListener> getUpdatePacket() {
+            return ClientboundBlockEntityDataPacket.create(this);
+        }
     }
 
     public enum EnumShape implements StringRepresentable {

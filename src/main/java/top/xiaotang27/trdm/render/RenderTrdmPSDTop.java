@@ -127,6 +127,10 @@ public class RenderTrdmPSDTop extends BlockEntityRendererMapper<BlockTrdmPSDTop.
             return;
         }
 
+        // 门楣上贴装的灯：模型 1 朝站台那侧；模型 2 / 3 朝轨道那侧。
+        // 画在站台 ID 判断之前：没选站台的门楣也要能看到灯。
+        TrdmLightRenderer.renderAttachment(state, entity, matrices, vertexConsumers, light);
+
         final long platformId = entity.getPlatformId(ClientData.PLATFORMS, ClientData.DATA_CACHE);
         if (platformId == 0) {
             return;

@@ -220,9 +220,15 @@ public final class TrdmModel {
         return new Vec3((rx + 8F) / 16F, point[1] / 16F, (rz + 8F) / 16F);
     }
 
-    /** 画一个带 UV 的面（UV 用 0~16 的方块纹理坐标）。 */
+    /** 画一个带 UV 的面（UV 用 0~16 的方块纹理坐标），颜色纯白。 */
     public static void emit(Matrix4f pose, VertexConsumer vertexConsumer, Vec3[] corners, Face face,
                             Vec3 outward, int light) {
+        emit(pose, vertexConsumer, corners, face, outward, light, IGui.ARGB_WHITE);
+    }
+
+    /** 画一个带 UV 的面；{@code argb} 用来给可染色灯的 color 贴图着色。 */
+    public static void emit(Matrix4f pose, VertexConsumer vertexConsumer, Vec3[] corners, Face face,
+                            Vec3 outward, int light, int argb) {
         final float[] us = {face.u2() / 16F, face.u1() / 16F, face.u1() / 16F, face.u2() / 16F};
         final float[] vs = {face.v1() / 16F, face.v1() / 16F, face.v2() / 16F, face.v2() / 16F};
         final Vec3 ab = corners[1].subtract(corners[0]);
@@ -233,7 +239,7 @@ public final class TrdmModel {
             final int actual = reversed ? 3 - index : index;
             final Vec3 corner = corners[actual];
             vertexConsumer.vertex(pose, (float) corner.x, (float) corner.y, (float) corner.z)
-                    .color(IGui.ARGB_WHITE)
+                    .color(argb)
                     .uv(us[actual], vs[actual])
                     .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
                     .uv2(light)
