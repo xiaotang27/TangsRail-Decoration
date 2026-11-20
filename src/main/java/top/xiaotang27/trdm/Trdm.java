@@ -43,6 +43,10 @@ import top.xiaotang27.trdm.block.BlockTicketVendingMachine;
 import top.xiaotang27.trdm.block.BlockCustomerServiceTerminal;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePaving;
 import top.xiaotang27.trdm.block.BlockTrdmTactilePavingStep;
+import top.xiaotang27.trdm.block.BlockTrdmMarbleFloor;
+import top.xiaotang27.trdm.block.BlockTrdmCeiling;
+import top.xiaotang27.trdm.block.BlockTrdmDecorativeSlab;
+import top.xiaotang27.trdm.block.BlockTrdmDecorativePlate;
 import top.xiaotang27.trdm.item.ItemTrdmPSD;
 import top.xiaotang27.trdm.item.ItemTrdmPSDLight;
 import top.xiaotang27.trdm.item.ItemTrdmWallLight;
@@ -102,6 +106,20 @@ public class Trdm implements ModInitializer {
     public static final BlockTrdmPSDExtension PSD_EXTENSION = new BlockTrdmPSDExtension();
     /** 墙上的荧光灯管：可独立贴天花板 / 墙面，也可贴装到门楣 / 延伸板上。 */
     public static final BlockTrdmWallLight WALL_LIGHT = new BlockTrdmWallLight();
+    /** 大理石地板（样式 1）：深灰斑点石材，普通整方块。 */
+    public static final BlockTrdmMarbleFloor MARBLE_FLOOR_1 = new BlockTrdmMarbleFloor();
+    /** 大理石地板（样式 2）：米白大理石，普通整方块。 */
+    public static final BlockTrdmMarbleFloor MARBLE_FLOOR_2 = new BlockTrdmMarbleFloor();
+    /** 天花板：穿孔金属吊顶板，普通整方块。 */
+    public static final BlockTrdmCeiling CEILING = new BlockTrdmCeiling();
+    /** 半砖版本：原版 SlabBlock（上下两半 / 两片合体 / 含水）。 */
+    public static final BlockTrdmDecorativeSlab MARBLE_FLOOR_1_SLAB = BlockTrdmDecorativeSlab.stone();
+    public static final BlockTrdmDecorativeSlab MARBLE_FLOOR_2_SLAB = BlockTrdmDecorativeSlab.stone();
+    public static final BlockTrdmDecorativeSlab CEILING_SLAB = BlockTrdmDecorativeSlab.metal();
+    /** 薄板版本：1/16 格厚的贴面，点底面吊顶、点顶面铺地。 */
+    public static final BlockTrdmDecorativePlate MARBLE_FLOOR_1_PLATE = BlockTrdmDecorativePlate.stone();
+    public static final BlockTrdmDecorativePlate MARBLE_FLOOR_2_PLATE = BlockTrdmDecorativePlate.stone();
+    public static final BlockTrdmDecorativePlate CEILING_PLATE = BlockTrdmDecorativePlate.metal();
     /** 屏蔽门端门：门楣 + 可旋开的门 + 固定玻璃。 */
 
     // 物品（与 MTR 一致：门楣没有独立物品，用玻璃物品放置）
@@ -128,6 +146,17 @@ public class Trdm implements ModInitializer {
             new BlockItem(TICKET_VENDING_MACHINE, new Item.Properties());
     public static final Item CUSTOMER_SERVICE_TERMINAL_ITEM =
             new BlockItem(CUSTOMER_SERVICE_TERMINAL, new Item.Properties());
+    /** 两种大理石地板 + 天花板：纯装饰方块，物品就是普通 BlockItem。 */
+    public static final Item MARBLE_FLOOR_1_ITEM = new BlockItem(MARBLE_FLOOR_1, new Item.Properties());
+    public static final Item MARBLE_FLOOR_2_ITEM = new BlockItem(MARBLE_FLOOR_2, new Item.Properties());
+    public static final Item CEILING_ITEM = new BlockItem(CEILING, new Item.Properties());
+    /** 半砖 / 薄板的物品，同样都是普通 BlockItem。 */
+    public static final Item MARBLE_FLOOR_1_SLAB_ITEM = new BlockItem(MARBLE_FLOOR_1_SLAB, new Item.Properties());
+    public static final Item MARBLE_FLOOR_2_SLAB_ITEM = new BlockItem(MARBLE_FLOOR_2_SLAB, new Item.Properties());
+    public static final Item CEILING_SLAB_ITEM = new BlockItem(CEILING_SLAB, new Item.Properties());
+    public static final Item MARBLE_FLOOR_1_PLATE_ITEM = new BlockItem(MARBLE_FLOOR_1_PLATE, new Item.Properties());
+    public static final Item MARBLE_FLOOR_2_PLATE_ITEM = new BlockItem(MARBLE_FLOOR_2_PLATE, new Item.Properties());
+    public static final Item CEILING_PLATE_ITEM = new BlockItem(CEILING_PLATE, new Item.Properties());
     public static final Item SINGLE_TICKET_ITEM = new ItemSingleTicket();
     public static final Item VARIABLE_TICKET_ITEM = new ItemVariableTicket();
     public static final Item TRANSIT_CARD_ITEM = new ItemTransitCard();
@@ -171,6 +200,15 @@ public class Trdm implements ModInitializer {
         registerBlock("wall_light", WALL_LIGHT);
         registerBlock("ticket_vending_machine", TICKET_VENDING_MACHINE);
         registerBlock("customer_service_terminal", CUSTOMER_SERVICE_TERMINAL);
+        registerBlock("marble_floor_1", MARBLE_FLOOR_1);
+        registerBlock("marble_floor_2", MARBLE_FLOOR_2);
+        registerBlock("ceiling", CEILING);
+        registerBlock("marble_floor_1_slab", MARBLE_FLOOR_1_SLAB);
+        registerBlock("marble_floor_2_slab", MARBLE_FLOOR_2_SLAB);
+        registerBlock("ceiling_slab", CEILING_SLAB);
+        registerBlock("marble_floor_1_plate", MARBLE_FLOOR_1_PLATE);
+        registerBlock("marble_floor_2_plate", MARBLE_FLOOR_2_PLATE);
+        registerBlock("ceiling_plate", CEILING_PLATE);
 
         registerItem("psd_door_1", PSD_DOOR_ITEM_1);
         registerItem("psd_glass_1", PSD_GLASS_ITEM_1);
@@ -190,6 +228,15 @@ public class Trdm implements ModInitializer {
         registerItem("psd_top_light_color", PSD_TOP_LIGHT_COLOR_ITEM);
         registerItem("ticket_vending_machine", TICKET_VENDING_MACHINE_ITEM);
         registerItem("customer_service_terminal", CUSTOMER_SERVICE_TERMINAL_ITEM);
+        registerItem("marble_floor_1", MARBLE_FLOOR_1_ITEM);
+        registerItem("marble_floor_2", MARBLE_FLOOR_2_ITEM);
+        registerItem("ceiling", CEILING_ITEM);
+        registerItem("marble_floor_1_slab", MARBLE_FLOOR_1_SLAB_ITEM);
+        registerItem("marble_floor_2_slab", MARBLE_FLOOR_2_SLAB_ITEM);
+        registerItem("ceiling_slab", CEILING_SLAB_ITEM);
+        registerItem("marble_floor_1_plate", MARBLE_FLOOR_1_PLATE_ITEM);
+        registerItem("marble_floor_2_plate", MARBLE_FLOOR_2_PLATE_ITEM);
+        registerItem("ceiling_plate", CEILING_PLATE_ITEM);
         registerItem("single_ticket", SINGLE_TICKET_ITEM);
         registerItem("variable_ticket", VARIABLE_TICKET_ITEM);
         registerItem("transit_card", TRANSIT_CARD_ITEM);
@@ -252,6 +299,15 @@ public class Trdm implements ModInitializer {
                     entries.accept(new ItemStack(PSD_TOP_LIGHT_COLOR_ITEM));
                     entries.accept(new ItemStack(TICKET_VENDING_MACHINE_ITEM));
                     entries.accept(new ItemStack(CUSTOMER_SERVICE_TERMINAL_ITEM));
+                    entries.accept(new ItemStack(MARBLE_FLOOR_1_ITEM));
+                    entries.accept(new ItemStack(MARBLE_FLOOR_2_ITEM));
+                    entries.accept(new ItemStack(CEILING_ITEM));
+                    entries.accept(new ItemStack(MARBLE_FLOOR_1_SLAB_ITEM));
+                    entries.accept(new ItemStack(MARBLE_FLOOR_2_SLAB_ITEM));
+                    entries.accept(new ItemStack(CEILING_SLAB_ITEM));
+                    entries.accept(new ItemStack(MARBLE_FLOOR_1_PLATE_ITEM));
+                    entries.accept(new ItemStack(MARBLE_FLOOR_2_PLATE_ITEM));
+                    entries.accept(new ItemStack(CEILING_PLATE_ITEM));
                     entries.accept(new ItemStack(SINGLE_TICKET_ITEM));
                     entries.accept(new ItemStack(VARIABLE_TICKET_ITEM));
                     entries.accept(new ItemStack(TRANSIT_CARD_ITEM));

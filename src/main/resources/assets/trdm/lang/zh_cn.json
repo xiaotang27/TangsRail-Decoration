@@ -667,5 +667,14 @@
   "gui.trdm.psd_light_color.invalid": "格式不正确",
   "gui.trdm.psd_light_color.done": "完成",
   "gui.trdm.psd_light_color.infect_hint": "底板颜色将跟随附近顶部灯的颜色",
-  "gui.trdm.psd_light_color.no_light": "无可染色的顶部灯"
+  "gui.trdm.psd_light_color.no_light": "无可染色的顶部灯",
+  "block.trdm.marble_floor_1": "大理石地板（样式 1）",
+  "block.trdm.marble_floor_2": "大理石地板（样式 2）",
+  "block.trdm.ceiling": "天花板",
+  "block.trdm.marble_floor_1_slab": "大理石地板台阶（样式 1）",
+  "block.trdm.marble_floor_2_slab": "大理石地板台阶（样式 2）",
+  "block.trdm.ceiling_slab": "天花板台阶",
+  "block.trdm.marble_floor_1_plate": "大理石地板薄板（样式 1）",
+  "block.trdm.marble_floor_2_plate": "大理石地板薄板（样式 2）",
+  "block.trdm.ceiling_plate": "天花板薄板"
 }

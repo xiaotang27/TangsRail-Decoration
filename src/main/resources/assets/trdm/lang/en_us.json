@@ -667,5 +667,14 @@
   "gui.trdm.psd_light_color.invalid": "Invalid format — use #RRGGBB",
   "gui.trdm.psd_light_color.done": "Done",
   "gui.trdm.psd_light_color.infect_hint": "Manual colors stay fixed; nearby connected lights that were not manually set follow this color",
-  "gui.trdm.psd_light_color.no_light": "This block has no dyeable top light"
+  "gui.trdm.psd_light_color.no_light": "This block has no dyeable top light",
+  "block.trdm.marble_floor_1": "Marble Floor (Style 1)",
+  "block.trdm.marble_floor_2": "Marble Floor (Style 2)",
+  "block.trdm.ceiling": "Ceiling Panel",
+  "block.trdm.marble_floor_1_slab": "Marble Floor Slab (Style 1)",
+  "block.trdm.marble_floor_2_slab": "Marble Floor Slab (Style 2)",
+  "block.trdm.ceiling_slab": "Ceiling Slab",
+  "block.trdm.marble_floor_1_plate": "Marble Floor Plate (Style 1)",
+  "block.trdm.marble_floor_2_plate": "Marble Floor Plate (Style 2)",
+  "block.trdm.ceiling_plate": "Ceiling Plate"
 }
