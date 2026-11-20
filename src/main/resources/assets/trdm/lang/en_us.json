@@ -396,7 +396,6 @@
   "gui.trdm.script.unsupported": "This editor does not support if/else yet; use JSON.",
   "gui.trdm.script.limit_statements": "At most 24 statements",
   "gui.trdm.script.limit_depth": "At most 4 nested levels",
-  "gui.trdm.script.limit_tiers": "At most 6 tiers",
   "gui.trdm.script.block.set_fare": "Set fare",
   "gui.trdm.script.block.add_fare": "Add fare",
   "gui.trdm.script.block.multiply_fare": "Multiply",

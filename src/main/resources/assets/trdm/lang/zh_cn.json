@@ -364,7 +364,6 @@
   "gui.trdm.script.unsupported": "当前界面暂不支持 if/否则，请用 JSON 编辑",
   "gui.trdm.script.limit_statements": "最多 24 条语句",
   "gui.trdm.script.limit_depth": "最多 4 层嵌套",
-  "gui.trdm.script.limit_tiers": "最多 6 行阶梯",
   "gui.trdm.script.block.set_fare": "设置票价",
   "gui.trdm.script.block.add_fare": "增加票价",
   "gui.trdm.script.block.multiply_fare": "乘以",

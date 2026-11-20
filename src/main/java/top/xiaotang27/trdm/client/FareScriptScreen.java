@@ -4156,11 +4156,6 @@ public final class FareScriptScreen extends Screen {
             });
         }
         button(x + 164, y + 42, 80, 18, Component.translatable("gui.trdm.script.add_row"), () -> {
-            if (table.tiers.size() >= 6) {
-                error = Component.translatable("gui.trdm.script.limit_tiers").getString();
-                rebuild();
-                return;
-            }
             double next = 10.0;
             if (!table.tiers.isEmpty()) {
                 final ScriptTier last = table.tiers.get(table.tiers.size() - 1);
