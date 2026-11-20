@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab",
+  "textures": {
+    "bottom": "trdm:block/marble_floor_1",
+    "top": "trdm:block/marble_floor_1",
+    "side": "trdm:block/marble_floor_1"
+  }
+}

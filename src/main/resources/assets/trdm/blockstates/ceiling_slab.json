@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "type=bottom": { "model": "trdm:block/ceiling_slab" },
+    "type=double": { "model": "trdm:block/ceiling" },
+    "type=top": { "model": "trdm:block/ceiling_slab_top" }
+  }
+}

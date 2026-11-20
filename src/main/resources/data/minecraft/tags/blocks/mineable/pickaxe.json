@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "values": [
+    "trdm:marble_floor_1",
+    "trdm:marble_floor_2",
+    "trdm:ceiling",
+    "trdm:marble_floor_1_slab",
+    "trdm:marble_floor_2_slab",
+    "trdm:ceiling_slab",
+    "trdm:marble_floor_1_plate",
+    "trdm:marble_floor_2_plate",
+    "trdm:ceiling_plate"
+  ]
+}

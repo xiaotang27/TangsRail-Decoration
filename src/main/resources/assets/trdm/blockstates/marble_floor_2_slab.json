@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "type=bottom": { "model": "trdm:block/marble_floor_2_slab" },
+    "type=double": { "model": "trdm:block/marble_floor_2" },
+    "type=top": { "model": "trdm:block/marble_floor_2_slab_top" }
+  }
+}

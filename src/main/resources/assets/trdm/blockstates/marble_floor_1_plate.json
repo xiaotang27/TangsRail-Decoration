@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "top=false": { "model": "trdm:block/marble_floor_1_plate" },
+    "top=true": { "model": "trdm:block/marble_floor_1_plate_top" }
+  }
+}

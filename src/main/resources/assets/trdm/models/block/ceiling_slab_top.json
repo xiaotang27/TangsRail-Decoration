@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "trdm:block/ceiling",
+    "top": "trdm:block/ceiling",
+    "side": "trdm:block/ceiling"
+  }
+}

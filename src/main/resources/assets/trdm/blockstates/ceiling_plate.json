@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "top=false": { "model": "trdm:block/ceiling_plate" },
+    "top=true": { "model": "trdm:block/ceiling_plate_top" }
+  }
+}
