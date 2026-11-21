@@ -107,6 +107,8 @@ public class TrdmClient implements ClientModInitializer {
                     @Override
                     public void onResourceManagerReload(net.minecraft.server.packs.resources.ResourceManager manager) {
                         TrdmMtrFonts.requestSync();
+                        // 站台门地面箭头缓存的是烘焙模型里的四边形，换资源包后要重新取
+                        top.xiaotang27.trdm.render.TrdmPlatformArrows.clearCache();
                     }
                 });
 

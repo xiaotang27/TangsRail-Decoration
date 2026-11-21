@@ -165,6 +165,11 @@ public class RenderTrdmPSDDoor<T extends BlockTrdmPSDDoor.TileEntityTrdmPSDDoor>
                 matricesNew.popPose();
             });
         }
+
+        if (!half) {
+            // 地面上的上下车引导箭头：MTR 只在自己的站台方块上画，这里补到门下任意方块上
+            TrdmPlatformArrows.render(world, pos, facing, overlay);
+        }
     }
 
     @Override
